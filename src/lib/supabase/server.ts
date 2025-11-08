@@ -41,3 +41,5 @@ export async function createWritableClient() {
     },
   });
 }
+// Back-compat: keep old import name working
+export { createRscClient as createClient };
