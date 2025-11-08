@@ -1,69 +1,96 @@
-'use client';
+/* ============================================
+   CHANGELOG
+   - 2025-11-08: Migrate signup to @supabase/ssr
+                 browser client (no auth-helpers).
+   ============================================
+*/
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getBrowserClient } from "@/lib/supabase/browser";
 
 export default function SignupPage() {
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const supabase = useMemo(() => getBrowserClient(), []);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  async function handleSignup(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    const { error } = await supabase.auth.signUp({ email, password });
-    setLoading(false);
-
-    if (error) {
-      setError(error.message);
-    } else {
-      router.push('/dashboard');          // or '/login' if you prefer
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        // If you use email confirmations, you can enable a redirect:
+        // options: { emailRedirectTo: `${location.origin}/auth/callback` },
+      });
+      if (error) {
+        setMsg(`Sign-up failed: ${error.message}`);
+      } else {
+        setMsg("Check your email for a verification link.");
+        // Optional: route to login after a moment
+        // setTimeout(() => router.push("/login"), 1200);
+      }
+    } catch (err: any) {
+      setMsg(`Unexpected error: ${err?.message || String(err)}`);
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 to-indigo-800 text-white">
-      <form
-        onSubmit={handleSignup}
-        className="bg-white/90 p-8 rounded-xl text-black w-full max-w-sm space-y-4 shadow"
-      >
-        <h1 className="text-2xl font-bold text-center">Create an Account</h1>
-
+    <main style={wrap}>
+      <h1 style={h1}>Create Your Account</h1>
+      <form onSubmit={onSubmit} style={card}>
+        <label style={label}>Email</label>
         <input
           type="email"
-          placeholder="Email"
+          style={input}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full border px-3 py-2 rounded"
+          placeholder="you@example.com"
         />
 
+        <label style={{ ...label, marginTop: 10 }}>Password</label>
         <input
           type="password"
-          placeholder="Password"
+          style={input}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="w-full border px-3 py-2 rounded"
+          minLength={6}
+          placeholder="••••••••"
         />
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-        >
-          {loading ? 'Signing up…' : 'Sign Up'}
+        <button type="submit" style={btn} disabled={busy}>
+          {busy ? "Creating…" : "Sign Up"}
         </button>
+
+        {msg && <p style={note}>{msg}</p>}
+
+        <p style={muted}>
+          Already have an account?{" "}
+          <a href="/login" style={link}>Login</a>
+        </p>
       </form>
     </main>
   );
 }
+
+/* minimal inline styles */
+const wrap: React.CSSProperties = { minHeight: "100vh", background: "#0b1423", color: "#e7efff", padding: 24 };
+const h1: React.CSSProperties = { margin: "0 0 16px 0", fontSize: 28 };
+const card: React.CSSProperties = { background: "#15243e", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, padding: 16, maxWidth: 460 };
+const label: React.CSSProperties = { display: "block", marginBottom: 6 };
+const input: React.CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.16)", background: "rgba(255,255,255,.06)", color: "#e7efff" };
+const btn: React.CSSProperties = { marginTop: 14, width: "100%", padding: "10px 14px", borderRadius: 10, background: "linear-gradient(135deg,#3b82f6,#7c3aed)", color: "#fff", border: "none", fontWeight: 700 };
+const note: React.CSSProperties = { marginTop: 10 };
+const muted: React.CSSProperties = { marginTop: 14, color: "#9db1d8" };
+const link: React.CSSProperties = { color: "#e7efff", textDecoration: "underline" };
