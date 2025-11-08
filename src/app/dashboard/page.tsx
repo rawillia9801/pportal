@@ -1,17 +1,17 @@
-// src/app/dashboard/page.tsx
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server"; // back-compat alias
+// src/app/dashboard/signout/route.ts
+import { NextResponse } from "next/server";
+import { createWritableClient } from "@/lib/supabase/server";
 
-export default async function Dashboard() {
-  const supabase = await createClient(); // <-- await
+export async function GET(request: Request) {
+  const supabase = await createWritableClient();
+  await supabase.auth.signOut();
+  const url = new URL("/login", new URL(request.url).origin);
+  return NextResponse.redirect(url);
+}
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  return (
-    <main style={{padding:24}}>
-      <h1>Dashboard</h1>
-      <p>Signed in as: {user.email}</p>
-    </main>
-  );
+export async function POST(request: Request) {
+  const supabase = await createWritableClient();
+  await supabase.auth.signOut();
+  const url = new URL("/login", new URL(request.url).origin);
+  return NextResponse.redirect(url);
 }

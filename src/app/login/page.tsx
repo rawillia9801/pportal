@@ -5,13 +5,13 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
-export default function LoginPage() {
+export default async function LoginPage() {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [mode, setMode] = useState<'password' | 'magic'>('password');
   const [msg, setMsg] = useState<string | null>(null);
   const r = useRouter();
-  const supabase = createClient();
+  const supabase = await createClient();
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();

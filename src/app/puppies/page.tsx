@@ -21,7 +21,7 @@ type Pup = {
 };
 
 export default async function PuppiesPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("available_puppies")
