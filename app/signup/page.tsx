@@ -5,16 +5,13 @@ export const revalidate = 0;
 
 /* ============================================
    CHANGELOG
-   - 2025-11-08: Client-only login; 'use client' first.
+   - 2025-11-08: Client-only signup; 'use client' first.
    ============================================
 */
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/browser";
 
-export default function LoginPage() {
-  const router = useRouter();
-
+export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,31 +22,27 @@ export default function LoginPage() {
     setBusy(true);
     setMsg(null);
 
-    const supabase = getBrowserClient(); // created in browser only
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const supabase = getBrowserClient();
+    const { error } = await supabase.auth.signUp({
+      email, password,
+      // options: { emailRedirectTo: `${location.origin}/auth/callback` }
+    });
 
-    if (error) setMsg(error.message);
-    else router.replace("/dashboard");
-
+    if (error) setMsg(`Sign-up failed: ${error.message}`);
+    else setMsg("Check your email for a verification link.");
     setBusy(false);
   }
 
   return (
     <main style={wrap}>
-      <h1 style={h1}>Login</h1>
+      <h1 style={h1}>Create Your Account</h1>
       <form onSubmit={onSubmit} style={card}>
         <label style={label}>Email</label>
         <input type="email" style={input} value={email} onChange={(e)=>setEmail(e.target.value)} required />
-
         <label style={{...label, marginTop:10}}>Password</label>
-        <input type="password" style={input} value={password} onChange={(e)=>setPassword(e.target.value)} required />
-
-        <button type="submit" style={btn} disabled={busy}>
-          {busy ? "Signing in…" : "Sign In"}
-        </button>
-
+        <input type="password" style={input} value={password} onChange={(e)=>setPassword(e.target.value)} required minLength={6} />
+        <button type="submit" style={btn} disabled={busy}>{busy ? "Creating…" : "Sign Up"}</button>
         {msg && <p style={note}>{msg}</p>}
-        <p style={muted}>No account? <a href="/signup" style={link}>Create one</a></p>
       </form>
     </main>
   );
@@ -62,5 +55,3 @@ const label: React.CSSProperties = { display:"block", marginBottom:6 };
 const input: React.CSSProperties = { width:"100%", padding:"10px 12px", borderRadius:8, border:"1px solid rgba(255,255,255,.16)", background:"rgba(255,255,255,.06)", color:"#e7efff" };
 const btn: React.CSSProperties = { marginTop:14, width:"100%", padding:"10px 14px", borderRadius:10, background:"linear-gradient(135deg,#3b82f6,#7c3aed)", color:"#fff", border:"none", fontWeight:700 };
 const note: React.CSSProperties = { marginTop:10 };
-const muted: React.CSSProperties = { marginTop:14, color:"#9db1d8" };
-const link: React.CSSProperties = { color:"#e7efff", textDecoration:"underline" };
