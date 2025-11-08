@@ -1,3 +1,6 @@
+// add at very top of each client page that touches Supabase
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 /* ============================================
    CHANGELOG
    - 2025-11-08: Client-side email/password login
