@@ -1,194 +1,223 @@
-'use client';
+/* ============================================
+   CHANGELOG
+   - 2025-11-08: Migrate from @supabase/auth-helpers-nextjs
+                 to @supabase/ssr browser client.
+                 Add minimal working Add Sale form.
+   ============================================
+   ANCHOR: SALES_ADD_PAGE
+*/
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getBrowserClient } from "@/lib/supabase/browser";
 
-type Platform = 'Walmart' | 'Walmart WFS' | 'eBay' | 'Puppies' | 'Other';
-type Category = 'Pet Supplies' | 'Electronics' | 'Apparel' | 'Miscellaneous';
+type Platform = "Walmart" | "Walmart WFS" | "eBay" | "Puppies" | "Other";
+type Category = "Pet Supplies" | "Electronics" | "Apparel" | "Miscellaneous";
 
-export default function AddSalePage() {
-  const supabase = createClientComponentClient();
+type FormState = {
+  platform: Platform;
+  category: Category;
+  item_name: string;
+  salesprice: number;
+  cost: number;
+  shippingcost: number;
+  commission: number;
+  transactiontype: "Sale";
+};
+
+export default function AddSale() {
   const router = useRouter();
+  const supabase = useMemo(() => getBrowserClient(), []);
 
-  const [platform, setPlatform] = useState<Platform>('Walmart');
-  const [category, setCategory] = useState<Category>('Pet Supplies');
-  const [productName, setProductName] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [priceEach, setPriceEach] = useState(0);
-  const [shippingCost, setShippingCost] = useState(0);
-  const [cogs, setCogs] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>({
+    platform: "Walmart",
+    category: "Pet Supplies",
+    item_name: "",
+    salesprice: 0,
+    cost: 0,
+    shippingcost: 0,
+    commission: 0.15, // 15% default for Walmart/WFS (you can change per platform below)
+    transactiontype: "Sale",
+  });
 
-  const [commissionRate, setCommissionRate] = useState<number | null>(null);
-  const [feeAmount, setFeeAmount] = useState(0);
-  const [error, setError] = useState('');
+  // Auto-commission helper per platform (adjust as you wish)
+  function defaultCommission(p: Platform) {
+    if (p === "Walmart" || p === "Walmart WFS") return 0.15;
+    if (p === "eBay") return 0.13; // example
+    if (p === "Puppies") return 0; // no marketplace fee
+    return 0.1; // Other
+  }
 
-  // Fetch the commission rate whenever platform/category changes
-  useEffect(() => {
-    if (!platform || !category) return;
-
-    (async () => {
-      const { data, error } = await supabase
-        .from('commission_rates')
-        .select('rate_pct')
-        .eq('platform', platform)
-        .eq('category', category)
-        .single();
-
-      if (error) {
-        setError(error.message);
-        setCommissionRate(null);
-        setFeeAmount(0);
-      } else if (data) {
-        setCommissionRate(data.rate_pct);
-        const fee =
-          Number(data.rate_pct) *
-          Number(priceEach) *
-          Number(quantity || 1);
-        setFeeAmount(fee);
-      }
-    })();
-  }, [platform, category, priceEach, quantity]);
+  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    setSubmitting(true);
+    setMsg(null);
+    try {
+      // Profit = salesprice - cost - shippingcost - (salesprice * commission)
+      const commissionAmount = form.salesprice * Number(form.commission || 0);
+      const profit =
+        Number(form.salesprice || 0) -
+        Number(form.cost || 0) -
+        Number(form.shippingcost || 0) -
+        commissionAmount;
 
-    const { error } = await supabase.from('platform_sales').insert([
-      {
-        platform,
-        sale_date: new Date().toISOString().slice(0, 10), // today
-        product_name: productName,
-        quantity,
-        price_each: priceEach,
-        shipping_cost: shippingCost,
-        commission_fee: feeAmount,
-        cogs,
-        category,
-      },
-    ]);
+      const payload = {
+        created_at: new Date().toISOString(),
+        platform: form.platform,
+        category: form.category,
+        name: form.item_name,
+        salesprice: Number(form.salesprice),
+        cost: Number(form.cost),
+        shippingcost: Number(form.shippingcost),
+        commission: commissionAmount,
+        profit,
+        transactiontype: form.transactiontype, // "Sale"
+      };
 
-    if (error) {
-      setError(error.message);
-    } else {
-      alert('Sale recorded!');
-      router.push('/dashboard');
+      const { error } = await supabase.from("transactions").insert(payload);
+
+      if (error) {
+        setMsg(`Save failed: ${error.message}`);
+      } else {
+        setMsg("Saved ✅");
+        // go back to list or dashboard if you have one:
+        // router.push("/sales");
+      }
+    } catch (err: any) {
+      setMsg(`Unexpected error: ${err?.message || String(err)}`);
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md bg-white p-8 rounded-lg shadow space-y-4"
-      >
-        <h1 className="text-2xl font-bold mb-2 text-center">
-          Record a Platform Sale
-        </h1>
+    <main style={wrap}>
+      <h1 style={h1}>Add Sale</h1>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-
-        {/* Platform */}
-        <div>
-          <label className="block text-sm font-medium text-gray-800">
-            Platform
-          </label>
+      <form onSubmit={handleSubmit} style={card}>
+        <div style={row}>
+          <label style={label}>Platform</label>
           <select
-            value={platform}
-            onChange={(e) => setPlatform(e.target.value as Platform)}
-            className="w-full border px-3 py-2 mt-1 rounded"
+            value={form.platform}
+            onChange={(e) => {
+              const p = e.target.value as Platform;
+              update("platform", p);
+              update("commission", defaultCommission(p));
+            }}
+            style={input}
           >
-            <option value="Walmart">Walmart</option>
-            <option value="Walmart WFS">Walmart WFS</option>
-            <option value="eBay">eBay</option>
-            <option value="Puppies">Puppies</option>
-            <option value="Other">Other</option>
+            <option>Walmart</option>
+            <option>Walmart WFS</option>
+            <option>eBay</option>
+            <option>Puppies</option>
+            <option>Other</option>
           </select>
         </div>
 
-        {/* Category */}
-        <div>
-          <label className="block text-sm font-medium text-gray-800">
-            Category
-          </label>
+        <div style={row}>
+          <label style={label}>Category</label>
           <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as Category)}
-            className="w-full border px-3 py-2 mt-1 rounded"
+            value={form.category}
+            onChange={(e) => update("category", e.target.value as Category)}
+            style={input}
           >
-            <option value="Pet Supplies">Pet Supplies</option>
-            <option value="Electronics">Electronics</option>
-            <option value="Apparel">Apparel</option>
-            <option value="Miscellaneous">Miscellaneous</option>
+            <option>Pet Supplies</option>
+            <option>Electronics</option>
+            <option>Apparel</option>
+            <option>Miscellaneous</option>
           </select>
         </div>
 
-        {/* Product Name */}
-        <input
-          type="text"
-          placeholder="Product name"
-          value={productName}
-          onChange={(e) => setProductName(e.target.value)}
-          className="w-full border px-3 py-2"
-          required
-        />
+        <div style={row}>
+          <label style={label}>Item Name</label>
+          <input
+            value={form.item_name}
+            onChange={(e) => update("item_name", e.target.value)}
+            style={input}
+            placeholder="What sold?"
+            required
+          />
+        </div>
 
-        {/* Quantity */}
-        <input
-          type="number"
-          placeholder="Quantity"
-          value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
-          className="w-full border px-3 py-2"
-          required
-        />
+        <div style={grid}>
+          <div style={col}>
+            <label style={label}>Sales Price</label>
+            <input
+              type="number"
+              step="0.01"
+              value={form.salesprice}
+              onChange={(e) => update("salesprice", Number(e.target.value))}
+              style={input}
+              required
+            />
+          </div>
+          <div style={col}>
+            <label style={label}>Cost of Goods</label>
+            <input
+              type="number"
+              step="0.01"
+              value={form.cost}
+              onChange={(e) => update("cost", Number(e.target.value))}
+              style={input}
+              required
+            />
+          </div>
+          <div style={col}>
+            <label style={label}>Shipping Cost</label>
+            <input
+              type="number"
+              step="0.01"
+              value={form.shippingcost}
+              onChange={(e) => update("shippingcost", Number(e.target.value))}
+              style={input}
+            />
+          </div>
+          <div style={col}>
+            <label style={label}>Commission (rate)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={form.commission}
+              onChange={(e) => update("commission", Number(e.target.value))}
+              style={input}
+            />
+            <small style={muted}>
+              Example: 0.15 = 15% (auto-updates when you change platform)
+            </small>
+          </div>
+        </div>
 
-        {/* Price Each */}
-        <input
-          type="number"
-          placeholder="Price each ($)"
-          value={priceEach}
-          onChange={(e) => setPriceEach(Number(e.target.value))}
-          className="w-full border px-3 py-2"
-          step="0.01"
-          required
-        />
+        <div style={{ ...row, marginTop: 14 }}>
+          <button type="submit" disabled={submitting} style={btnPrimary}>
+            {submitting ? "Saving…" : "Save Sale"}
+          </button>
+        </div>
 
-        {/* Shipping Cost */}
-        <input
-          type="number"
-          placeholder="Shipping cost ($)"
-          value={shippingCost}
-          onChange={(e) => setShippingCost(Number(e.target.value))}
-          className="w-full border px-3 py-2"
-          step="0.01"
-        />
-
-        {/* COGS */}
-        <input
-          type="number"
-          placeholder="COGS ($)"
-          value={cogs}
-          onChange={(e) => setCogs(Number(e.target.value))}
-          className="w-full border px-3 py-2"
-          step="0.01"
-        />
-
-        {/* Auto-calculated commission fee */}
-        <input
-          type="text"
-          readOnly
-          value={commissionRate !== null ? feeAmount.toFixed(2) : 'N/A'}
-          className="w-full border px-3 py-2 bg-gray-100 text-gray-700"
-        />
-
-        <button
-          type="submit"
-          className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-        >
-          Record Sale
-        </button>
+        {msg && (
+          <div style={{ marginTop: 10, color: msg.includes("✅") ? "#2fa36b" : "#cc3344" }}>
+            {msg}
+          </div>
+        )}
       </form>
-    </div>
+    </main>
   );
 }
+
+/* Minimal inline styles to avoid styled-jsx */
+const wrap: React.CSSProperties = { padding: 24, color: "#e7efff", background: "#0b1423", minHeight: "100vh" };
+const h1: React.CSSProperties = { margin: "0 0 16px 0", fontSize: 28 };
+const card: React.CSSProperties = { background: "#15243e", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, padding: 16, maxWidth: 820 };
+const row: React.CSSProperties = { display: "flex", gap: 12, marginBottom: 12, alignItems: "center" };
+const label: React.CSSProperties = { minWidth: 140 };
+const input: React.CSSProperties = { flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.16)", background: "rgba(255,255,255,.06)", color: "#e7efff" };
+const grid: React.CSSProperties = { display: "grid", gap: 12, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" };
+const col: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6 };
+const btnPrimary: React.CSSProperties = { padding: "10px 14px", borderRadius: 10, background: "linear-gradient(135deg,#3b82f6,#7c3aed)", color: "#fff", border: "none", fontWeight: 700 };
+const muted: React.CSSProperties = { color: "#9db1d8" };
