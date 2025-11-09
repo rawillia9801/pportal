@@ -1,20 +1,19 @@
 "use client";
-export const prerender = false;
-export const fetchCache = "force-no-store";
-export const dynamic = "force-dynamic"; // remove any `revalidate` export
 
 /* ============================================
    CHANGELOG
-   - 2025-11-08: Client-only login; 'use client' first.
+   - 2025-11-09: Remove invalid `prerender` export.
+   - 2025-11-08: Client-only login page.
    ============================================
+   ANCHOR: LOGIN_PAGE
 */
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/browser";
 
 export default function LoginPage() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,7 +24,7 @@ export default function LoginPage() {
     setBusy(true);
     setMsg(null);
 
-    const supabase = getBrowserClient(); // created in browser only
+    const supabase = getBrowserClient(); // browser-only client
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) setMsg(error.message);
@@ -39,22 +38,37 @@ export default function LoginPage() {
       <h1 style={h1}>Login</h1>
       <form onSubmit={onSubmit} style={card}>
         <label style={label}>Email</label>
-        <input type="email" style={input} value={email} onChange={(e)=>setEmail(e.target.value)} required />
+        <input
+          type="email"
+          style={input}
+          value={email}
+          onChange={(e)=>setEmail(e.target.value)}
+          required
+        />
 
         <label style={{...label, marginTop:10}}>Password</label>
-        <input type="password" style={input} value={password} onChange={(e)=>setPassword(e.target.value)} required />
+        <input
+          type="password"
+          style={input}
+          value={password}
+          onChange={(e)=>setPassword(e.target.value)}
+          required
+        />
 
         <button type="submit" style={btn} disabled={busy}>
           {busy ? "Signing in…" : "Sign In"}
         </button>
 
         {msg && <p style={note}>{msg}</p>}
-        <p style={muted}>No account? <a href="/signup" style={link}>Create one</a></p>
+        <p style={muted}>
+          No account? <a href="/signup" style={link}>Create one</a>
+        </p>
       </form>
     </main>
   );
 }
 
+/* ---- styles ---- */
 const wrap: React.CSSProperties = { minHeight:"100vh", background:"#0b1423", color:"#e7efff", padding:24 };
 const h1: React.CSSProperties = { margin:"0 0 16px 0", fontSize:28 };
 const card: React.CSSProperties = { background:"#15243e", border:"1px solid rgba(255,255,255,.08)", borderRadius:12, padding:16, maxWidth:460 };
