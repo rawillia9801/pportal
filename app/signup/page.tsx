@@ -84,4 +84,3 @@ const btn: React.CSSProperties = { marginTop:14, width:"100%", padding:"10px 14p
 const note: React.CSSProperties = { marginTop:10 };
 const muted: React.CSSProperties = { marginTop:14, color:"#9db1d8" };
 const link: React.CSSProperties = { color:"#e7efff", textDecoration:"underline" };
-v
