@@ -1,4 +1,6 @@
 "use client";
+export const prerender = false;
+export const fetchCache = "force-no-store";
 export const dynamic = "force-dynamic"; // remove any `revalidate` export
 
 /* ============================================

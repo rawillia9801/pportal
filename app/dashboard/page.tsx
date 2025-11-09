@@ -6,7 +6,11 @@ export const dynamic = "force-dynamic";
    - 2025-11-08: Polished dashboard with sidebar,
      dark blue gradient to match landing, client auth.
    ============================================ */
-import { useEffect, useMemo, useState } from "react";
+export const dynamic = "force-dynamic";
+export const prerender = false;
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+   import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/browser";
 
