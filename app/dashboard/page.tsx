@@ -1,13 +1,10 @@
 "use client";
-
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "force-no-store";
 
 /* ============================================
    CHANGELOG
-   - 2025-11-08: Polished dashboard with sidebar,
-     dark blue gradient to match landing, client auth.
+   - 2025-11-09: Dashboard (client-only); remove revalidate/fetchCache.
+   ANCHOR: DASHBOARD_PAGE
    ============================================ */
 
 import { useEffect, useMemo, useState } from "react";
@@ -89,7 +86,7 @@ export default function Dashboard() {
   );
 }
 
-/* ---- Styles (inline to keep it single-file) ---- */
+/* ---- Styles ---- */
 const shell: React.CSSProperties = {
   minHeight: "100vh",
   display: "grid",
@@ -100,66 +97,39 @@ const shell: React.CSSProperties = {
     "#0b1423",
   color: "#e7efff",
 };
-
 const side: React.CSSProperties = {
   borderRight: "1px solid rgba(255,255,255,.08)",
   padding: "24px 18px",
-  background:
-    "linear-gradient(180deg, rgba(21,36,62,.95), rgba(11,20,35,.95))",
+  background: "linear-gradient(180deg, rgba(21,36,62,.95), rgba(11,20,35,.95))",
   backdropFilter: "blur(4px)",
 };
-
 const brand: React.CSSProperties = {
-  fontWeight: 800,
-  letterSpacing: ".6px",
-  lineHeight: 1.05,
-  fontSize: 22,
-  marginBottom: 18,
+  fontWeight: 800, letterSpacing: ".6px", lineHeight: 1.05, fontSize: 22, marginBottom: 18,
 };
-
 const nav: React.CSSProperties = { display: "grid", gap: 6, marginTop: 6 };
 const item: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 10,
-  textDecoration: "none",
-  color: "#e7efff",
+  padding: "10px 12px", borderRadius: 10, textDecoration: "none", color: "#e7efff",
   border: "1px solid transparent",
 };
 const active: React.CSSProperties = {
-  background: "rgba(255,255,255,.06)",
-  borderColor: "rgba(255,255,255,.12)",
+  background: "rgba(255,255,255,.06)", borderColor: "rgba(255,255,255,.12)",
 };
-
 const signout: React.CSSProperties = {
-  marginTop: "auto",
-  width: "100%",
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,.18)",
-  background: "transparent",
-  color: "#e7efff",
-  cursor: "pointer",
+  marginTop: "auto", width: "100%", padding: "10px 12px", borderRadius: 10,
+  border: "1px solid rgba(255,255,255,.18)", background: "transparent",
+  color: "#e7efff", cursor: "pointer",
 };
-
 const main: React.CSSProperties = { padding: 24 };
 const header: React.CSSProperties = { marginBottom: 14 };
 const h1: React.CSSProperties = { margin: 0, fontSize: 40, letterSpacing: .3 };
 const signedIn: React.CSSProperties = { margin: "8px 0 0 0", opacity: .9 };
-
 const cards: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))",
-  gap: 14,
-  marginTop: 10,
+  display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))",
+  gap: 14, marginTop: 10,
 };
 const card: React.CSSProperties = {
-  display: "block",
-  padding: 16,
-  borderRadius: 14,
-  background: "rgba(255,255,255,.06)",
-  border: "1px solid rgba(255,255,255,.10)",
-  textDecoration: "none",
-  color: "#e7efff",
+  display: "block", padding: 16, borderRadius: 14, background: "rgba(255,255,255,.06)",
+  border: "1px solid rgba(255,255,255,.10)", textDecoration: "none", color: "#e7efff",
 };
 const cardTitle: React.CSSProperties = { margin: "0 0 6px 0", fontSize: 18 };
 const cardBody: React.CSSProperties = { margin: 0, opacity: .9 };
