@@ -19,7 +19,8 @@ type Puppy = {
 };
 
 export default async function PuppiesPage() {
-  const supabase = createRscClient();
+  // NOTE: createRscClient() returns a Promise in your codebase → await it
+  const supabase = await createRscClient();
 
   const { data, error } = await supabase
     .from("puppies")
@@ -44,7 +45,7 @@ export default async function PuppiesPage() {
 
       <section style={grid}>
         {puppies.map((p) => {
-          const title = p.name ?? `Puppy ${p.id.slice(0, 6)}`;
+          const title = p.name ?? `Puppy ${p.id?.slice?.(0, 6) ?? ""}`;
           const price =
             typeof p.price === "number" ? `$${p.price.toLocaleString()}` : "—";
           const status = p.status ?? "Available";
@@ -57,7 +58,7 @@ export default async function PuppiesPage() {
             Array.isArray(p.photos) && p.photos.length ? p.photos[0] : undefined;
 
           return (
-            <Link key={p.id} href={`/puppies/${p.id}`} style={card} prefetch={false}>
+            <Link key={p.id} href={`/puppies/${p.id ?? ""}`} style={card} prefetch={false}>
               <div style={thumbWrap}>
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
