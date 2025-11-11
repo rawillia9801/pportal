@@ -3,17 +3,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getBrowserClient } from "@/lib/supabase/client";
+// If your helper lives at "@/lib/supabase/browser", import from there.
+// (This avoids the “not exported from …/client” build error.)
+import { getBrowserClient } from "@/lib/supabase/browser";
+
+type Gender = "Male" | "Female";
+type Status = "Available" | "Reserved" | "Sold";
 
 type PupForm = {
   name: string;
-  price: string; // keep as string for the input, convert on submit
-  gender: string;
-  registry: string; // AKC/CKC/ACA
-  status: "Available" | "Reserved" | "Sold";
-  dob: string;        // YYYY-MM-DD
-  ready_date: string; // YYYY-MM-DD
-  photo: string;      // single URL (we’ll wrap into an array)
+  price: string;       // keep string for input; convert on submit
+  gender: Gender;
+  registry: string;    // AKC/CKC/ACA (free text or picklist)
+  status: Status;
+  dob: string;         // YYYY-MM-DD
+  ready_date: string;  // YYYY-MM-DD
+  photo: string;       // single URL (wrapped to array on submit)
 };
 
 export default function AdminPuppiesPage() {
@@ -28,7 +33,7 @@ export default function AdminPuppiesPage() {
   const [f, setF] = useState<PupForm>({
     name: "",
     price: "",
-    gender: "",
+    gender: "Male",
     registry: "",
     status: "Available",
     dob: "",
@@ -59,34 +64,38 @@ export default function AdminPuppiesPage() {
 
     setMsg(null);
     setSaving(true);
-    try {
-      const priceNum =
-        f.price.trim() === "" ? null : Number.isFinite(Number(f.price)) ? Number(f.price) : null;
 
-      // IMPORTANT: photos must never be null if the column is NOT NULL.
-      // Wrap single photo into an array; if empty, use [].
+    try {
+      // Parse price safely (allow empty)
+      const priceNum =
+        f.price.trim() === ""
+          ? null
+          : Number.isFinite(Number(f.price))
+          ? Number(f.price)
+          : null;
+
+      // photos must never be NULL; [] is safe if your column is NOT NULL
+      // (Do NOT add a non-empty CHECK unless you always require a photo.)
       const photos = f.photo.trim() ? [f.photo.trim()] : [];
 
-      // Type-safe status to satisfy CHECK constraint ('Available'|'Reserved'|'Sold')
-      const status: "Available" | "Reserved" | "Sold" = f.status;
-
+      // Build row matching DB column names
       const insertRow = {
         name: f.name || null,
         price: priceNum,
-        gender: f.gender || null,
+        gender: f.gender as Gender,          // satisfies puppies_gender_check
         registry: f.registry || null,
-        status,
+        status: f.status as Status,          // satisfies puppies_status_check
         dob: f.dob || null,
         ready_date: f.ready_date || null,
-        photos, // <- array (never null)
-        // created_at handled by default if you set it in DB; remove if you don’t have that column
+        photos,                              // NEVER null
+        // created_at: default now() in DB (omit here)
       };
 
       const { error } = await supabase.from("puppies").insert([insertRow]);
       if (error) throw error;
 
       setMsg("Saved. Redirecting to Available Puppies…");
-      setTimeout(() => r.replace("/available-puppies"), 700);
+      setTimeout(() => r.replace("/puppies"), 700);
     } catch (err: any) {
       setMsg(err?.message || "Save failed.");
     } finally {
@@ -110,26 +119,33 @@ export default function AdminPuppiesPage() {
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
         <Field label="Name">
-          <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          <input
+            required
+            value={f.name}
+            onChange={(e) => setF({ ...f, name: e.target.value })}
+          />
         </Field>
 
         <Field label="Price (USD)">
           <input
             inputMode="decimal"
+            placeholder="e.g., 1800"
             value={f.price}
             onChange={(e) => setF({ ...f, price: e.target.value })}
           />
         </Field>
 
         <Field label="Gender">
-          <input
+          <select
             value={f.gender}
-            onChange={(e) => setF({ ...f, gender: e.target.value })}
-            placeholder="Male / Female"
-          />
+            onChange={(e) => setF({ ...f, gender: e.target.value as Gender })}
+          >
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
         </Field>
 
-        <Field label="Registry (AKC/CKC/ACA)">
+        <Field label="Registry (AKC / CKC / ACA)">
           <input
             value={f.registry}
             onChange={(e) => setF({ ...f, registry: e.target.value })}
@@ -140,16 +156,20 @@ export default function AdminPuppiesPage() {
         <Field label="Status">
           <select
             value={f.status}
-            onChange={(e) => setF({ ...f, status: e.target.value as any })}
+            onChange={(e) => setF({ ...f, status: e.target.value as Status })}
           >
-            <option>Available</option>
-            <option>Reserved</option>
-            <option>Sold</option>
+            <option value="Available">Available</option>
+            <option value="Reserved">Reserved</option>
+            <option value="Sold">Sold</option>
           </select>
         </Field>
 
         <Field label="DOB">
-          <input type="date" value={f.dob} onChange={(e) => setF({ ...f, dob: e.target.value })} />
+          <input
+            type="date"
+            value={f.dob}
+            onChange={(e) => setF({ ...f, dob: e.target.value })}
+          />
         </Field>
 
         <Field label="Ready Date">
@@ -166,6 +186,9 @@ export default function AdminPuppiesPage() {
             onChange={(e) => setF({ ...f, photo: e.target.value })}
             placeholder="https://…"
           />
+          <small style={{ color: "#666" }}>
+            Leave blank if you don’t have a photo yet (you can add one later).
+          </small>
         </Field>
 
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -197,6 +220,8 @@ function Field(props: { label: string; children: React.ReactNode }) {
           border: 1px solid #ddd;
           border-radius: 10px;
           outline: none;
+          background: #fff;
+          color: #111;
         }
         input:focus,
         select:focus {
