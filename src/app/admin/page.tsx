@@ -6,9 +6,9 @@
                  Tabs: Overview, Puppies, Litters, Applications,
                  Buyers, Payments, Messages, Documents,
                  Transportation, Reports, Settings.
-                 Fixed sidebar (no fade), pro styling, admin gate.
-   - 2025-11-11 (fix): Functions defined before effects,
-                       newline escape in join('\n'), type tweaks.
+                 Fixed sidebar, professional styling, admin gate.
+   - 2025-11-11 (fix): Define loaders before effects; use NL constant
+                       to avoid accidental hard linebreaks in join().
    ============================================
    ANCHOR: IMPORTS & CLIENT
 */
@@ -96,6 +96,8 @@ type Transport = {
    ANCHOR: CONFIG
 */
 const ADMIN_EMAIL = 'rawillia9809@gmail.com';
+const NL = String.fromCharCode(10);
+
 type TabKey =
   | 'overview'
   | 'puppies'
@@ -178,6 +180,7 @@ export default function AdminDashboardPage() {
       maximumFractionDigits: 2,
     })}`;
   }
+
   function titleFor(t: TabKey) {
     return (
       {
@@ -195,6 +198,7 @@ export default function AdminDashboardPage() {
       } as const
     )[t];
   }
+
   function Badge({ status }: { status?: string | null }) {
     const norm = (status || '').toLowerCase();
     const cls = norm === 'sold' ? 'danger' : norm === 'reserved' ? 'warn' : 'ok';
@@ -214,6 +218,7 @@ export default function AdminDashboardPage() {
     } catch {
       setKpiPuppies('—');
     }
+
     try {
       const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
       const { count } = await supabase
@@ -225,6 +230,7 @@ export default function AdminDashboardPage() {
     } catch {
       setKpiApps('—');
     }
+
     try {
       const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
       const { data } = await supabase
@@ -240,6 +246,7 @@ export default function AdminDashboardPage() {
       );
       setKpiPayments(fmtMoney(total));
 
+      // Use NL constant to avoid accidental hard wrap inside quotes
       setRecentActivity(
         (data || [])
           .map(
@@ -248,7 +255,7 @@ export default function AdminDashboardPage() {
                 r.paid_at
               ).toLocaleString()}`
           )
-          .join('\n') || 'No recent activity.'
+          .join(NL) || 'No recent activity.'
       );
     } catch {
       setRecentActivity('—');
@@ -261,6 +268,7 @@ export default function AdminDashboardPage() {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(200);
+
     if (query && query.trim()) {
       rq = supabase
         .from('puppies')
@@ -364,6 +372,7 @@ export default function AdminDashboardPage() {
     ]);
     setPaymentsAscii(asciiBarByDay(pays || []));
   }
+
   function biggestDay(rows: any[]) {
     const map = new Map<string, number>();
     for (const r of rows) {
@@ -376,6 +385,7 @@ export default function AdminDashboardPage() {
     for (const [k, v] of map) if (v > best.total) best = { day: k, total: v };
     return best;
   }
+
   function asciiBarByDay(rows: any[]) {
     const map = new Map<string, number>();
     for (const r of rows) {
@@ -392,7 +402,7 @@ export default function AdminDashboardPage() {
         const len = max ? Math.round((val / max) * 40) : 0;
         return `${day} | ${'#'.repeat(len)} ${fmtMoney(val)}`;
       })
-      .join('\n');
+      .join(NL);
   }
 
   /* ============================================
@@ -440,6 +450,7 @@ export default function AdminDashboardPage() {
     if (error) alert(error.message);
     else loadApplications(appFilter);
   }
+
   async function denyApp(id: string) {
     const { error } = await supabase
       .from('applications')
@@ -545,7 +556,7 @@ export default function AdminDashboardPage() {
   */
   // Persist active tab
   useEffect(() => {
-    const saved = (localStorage.getItem('admin_active_tab') as TabKey) || null;
+    const saved = (localStorage.getItem('admin_active_tab') || '') as TabKey;
     if (saved) setTab(saved);
   }, []);
   useEffect(() => {
