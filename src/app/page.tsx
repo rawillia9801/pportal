@@ -24,7 +24,7 @@ export default function Home() {
         </nav>
 
         <footer style={foot}>
-          <small style={{ opacity: 0.8 }}>
+          <small style={{ opacity: 0.85 }}>
             © {new Date().getFullYear()} Southwest Virginia Chihuahua
           </small>
         </footer>
@@ -84,7 +84,7 @@ function NavItem({
       href={href}
       style={{
         ...navItem,
-        ...(subtle ? { opacity: 0.85 } : null),
+        ...(subtle ? { opacity: 0.9 } : null),
       }}
     >
       <span>{label}</span>
@@ -117,7 +117,7 @@ const shell: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "260px 1fr",
   background:
-    "linear-gradient(180deg, #f4f8ff 0%, #ffffff 55%, #f8f5ff 100%)", // light, not bland
+    "linear-gradient(180deg, #f4f8ff 0%, #ffffff 55%, #f8f5ff 100%)",
   color: "#141821",
   fontFamily:
     "system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif",
@@ -131,15 +131,15 @@ const side: React.CSSProperties = {
   display: "grid",
   gridTemplateRows: "auto 1fr auto",
   padding: 16,
-  background:
-    "radial-gradient(800px 400px at -10% -10%, #e9f2ff 0%, #eaf0ff 25%, #f1eaff 75%, transparent 100%), linear-gradient(180deg, #0c1222 0%, #151b2c 100%)",
+  // FIX: solid, non-fading background for perfect contrast
+  background: "linear-gradient(180deg, #0f1326 0%, #141b30 100%)",
   color: "white",
   boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
 };
 
 const brand: React.CSSProperties = { lineHeight: 1, margin: "4px 4px 12px" };
 const brandTop: React.CSSProperties = { fontWeight: 800, fontSize: 24, letterSpacing: 0.2 };
-const brandSub: React.CSSProperties = { fontWeight: 700, fontSize: 18, opacity: 0.9 };
+const brandSub: React.CSSProperties = { fontWeight: 700, fontSize: 18, opacity: 0.92 };
 
 const nav: React.CSSProperties = {
   display: "grid",
@@ -156,22 +156,22 @@ const navItem: React.CSSProperties = {
   borderRadius: 12,
   textDecoration: "none",
   color: "#eaf0ff",
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid rgba(255,255,255,0.10)",
   transition: "transform .06s ease, background .15s ease, border .15s ease",
 } as const;
 
 const divider: React.CSSProperties = {
   height: 1,
-  background: "linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent)",
+  background: "linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent)",
   margin: "6px 4px",
 };
 
 const foot: React.CSSProperties = {
-  borderTop: "1px solid rgba(255,255,255,0.08)",
+  borderTop: "1px solid rgba(255,255,255,0.10)",
   paddingTop: 10,
   marginTop: 12,
-  color: "#cfd7ff",
+  color: "#d7defc",
 };
 
 const main: React.CSSProperties = {
@@ -232,8 +232,7 @@ const quickLink: React.CSSProperties = {
   borderRadius: 12,
   color: "#0d1530",
   textDecoration: "none",
-  background:
-    "linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%)",
+  background: "linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%)",
   border: "1px solid #dfe6f4",
   boxShadow: "0 1px 2px rgba(14, 28, 45, 0.05)",
 };

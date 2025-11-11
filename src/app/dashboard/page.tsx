@@ -1,117 +1,163 @@
+// src/app/dashboard/page.tsx
 "use client";
-export const dynamic = "force-dynamic";
 
 /* ============================================
    CHANGELOG
-   - 2025-11-09: Clean client-only dashboard.
-                 Removed server imports and signout route usage.
+   - 2025-11-10: New light/modern dashboard shell.
+                 • Brand text → "My Puppy Portal"
+                 • Lighter gradient + white cards
+                 • Keeps existing nav routes
    ANCHOR: DASHBOARD_PAGE
    ============================================ */
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getBrowserClient } from "@/lib/supabase/browser";
+import { getBrowserClient } from "@/lib/supabase/client";
 
 export default function Dashboard() {
   const router = useRouter();
-  const supabase = useMemo(() => getBrowserClient(), []);
-  const [email, setEmail] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!mounted) return;
-      if (!user) {
-        router.replace("/login");
-        return;
-      }
-      setEmail(user.email ?? null);
-      setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [supabase, router]);
+  const supabase = getBrowserClient();
 
   async function signOut() {
-    await supabase.auth.signOut(); // client-side signout
+    await supabase.auth.signOut();
     router.replace("/login");
   }
 
   return (
-    <div style={shell}>
-      {/* LEFT SIDEBAR */}
-      <aside style={side}>
-        <div style={brand}>PUPPY<br/>Portal</div>
-        <nav style={nav}>
-          <a href="/dashboard" style={{...item, ...active}}>Dashboard</a>
-          <a href="/puppies" style={item}>Available Puppies</a>
-          <a href="/applications" style={item}>My Applications</a>
-          <a href="/my-puppy" style={item}>My Puppy</a>
-          <a href="/health" style={item}>Health Records</a>
-          <a href="/payments" style={item}>Payments</a>
-          <a href="/messages" style={item}>Messages</a>
-          <a href="/profile" style={item}>Profile</a>
+    <div className="shell">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brand-top">My Puppy</span>
+          <span className="brand-bottom">Portal</span>
+        </div>
+
+        <nav className="nav">
+          <NavLink href="/dashboard">Dashboard</NavLink>
+          <NavLink href="/available-puppies">Available Puppies</NavLink>
+          <NavLink href="/applications">My Applications</NavLink>
+          <NavLink href="/my-puppy">My Puppy</NavLink>
+          <NavLink href="/health-records">Health Records</NavLink>
+          <NavLink href="/payments">Payments</NavLink>
+          <NavLink href="/messages">Messages</NavLink>
+          <NavLink href="/profile">Profile</NavLink>
         </nav>
-        <button onClick={signOut} style={signout}>Sign Out</button>
+
+        <button className="signout" onClick={signOut}>Sign Out</button>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main style={main}>
-        <header style={header}>
-          <h1 style={h1}>Dashboard</h1>
-          {email && <p style={signedIn}>Signed in as <strong>{email}</strong></p>}
+      {/* Main */}
+      <main className="main">
+        <header className="header">
+          <h1>Dashboard</h1>
+          <p className="tagline">
+            A simple, high-tech hub for your Chihuahua adoption journey.
+          </p>
         </header>
 
-        {loading ? (
-          <p style={{opacity:.8}}>Loading…</p>
-        ) : (
-          <section style={cards}>
-            <a href="/payments" style={card}>
-              <h3 style={cardTitle}>Make a Payment →</h3>
-              <p style={cardBody}>Pay deposits and balances securely.</p>
-            </a>
-            <a href="/my-puppy" style={card}>
-              <h3 style={cardTitle}>Growth Journey →</h3>
-              <p style={cardBody}>Weekly weights, milestones, and photos.</p>
-            </a>
-            <a href="/messages" style={card}>
-              <h3 style={cardTitle}>Messages →</h3>
-              <p style={cardBody}>Two-way chat with the breeder.</p>
-            </a>
-            <a href="/applications" style={card}>
-              <h3 style={cardTitle}>Applications →</h3>
-              <p style={cardBody}>View status and signed documents.</p>
-            </a>
-          </section>
-        )}
+        <section className="cards">
+          <Card
+            title="Make a Payment →"
+            desc="Pay deposits and balances securely."
+            href="/payments"
+          />
+          <Card
+            title="Growth Journey →"
+            desc="Weekly weights, milestones, and photos."
+            href="/my-puppy"
+          />
+          <Card
+            title="Messages →"
+            desc="Two-way chat with the breeder."
+            href="/messages"
+          />
+          <Card
+            title="Applications →"
+            desc="View status and signed documents."
+            href="/applications"
+          />
+        </section>
       </main>
+
+      {/* Styles */}
+      <style jsx>{`
+        /* ===== Theme (lighter, friendly, professional) ===== */
+        :root {
+          --ink: #1e232d;
+          --muted: #6b7280;
+          --bg-grad-a: #f7f9ff;   /* top */
+          --bg-grad-b: #eef3ff;   /* middle */
+          --bg-grad-c: #e9f6ff;   /* bottom */
+          --panel: #ffffff;
+          --panel-border: rgba(15, 23, 42, 0.08);
+          --panel-ring: rgba(35, 99, 235, 0.18);
+          --accent: #5a6cff;      /* soft indigo */
+          --accent-ink: #28306b;
+          --nav-hover: rgba(90, 108, 255, 0.08);
+        }
+
+        .shell {
+          display: grid;
+          grid-template-columns: 280px 1fr;
+          min-height: 100dvh;
+          background: linear-gradient(180deg, var(--bg-grad-a), var(--bg-grad-b) 40%, var(--bg-grad-c));
+          color: var(--ink);
+        }
+
+        /* ===== Sidebar ===== */
+        .sidebar {
+          padding: 20px 18px;
+          border-right: 1px solid var(--panel-border);
+          background: linear-gradient(180deg, #ffffffee, #f9fbffcc);
+          backdrop-filter: blur(6px);
+          display: grid;
+          grid-template-rows: auto 1fr auto;
+          gap: 16px;
+        }
+
+        .brand {
+          line-height: 1.05;
+          font-weight: 800;
+          letter-spacing: 0.4px;
+          color: var(--accent-ink);
+        }
+        .brand-top {
+          display: block;
+          font-size: 24px;
+        }
+        .brand-bottom {
+          display: bl: transparent;
+          transition: background 0.2s ease, border-color 0.2s ease, transform 0.05s ease;
+        }
+        .lin
+            grid-template-columns: 1fr;
+          }
+          .sidebar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            grid-template-rows: auto auto;
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
-/* ---- Styles ---- */
-const shell: React.CSSProperties = {
-  minHeight:"100vh",
-  display:"grid",
-  gridTemplateColumns:"260px 1fr",
-  background:
-    "radial-gradient(1200px 800px at 70% -10%, rgba(124,58,237,.28), rgba(11,20,35,0) 60%)," +
-    "radial-gradient(900px 600px at -10% 30%, rgba(59,130,246,.25), rgba(11,20,35,0) 60%)," +
-    "#0b1423",
-  color:"#e7efff"
-};
-const side: React.CSSProperties = { borderRight:"1px solid rgba(255,255,255,.08)", padding:"24px 18px", background:"linear-gradient(180deg, rgba(21,36,62,.95), rgba(11,20,35,.95))" };
-const brand: React.CSSProperties = { fontWeight:800, letterSpacing:".6px", lineHeight:1.05, fontSize:22, marginBottom:18 };
-const nav: React.CSSProperties = { display:"grid", gap:6, marginTop:6 };
-const item: React.CSSProperties = { padding:"10px 12px", borderRadius:10, textDecoration:"none", color:"#e7efff", border:"1px solid transparent" };
-const active: React.CSSProperties = { background:"rgba(255,255,255,.06)", borderColor:"rgba(255,255,255,.12)" };
-const signout: React.CSSProperties = { marginTop:"auto", width:"100%", padding:"10px 12px", borderRadius:10, border:"1px solid rgba(255,255,255,.18)", background:"transparent", color:"#e7efff", cursor:"pointer" };
-const main: React.CSSProperties = { padding:24 };
-const header: React.CSSProperties = { marginBottom:14 };
-const h1: React.CSSProperties = { margin:0, fontSize:40, letterSpacing:.3 };
-const signedIn: React.CSSProperties = { margin:"8px 0 0 0", opacity:.9 };
-const cards: React.CSSProperties = { display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:14, marginTop:10 };
-const card: React.CSSProperties = { display:"block", padding:16, borderRadius:14, background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.10)", textDecoration:"none", color:"#e7efff" };
-const cardTitle: React.CSSProperties = { margin:"0 0 6px 0", fontSize:18 };
-const cardBody: React.CSSProperties = { margin:0, opacity:.9 };
+function NavLink(props: { href: string; children: React.ReactNode }) {
+  return (
+    <Link className="link" href={props.href}>
+      {props.children}
+      <style jsx>{``}</style>
+    </Link>
+  );
+}
+
+function Card(props: { title: string; desc: string; href: string }) {
+  return (
+    <Link className="card" href={props.href}>
+      <h3>{props.title}</h3>
+      <p>{props.desc}</p>
+    </Link>
+  );
+}
