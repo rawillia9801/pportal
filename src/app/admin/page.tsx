@@ -4,6 +4,7 @@
    CHANGELOG
    - 2025-11-11: Full Admin Dashboard (tabs + admin gate)
    - 2025-11-11: Fix: newline-safe Recent Activity via NL constant
+   - 2025-11-11: Add Puppy now uses Sire/Dam dropdowns from dogs table
    ============================================ */
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -76,6 +77,7 @@ type Transport = {
   note: string | null;
   created_at: string | null;
 };
+type Dog = { id: string; name: string; sex: 'Male' | 'Female' };
 
 /* ========== Config ========== */
 const ADMIN_EMAIL = 'rawillia9809@gmail.com';
@@ -108,6 +110,9 @@ export default function AdminDashboardPage() {
   const [puppies, setPuppies] = useState<Puppy[]>([]);
   const [puppyMsg, setPuppyMsg] = useState<string>('');
   const puppySearchRef = useRef<HTMLInputElement>(null);
+
+  // Dogs (for Sire/Dam dropdowns)
+  const [dogs, setDogs] = useState<Dog[]>([]);
 
   // Litters
   const [litters, setLitters] = useState<any[]>([]);
@@ -208,6 +213,16 @@ export default function AdminDashboardPage() {
     const { data } = await rq;
     setPuppies((data as Puppy[]) || []);
   }
+
+  async function loadDogs() {
+    const { data, error } = await supabase
+      .from('dogs')
+      .select('id,name,sex')
+      .eq('active', true)
+      .order('name', { ascending: true });
+    if (!error) setDogs((data as Dog[]) || []);
+  }
+
   async function loadLitters() {
     const { data } = await supabase.from('litters').select('*')
       .order('whelp_date', { ascending: false }).limit(200);
@@ -299,11 +314,16 @@ export default function AdminDashboardPage() {
       registry: (fd.get('registry') as any) || null,
       dob: (fd.get('dob') as string) || null,
       ready_date: (fd.get('ready_date') as string) || null,
-      photos, sire_id: (fd.get('sire_id') as string) || null, dam_id: (fd.get('dam_id') as string) || null
+      photos,
+      sire_id: (fd.get('sire_id') as string) || null,
+      dam_id: (fd.get('dam_id') as string) || null
     };
     const { error } = await supabase.from('puppies').insert(row);
     setPuppyMsg(error ? error.message : 'Saved.');
-    if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadPuppies(puppySearchRef.current?.value || ''); }
+    if (!error) {
+      (e.currentTarget as HTMLFormElement).reset();
+      await loadPuppies(puppySearchRef.current?.value || '');
+    }
   }
   async function onDeletePuppy(id: string) {
     if (!confirm('Delete this puppy?')) return;
@@ -397,13 +417,11 @@ export default function AdminDashboardPage() {
         const email = data.user?.email ?? null;
         setMe(email);
         if (!email) { r.replace('/login'); return; }
-        if (email.toLowerCase() !== ADMIN_EMAIL) {
-          const { data: prof } = await supabase.from('profiles').select('role')
-            .eq('id', data.user!.id).maybeSingle();
-          if (!prof || (prof as any).role !== 'admin') { setBlocked(true); return; }
-        }
+        // Email-only gate (avoids profiles recursion)
+        if (email.toLowerCase() !== ADMIN_EMAIL) { setBlocked(true); return; }
+
         await Promise.all([
-          loadOverview(), loadPuppies(), loadLitters(), loadApplications('all'),
+          loadOverview(), loadPuppies(), loadDogs(), loadLitters(), loadApplications('all'),
           loadBuyers(), loadPayments(), loadMessages(), loadDocuments(),
           loadTransports(), refreshReports()
         ]);
@@ -411,6 +429,10 @@ export default function AdminDashboardPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* ========== Derived lists ========== */
+  const maleDogs = dogs.filter(d => d.sex === 'Male');
+  const femaleDogs = dogs.filter(d => d.sex === 'Female');
 
   /* ========== Render ========== */
   if (loadingGate) {
@@ -493,9 +515,26 @@ export default function AdminDashboardPage() {
                     <div className="col4"><label>Gender</label><select name="gender"><option value="">—</option><option>Male</option><option>Female</option></select></div>
                     <div className="col4"><label>Registry</label><select name="registry"><option value="">—</option><option>AKC</option><option>CKC</option><option>ACA</option></select></div>
                     <div className="col12"><label>Photo URL (first)</label><input name="photo" placeholder="https://…" /></div>
-                    <div className="col6"><label>Sire ID</label><input name="sire_id" /></div>
-                    <div className="col6"><label>Dam ID</label><input name="dam_id" /></div>
+
+                    {/* NEW: Sire/Dam dropdowns from dogs table */}
+                    <div className="col6">
+                      <label>Sire</label>
+                      <select name="sire_id" defaultValue="">
+                        <option value="">—</option>
+                        {maleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                      {maleDogs.length === 0 && <div className="crumbs">No active males. Add dogs in your database.</div>}
+                    </div>
+                    <div className="col6">
+                      <label>Dam</label>
+                      <select name="dam_id" defaultValue="">
+                        <option value="">—</option>
+                        {femaleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                      {femaleDogs.length === 0 && <div className="crumbs">No active females. Add dogs in your database.</div>}
+                    </div>
                   </div>
+
                   <div className="actions" style={{marginTop:12}}>
                     <button className="btn primary" type="submit">Save Puppy</button>
                     <span className="crumbs">{puppyMsg}</span>
@@ -548,8 +587,8 @@ export default function AdminDashboardPage() {
                   setLitterMsg(error?error.message:'Saved.'); if(!error){ (e.currentTarget as HTMLFormElement).reset(); await loadLitters(); }
                 }}>
                   <label>Code</label><input name="code" placeholder="2025-EMB×BUB-01" required />
-                  <label>Dam</label><input name="dam" />
-                  <label>Sire</label><input name="sire" />
+                  <label>Dam</label><input name="dam" placeholder="e.g., Ember" />
+                  <label>Sire</label><input name="sire" placeholder="e.g., Bubba Roe" />
                   <label>Whelp Date</label><input type="date" name="whelp_date" />
                   <label>Notes</label><textarea name="notes" rows={3} />
                   <div className="actions" style={{marginTop:12}}>
@@ -800,16 +839,7 @@ export default function AdminDashboardPage() {
             <div className="grid">
               <div className="card span6">
                 <h3 style={{margin:0,marginBottom:8}}>Admin Access</h3>
-                <div className="notice">Users with role <code>admin</code> in <code>profiles</code> (or {ADMIN_EMAIL} bypass) may access this page.</div>
-                <form onSubmit={async e=>{ e.preventDefault(); const fd=new FormData(e.currentTarget);
-                  const row={ id: fd.get('user_id') as string, role: fd.get('role') as string } as any;
-                  const { error } = await supabase.from('profiles').upsert(row);
-                  alert(error ? error.message : 'Updated.');
-                }}>
-                  <label>User ID (auth.uid)</label><input name="user_id" required />
-                  <label>Role</label><select name="role"><option value="admin">admin</option><option value="staff">staff</option><option value="buyer">buyer</option></select>
-                  <div className="actions" style={{marginTop:12}}><button className="btn primary" type="submit">Set Role</button></div>
-                </form>
+                <div className="notice">Admin access is currently email-gated for {ADMIN_EMAIL}.</div>
               </div>
               <div className="card span6"><h3 style={{margin:0,marginBottom:8}}>Profile</h3><div className="notice">Signed in as {me}</div></div>
             </div>
