@@ -1,12 +1,14 @@
 'use client';
 
 /* ============================================
-   Puppy Application (Public)
-   - Saves application to Supabase
-   - Generates a PDF for the applicant
-   - Uploads PDF to Storage (docs/applications/)
-   - Creates a 'documents' record
-   ============================================ */
+   CHANGELOG
+   - 2025-11-11: Initial application page
+   - 2025-11-11: Type fix for PDF declarations array
+                 (decos typed as [string, boolean][])
+   ============================================
+   ANCHOR: PUPPY_APPLICATION_PAGE
+*/
+
 import React, { useEffect, useRef, useState } from 'react';
 import { getBrowserClient } from '@/lib/supabase/client';
 
@@ -66,17 +68,14 @@ type AppState = {
 
 export default function PuppyApplicationPage() {
   const supabase = getBrowserClient();
-  const [meEmail, setMeEmail] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string>('');
-  const [pdfUrl, setPdfUrl] = useState<string>('');
-  const formRef = useRef<HTMLFormElement>(null);
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState<string>('');
+  const [pdfUrl, setPdfUrl]   = useState<string>('');
+  const formRef               = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getUser();
-      setMeEmail(data.user?.email ?? null);
-    })();
+    // noop: we used to read meEmail; keeping hook in case you want to gate later
+    (async () => { await supabase.auth.getUser(); })();
   }, [supabase]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -84,7 +83,7 @@ export default function PuppyApplicationPage() {
     setMsg(''); setSaving(true);
 
     const fd = new FormData(e.currentTarget);
-    const v = (name: string) => String(fd.get(name) || '').trim();
+    const v  = (name: string) => String(fd.get(name) ?? '').trim();
 
     const state: AppState = {
       full_name: v('full_name'),
@@ -141,16 +140,15 @@ export default function PuppyApplicationPage() {
       return;
     }
 
-    // Insert into applications
     try {
-      // try to attach user_id if logged in
+      // attach user_id if logged in
       const { data: auth } = await supabase.auth.getUser();
       const user_id = auth.user?.id ?? null;
 
       const insertRow = {
         user_id,
         full_name: state.full_name,
-        buyer_name: state.full_name,   // keep admin view working
+        buyer_name: state.full_name,   // keeps admin view compatibility
         email: state.email,
         phone: state.phone,
         address: state.address,
@@ -164,17 +162,17 @@ export default function PuppyApplicationPage() {
         desired_date: state.desired_date || null,
         interest_type: state.interest_type,
         current_puppy: state.current_puppy,
-        other_pets: state.other_pets.toLowerCase()==='yes',
+        other_pets: state.other_pets.toLowerCase() === 'yes',
         pet_details: state.pet_details,
-        owned_chi: state.owned_chi.toLowerCase()==='yes',
+        owned_chi: state.owned_chi.toLowerCase() === 'yes',
         home_type: state.home_type,
-        fenced_yard: state.fenced_yard.toLowerCase()==='yes',
+        fenced_yard: state.fenced_yard.toLowerCase() === 'yes',
         work_status: state.work_status,
         caregiver: state.caregiver,
         children_at_home: state.children_at_home,
         payment_preference: state.payment_preference,
         heard_about: state.heard_about,
-        ready_to_deposit: state.ready_to_deposit.toLowerCase()==='yes',
+        ready_to_deposit: state.ready_to_deposit.toLowerCase() === 'yes',
         questions: state.questions,
         terms_agreed: state.terms_agreed,
         declarations: {
@@ -204,6 +202,7 @@ export default function PuppyApplicationPage() {
       // Generate PDF in-browser
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ unit: 'pt', compress: true });
+
       const NL = '\n';
       const title = 'Southwest Virginia Chihuahua — Puppy Application';
       doc.setFont('Helvetica', 'bold'); doc.setFontSize(14);
@@ -253,9 +252,9 @@ export default function PuppyApplicationPage() {
       block('Ready to Place Deposit', state.ready_to_deposit);
       block('Questions', state.questions);
 
-      // Declarations (compact)
+      // Declarations (typed correctly)
       doc.setFont('Helvetica','bold'); doc.text('Applicant Declarations', 40, y); y+=16; doc.setFont('Helvetica','normal');
-      const decos = [
+      const decos: [string, boolean][] = [
         ['Age and Capacity', state.decl_age],
         ['Accuracy of Information', state.decl_accuracy],
         ['Home Environment & Pet Ownership', state.decl_home],
@@ -287,13 +286,12 @@ export default function PuppyApplicationPage() {
       if (up.error) throw up.error;
 
       // Create a document row (attach to user if known)
-      const docRow = {
+      const { error: dErr } = await supabase.from('documents').insert({
         user_id: appIns!.user_id ?? null,
         application_id: appId,
         label: 'Puppy Application',
         file_key: key
-      };
-      const { error: dErr } = await supabase.from('documents').insert(docRow);
+      });
       if (dErr) throw dErr;
 
       // Public URL to hand back immediately
@@ -370,7 +368,7 @@ export default function PuppyApplicationPage() {
 
           <h2>Terms and Conditions *</h2>
           <div className="terms">
-            <p><b>Read carefully:</b> By submitting, you agree to the Terms and Conditions and all declarations you check below. (Full text you supplied is incorporated by reference; this form stores your acceptance and a PDF copy.)</p>
+            <p><b>Read carefully:</b> By submitting, you agree to the Terms and Conditions and all declarations you check below. (Full text is referenced; this form stores your acceptance and a PDF copy.)</p>
           </div>
           <label className="chk"><input type="checkbox" name="terms_agreed" /> <span>I have read and agree to the Terms and Conditions.</span></label>
 
