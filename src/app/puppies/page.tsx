@@ -1,64 +1,70 @@
 // src/app/puppies/page.tsx
-export const dynamic = "force-dynamic";
+"use client";
 
-/* Available Puppies (server/RSC-safe) */
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createRscClient } from "@/lib/supabase/server";
+import { getBrowserClient } from "@/lib/supabase/client";
 
-type Puppy = {
+type Pup = {
   id: string;
-  name?: string;
-  price?: number;
-  status?: string;
-  gender?: string;
-  registry?: string;
-  dob?: string;
-  date_of_birth?: string;
-  ready_date?: string;
-  photos?: string[];
+  name: string | null;
+  price: number | null;
+  gender: string | null;
+  registry: string | null;
+  status: "Available" | "Reserved" | "Sold" | null;
+  dob: string | null;
+  ready_date: string | null;
+  photos: string[]; // assume text[]; if jsonb, cast accordingly in SQL/RLS
 };
 
-export default async function PuppiesPage() {
-  // NOTE: createRscClient() returns a Promise in your codebase → await it
-  const supabase = await createRscClient();
+export default function PuppiesListPage() {
+  const supabase = getBrowserClient();
+  const [rows, setRows] = useState<Pup[]>([]);
+  const [err, setErr] = useState<string | null>(null);
 
-  const { data, error } = await supabase
-    .from("puppies")
-    .select("*")
-    .neq("status", "Sold");
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from("puppies")
+        .select("*")
+        .neq("status", "Sold");
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+      setRows((data as any[])?.map(normalize) ?? []);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  if (error) {
+  if (err) {
     return (
       <main style={wrap}>
         <h1 style={h1}>Available Puppies</h1>
-        <p style={lead}>Couldn’t load puppies: {error.message}</p>
+        <p style={{ color: "#fca5a5" }}>Error: {err}</p>
       </main>
     );
   }
 
-  const puppies = (data ?? []) as Puppy[];
-
   return (
     <main style={wrap}>
       <h1 style={h1}>Available Puppies</h1>
-      <p style={lead}>Browse current pups. Click a card for details.</p>
+      <p style={lead}>Browse current pups.</p>
 
       <section style={grid}>
-        {puppies.map((p) => {
-          const title = p.name ?? `Puppy ${p.id?.slice?.(0, 6) ?? ""}`;
+        {rows.map((p) => {
+          const title = p.name ?? `Puppy ${p.id.slice(0, 6)}`;
           const price =
-            typeof p.price === "number" ? `$${p.price.toLocaleString()}` : "—";
-          const status = p.status ?? "Available";
+            p.price != null ? `$${Number(p.price).toLocaleString()}` : "—";
           const gender = p.gender ?? "—";
           const registry = p.registry ?? "—";
-          const dob = p.dob ?? p.date_of_birth ?? null;
-          const ready = p.ready_date ?? null;
-
-          const photo =
-            Array.isArray(p.photos) && p.photos.length ? p.photos[0] : undefined;
+          const status = p.status ?? "Available";
+          const dob = p.dob ?? undefined;
+          const ready = p.ready_date ?? undefined;
+          const photo = p.photos?.[0];
 
           return (
-            <Link key={p.id} href={`/puppies/${p.id ?? ""}`} style={card} prefetch={false}>
+            <article key={p.id} style={card}>
               <div style={thumbWrap}>
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -81,7 +87,7 @@ export default async function PuppiesPage() {
                   {ready && <span style={pill}>Ready: {ready}</span>}
                 </div>
               </div>
-            </Link>
+            </article>
           );
         })}
       </section>
@@ -89,7 +95,21 @@ export default async function PuppiesPage() {
   );
 }
 
-/* ---- inline styles ---- */
+function normalize(row: any): Pup {
+  return {
+    id: row.id,
+    name: row.name ?? null,
+    price: row.price ?? null,
+    gender: row.gender ?? null,
+    registry: row.registry ?? null,
+    status: row.status ?? null,
+    dob: row.dob ?? row.date_of_birth ?? null,
+    ready_date: row.ready_date ?? null,
+    photos: Array.isArray(row.photos) ? row.photos : [],
+  };
+}
+
+/* ---- Inline styles ---- */
 const wrap: React.CSSProperties = {
   padding: 24,
   color: "#e7efff",
@@ -103,6 +123,7 @@ const grid: React.CSSProperties = {
   gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
   gap: 14,
 };
+
 const card: React.CSSProperties = {
   display: "block",
   borderRadius: 14,
@@ -112,6 +133,7 @@ const card: React.CSSProperties = {
   color: "#e7efff",
   overflow: "hidden",
 };
+
 const thumbWrap: React.CSSProperties = {
   aspectRatio: "4 / 3",
   background: "rgba(255,255,255,.06)",
@@ -129,6 +151,7 @@ const thumbPlaceholder: React.CSSProperties = {
   placeItems: "center",
   opacity: 0.7,
 };
+
 const meta: React.CSSProperties = { padding: 12 };
 const rowBetween: React.CSSProperties = {
   display: "flex",
