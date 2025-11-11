@@ -4,7 +4,8 @@
    CHANGELOG
    - 2025-11-11: Full Admin Dashboard (tabs + admin gate)
    - 2025-11-11: Fix: newline-safe Recent Activity via NL constant
-   - 2025-11-11: Add Puppy now uses Sire/Dam dropdowns from dogs table
+   - 2025-11-11: Add Puppy uses Sire/Dam dropdowns from dogs table
+   - 2025-11-11: Buyers tab: Add + Edit + Delete (full CRUD)
    ============================================ */
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -113,6 +114,8 @@ export default function AdminDashboardPage() {
 
   // Dogs (for Sire/Dam dropdowns)
   const [dogs, setDogs] = useState<Dog[]>([]);
+  const maleDogs = dogs.filter(d => d.sex === 'Male');
+  const femaleDogs = dogs.filter(d => d.sex === 'Female');
 
   // Litters
   const [litters, setLitters] = useState<any[]>([]);
@@ -125,6 +128,8 @@ export default function AdminDashboardPage() {
 
   // Buyers
   const [buyers, setBuyers] = useState<Buyer[]>([]);
+  const [buyerMsg, setBuyerMsg] = useState<string>('');
+  const [editBuyer, setEditBuyer] = useState<Buyer | null>(null);
 
   // Payments
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -147,7 +152,7 @@ export default function AdminDashboardPage() {
   const [reportSignals, setReportSignals] = useState<string[]>([]);
   const [paymentsAscii, setPaymentsAscii] = useState<string>('');
 
-  /* ========== Helpers (before effects) ========== */
+  /* ========== Helpers ========== */
   function fmtMoney(n: number | null | undefined) {
     if (n == null || Number.isNaN(n)) return '-';
     return `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -166,7 +171,7 @@ export default function AdminDashboardPage() {
     return <span className={`badge ${cls}`}>{status || '-'}</span>;
   }
 
-  /* ========== Loaders (before effects) ========== */
+  /* ========== Loaders ========== */
   async function loadOverview() {
     try {
       const { count } = await supabase.from('puppies')
@@ -302,6 +307,7 @@ export default function AdminDashboardPage() {
   }
 
   /* ========== Handlers ========== */
+  // Puppies
   async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setPuppyMsg('');
     const fd = new FormData(e.currentTarget);
@@ -330,6 +336,8 @@ export default function AdminDashboardPage() {
     const { error } = await supabase.from('puppies').delete().eq('id', id);
     if (error) alert(error.message); else loadPuppies(puppySearchRef.current?.value || '');
   }
+
+  // Applications
   async function approveApp(id: string) {
     const { error } = await supabase.from('applications').update({ status: 'approved' }).eq('id', id);
     if (error) alert(error.message); else loadApplications(appFilter);
@@ -338,6 +346,8 @@ export default function AdminDashboardPage() {
     const { error } = await supabase.from('applications').update({ status: 'denied' }).eq('id', id);
     if (error) alert(error.message); else loadApplications(appFilter);
   }
+
+  // Payments
   async function onRecordPayment(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setPaymentMsg('');
     const fd = new FormData(e.currentTarget);
@@ -353,6 +363,8 @@ export default function AdminDashboardPage() {
     setPaymentMsg(error ? error.message : 'Saved.');
     if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadPayments(); await refreshReports(); }
   }
+
+  // Messages
   async function onSendMessage(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setMessageMsg('');
     const fd = new FormData(e.currentTarget);
@@ -366,6 +378,8 @@ export default function AdminDashboardPage() {
     setMessageMsg(error ? error.message : 'Sent.');
     if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadMessages(); }
   }
+
+  // Documents
   async function onUploadDoc(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setDocMsg('');
     const fd = new FormData(e.currentTarget);
@@ -386,6 +400,8 @@ export default function AdminDashboardPage() {
     setDocMsg(error ? error.message : 'Uploaded.');
     if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadDocuments(); }
   }
+
+  // Transport
   async function onSaveTransport(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setTransportMsg('');
     const fd = new FormData(e.currentTarget);
@@ -403,6 +419,44 @@ export default function AdminDashboardPage() {
     if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadTransports(); }
   }
 
+  // Buyers
+  async function onAddBuyer(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault(); setBuyerMsg('');
+    const fd = new FormData(e.currentTarget);
+    const row = {
+      full_name: (fd.get('full_name') as string) || null,
+      email: (fd.get('email') as string) || null,
+      phone: (fd.get('phone') as string) || null,
+      is_repeat: (fd.get('is_repeat') as string) === 'on'
+    };
+    const { error } = await supabase.from('buyers').insert(row);
+    setBuyerMsg(error ? error.message : 'Buyer added.');
+    if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadBuyers(); }
+  }
+  async function onUpdateBuyer(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault(); setBuyerMsg('');
+    if (!editBuyer?.id) { setBuyerMsg('No buyer selected.'); return; }
+    const fd = new FormData(e.currentTarget);
+    const row = {
+      full_name: (fd.get('full_name') as string) || null,
+      email: (fd.get('email') as string) || null,
+      phone: (fd.get('phone') as string) || null,
+      is_repeat: (fd.get('is_repeat') as string) === 'on'
+    };
+    const { error } = await supabase.from('buyers').update(row).eq('id', editBuyer.id);
+    setBuyerMsg(error ? error.message : 'Buyer updated.');
+    if (!error) { await loadBuyers(); }
+  }
+  async function onDeleteBuyer(id: string) {
+    if (!confirm('Delete this buyer?')) return;
+    const { error } = await supabase.from('buyers').delete().eq('id', id);
+    if (error) alert(error.message);
+    else {
+      if (editBuyer?.id === id) setEditBuyer(null);
+      await loadBuyers();
+    }
+  }
+
   /* ========== Effects ========== */
   useEffect(() => {
     const saved = (localStorage.getItem('admin_active_tab') || '') as TabKey;
@@ -417,7 +471,6 @@ export default function AdminDashboardPage() {
         const email = data.user?.email ?? null;
         setMe(email);
         if (!email) { r.replace('/login'); return; }
-        // Email-only gate (avoids profiles recursion)
         if (email.toLowerCase() !== ADMIN_EMAIL) { setBlocked(true); return; }
 
         await Promise.all([
@@ -429,10 +482,6 @@ export default function AdminDashboardPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  /* ========== Derived lists ========== */
-  const maleDogs = dogs.filter(d => d.sex === 'Male');
-  const femaleDogs = dogs.filter(d => d.sex === 'Female');
 
   /* ========== Render ========== */
   if (loadingGate) {
@@ -515,15 +564,12 @@ export default function AdminDashboardPage() {
                     <div className="col4"><label>Gender</label><select name="gender"><option value="">—</option><option>Male</option><option>Female</option></select></div>
                     <div className="col4"><label>Registry</label><select name="registry"><option value="">—</option><option>AKC</option><option>CKC</option><option>ACA</option></select></div>
                     <div className="col12"><label>Photo URL (first)</label><input name="photo" placeholder="https://…" /></div>
-
-                    {/* NEW: Sire/Dam dropdowns from dogs table */}
                     <div className="col6">
                       <label>Sire</label>
                       <select name="sire_id" defaultValue="">
                         <option value="">—</option>
                         {maleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
-                      {maleDogs.length === 0 && <div className="crumbs">No active males. Add dogs in your database.</div>}
                     </div>
                     <div className="col6">
                       <label>Dam</label>
@@ -531,7 +577,6 @@ export default function AdminDashboardPage() {
                         <option value="">—</option>
                         {femaleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
-                      {femaleDogs.length === 0 && <div className="crumbs">No active females. Add dogs in your database.</div>}
                     </div>
                   </div>
 
@@ -651,27 +696,91 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* BUYERS */}
+          {/* BUYERS (ADD + EDIT) */}
           {tab==='buyers' && (
-            <div className="card">
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-                <h3 style={{margin:0}}>Buyers</h3>
-                <div className="actions"><button className="btn" onClick={loadBuyers}>Refresh</button></div>
+            <div className="grid">
+              {/* Add Buyer */}
+              <div className="card span4">
+                <h3 style={{margin:0,marginBottom:8}}>Add Buyer</h3>
+                <form onSubmit={onAddBuyer}>
+                  <label>Full Name</label><input name="full_name" placeholder="First Last" required />
+                  <label>Email</label><input name="email" type="email" placeholder="name@example.com" />
+                  <label>Phone</label><input name="phone" placeholder="(555) 555-5555" />
+                  <label className="chk"><input type="checkbox" name="is_repeat" /> <span>Repeat Buyer</span></label>
+                  <div className="actions" style={{marginTop:12}}>
+                    <button className="btn primary" type="submit">Save Buyer</button>
+                    <span className="crumbs">{buyerMsg}</span>
+                  </div>
+                </form>
               </div>
-              <div style={{marginTop:8}}>
-                {buyers.length===0 ? <div className="notice">No buyers found.</div> : (
-                  <table>
-                    <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Repeat</th><th>Created</th></tr></thead>
-                    <tbody>{buyers.map(b=>(
-                      <tr key={b.id}>
-                        <td>{b.full_name || '-'}</td><td>{b.email || '-'}</td><td>{b.phone || '-'}</td>
-                        <td>{b.is_repeat ? 'Yes' : 'No'}</td>
-                        <td>{b.created_at ? new Date(b.created_at).toLocaleDateString() : '-'}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                )}
+
+              {/* Buyers List */}
+              <div className="card span8">
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                  <h3 style={{margin:0}}>Buyers</h3>
+                  <div className="actions"><button className="btn" onClick={loadBuyers}>Refresh</button></div>
+                </div>
+                <div style={{marginTop:8}}>
+                  {buyers.length===0 ? <div className="notice">No buyers found.</div> : (
+                    <table>
+                      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Repeat</th><th>Created</th><th/></tr></thead>
+                      <tbody>{buyers.map(b=>(
+                        <tr key={b.id}>
+                          <td>{b.full_name || '-'}</td>
+                          <td>{b.email || '-'}</td>
+                          <td>{b.phone || '-'}</td>
+                          <td>{b.is_repeat ? 'Yes' : 'No'}</td>
+                          <td>{b.created_at ? new Date(b.created_at).toLocaleDateString() : '-'}</td>
+                          <td>
+                            <div className="actions">
+                              <button className="btn" onClick={()=>setEditBuyer(b)}>Edit</button>
+                              <button className="btn" onClick={()=>onDeleteBuyer(b.id)}>Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  )}
+                </div>
               </div>
+
+              {/* Edit Buyer Drawer/Card */}
+              {editBuyer && (
+                <div className="card span12" style={{borderColor:'var(--brand)'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                    <h3 style={{margin:0}}>Edit Buyer</h3>
+                    <div className="actions">
+                      <button className="btn" onClick={()=>setEditBuyer(null)}>Close</button>
+                    </div>
+                  </div>
+                  <form onSubmit={onUpdateBuyer} style={{marginTop:8,display:'grid',gap:12}}>
+                    <div className="row">
+                      <div className="col6">
+                        <label>Full Name</label>
+                        <input name="full_name" defaultValue={editBuyer.full_name || ''} required />
+                      </div>
+                      <div className="col6">
+                        <label>Email</label>
+                        <input name="email" type="email" defaultValue={editBuyer.email || ''} />
+                      </div>
+                      <div className="col6">
+                        <label>Phone</label>
+                        <input name="phone" defaultValue={editBuyer.phone || ''} />
+                      </div>
+                      <div className="col6" style={{display:'flex',alignItems:'flex-end'}}>
+                        <label className="chk" style={{margin:0}}>
+                          <input type="checkbox" name="is_repeat" defaultChecked={!!editBuyer.is_repeat} /> <span>Repeat Buyer</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div className="actions">
+                      <button className="btn primary" type="submit">Update</button>
+                      <button className="btn" type="button" onClick={()=>onDeleteBuyer(editBuyer.id)}>Delete</button>
+                      <span className="crumbs">{buyerMsg}</span>
+                    </div>
+                  </form>
+                </div>
+              )}
             </div>
           )}
 
@@ -868,7 +977,7 @@ export default function AdminDashboardPage() {
         .nav .icon{width:18px;height:18px;border-radius:4px;background:var(--brand);opacity:.15}
         .spacer{flex:1}
         .authBtns{padding:12px;border-top:1px solid #eee;display:flex;gap:8px}
-        .btn{appearance:none;border:1px solid #e0d8d0;background:#fff;color:var(--ink);padding:8px 10px;border-radius:10px;cursor:pointer}
+        .btn{appearance:none;border:1px solid #e0d8d0;background:#fff;color:var(--ink);padding:8px 10px;border-radius:10px;cursor:pointer;text-decoration:none}
         .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
         .main{padding:22px;min-height:100vh}
         .header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
@@ -891,6 +1000,7 @@ export default function AdminDashboardPage() {
         input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
         .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
         .actions{display:flex;gap:8px;flex-wrap:wrap}
+        .chk{display:flex;align-items:center;gap:8px}
         .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:.8rem}
         .badge.ok{background:rgba(47,163,107,.12);color:#1f6b47}
         .badge.warn{background:rgba(210,133,18,.12);color:#6f470e}
