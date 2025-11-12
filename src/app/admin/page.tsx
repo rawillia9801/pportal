@@ -358,9 +358,11 @@ function toPublicUrl(key: string): string {
           .order('uploaded_at', { ascending: false })
           .limit(1);
         if (!q2.error && q2.data?.[0]?.file_key) {
-          const pub = await supabase.storage.from('docs').getPublicUrl(q2.data[0].file_key);
-          if (!pub.error) return pub.data.publicUrl || '';
-        }
+const key2 = q2.data?.[0]?.file_key as string | undefined;
+if (key2) {
+  const url2 = toPublicUrl(key2); // uses the helper you already added
+  if (url2) return url2;
+}
       }
     } catch {/* ignored */}
     return '';
