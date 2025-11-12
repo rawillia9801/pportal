@@ -452,22 +452,36 @@ function toPublicUrl(key: string): string {
 
   /* ========== Form Handlers (existing) ========== */
   // Puppies
-  async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setPuppyMsg('');
-    const fd = new FormData(e.currentTarget);
-    const photos = (fd.get('photo') as string)?.trim() ? [(fd.get('photo') as string).trim()] : [];
-    const row = {
-      name: (fd.get('name') as string) || null,
-      price: fd.get('price') ? Number(fd.get('price')) : null,
-      status: (fd.get('status') as any) || 'Available',
-      gender: (fd.get('gender') as any) || null,
-      registry: (fd.get('registry') as any) || null,
-      dob: (fd.get('dob') as string) || null,
-      ready_date: (fd.get('ready_date') as string) || null,
-      photos,
-      sire_id: (fd.get('sire_id') as string) || null,
-      dam_id: (fd.get('dam_id') as string) || null,
-    };
+/* ANCHOR: onAddPuppy */
+async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
+  e.preventDefault();
+  setPuppyMsg('');
+
+  const fd = new FormData(e.currentTarget);
+  const firstPhoto = (fd.get('photo') as string | null)?.trim();
+  const photos = firstPhoto ? [firstPhoto] : [];
+
+  const row = {
+    name: (fd.get('name') as string) || null,
+    price: fd.get('price') ? Number(fd.get('price')) : null,
+    status: ((fd.get('status') as string) || 'Available') as Puppy['status'],
+    gender: (fd.get('gender') as Puppy['gender']) || null,
+    registry: (fd.get('registry') as Puppy['registry']) || null,
+    dob: (fd.get('dob') as string) || null,
+    ready_date: (fd.get('ready_date') as string) || null,
+    photos,
+    sire_id: (fd.get('sire_id') as string) || null,
+    dam_id: (fd.get('dam_id') as string) || null,
+  };
+
+  const { error } = await supabase.from('puppies').insert(row);
+  setPuppyMsg(error ? error.message : 'Saved.');
+
+  if (!error) {
+    (e.currentTarget as HTMLFormElement).reset();
+    await loadPuppies(puppySearchRef.current?.value || '');
+  }
+}
     const { error } = await supabase.from('puppies').insert(row);
     setPuppyMsg(error ? error.message : 'Saved.');
     if (!error) {
