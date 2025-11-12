@@ -482,7 +482,6 @@ async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
     (e.currentTarget as HTMLFormElement).reset();
     await loadPuppies(puppySearchRef.current?.value || '');
   }
-}
     const { error } = await supabase.from('puppies').insert(row);
     setPuppyMsg(error ? error.message : 'Saved.');
     if (!error) {
