@@ -453,6 +453,7 @@ function toPublicUrl(key: string): string {
   /* ========== Form Handlers (existing) ========== */
   // Puppies
 /* ANCHOR: onAddPuppy */
+/* ANCHOR: onAddPuppy */
 async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
   e.preventDefault();
   setPuppyMsg('');
