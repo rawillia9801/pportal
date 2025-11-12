@@ -483,55 +483,61 @@ export default function AdminDashboardPage() {
     );
   }
 
-  /* ========== Approve Drawer Flow ========== */
-  async function findApplicationDocUrl(app: Application): Promise<string> {
-    try {
-      const q1 = await supabase
+ /* ========== Approve Drawer Flow ========== */
+async function findApplicationDocUrl(app: Application): Promise<string> {
+  // Try 1: link by application_id
+  try {
+    const q1 = await supabase
+      .from('documents')
+      .select('file_key')
+      .eq('application_id', app.id)
+      .order('uploaded_at', { ascending: false })
+      .limit(1);
+    const key1 = q1.data?.[0]?.file_key as string | undefined;
+    if (key1) {
+      const url1 = toPublicUrl(key1);
+      if (url1) return url1;
+    }
+  } catch { /* ignored */ }
+
+  // Try 2: fallback by buyer/user id w/ label match
+  try {
+    const buyerId = (app as any).user_id || (app as any).buyer_id || null;
+    if (buyerId) {
+      const q2 = await supabase
         .from('documents')
         .select('file_key')
-        .eq('application_id', app.id)
+        .eq('buyer_id', buyerId)
+        .ilike('label', '%Application%')
         .order('uploaded_at', { ascending: false })
         .limit(1);
-      const key1 = q1.data?.[0]?.file_key as string | undefined;
-      if (key1) {
-        const url1 = toPublicUrl(key1);
-        if (url1) return url1;
+      const key2 = q2.data?.[0]?.file_key as string | undefined;
+      if (key2) {
+        const url2 = toPublicUrl(key2);
+        if (url2) return url2;
       }
-    } catch {}
-    try {
-      const buyerId = (app as any).user_id || (app as any).buyer_id || null;
-      if (buyerId) {
-        const q2 = await supabase
-          .from('documents')
-          .select('file_key')
-          .eq('buyer_id', buyerId)
-          .ilike('label', '%Application%')
-          .order('uploaded_at', { ascending: false })
-          .limit(1);
-        const key2 = q2.data?.[0]?.file_key as string | undefined;
-        if (key2) {
-          const url2 = toPublicUrl(key2);
-          if (url2) return url2;
-        }
-      }
-    } catch {}
-    return '';
-  }
-  async function onOpenApprove(app: Application) {
-    setActiveApp(app);
-    setApproveMsg('');
-    setSelectedPupId('');
-    setAppDocUrl('');
-    setApproveOpen(true);
-    await Promise.all([
-      loadAvailableOnly(),
-      (async () => {
-        const url = await findApplicationDocUrl(app);
-        if (url) setAppDocUrl(url);
-      })(),
-    ]);
-  }
-  /* ========== Simple handlers for Approve/Deny row actions ========== */
+    }
+  } catch { /* ignored */ }
+
+  return '';
+}
+
+async function onOpenApprove(app: Application) {
+  setActiveApp(app);
+  setApproveMsg('');
+  setSelectedPupId('');
+  setAppDocUrl('');
+  setApproveOpen(true);
+
+  await Promise.all([
+    loadAvailableOnly(),
+    (async () => {
+      const url = await findApplicationDocUrl(app);
+      if (url) setAppDocUrl(url);
+    })(),
+  ]);
+}
+
 async function approveAndAssign() {
   if (!activeApp) return;
   if (!selectedPupId) { setApproveMsg('Select a puppy to assign.'); return; }
@@ -567,7 +573,7 @@ async function approveAndAssign() {
       .eq('id', (activeApp as any).id);
     if (appErr) throw appErr;
 
-    // ✅ Refresh lists in parallel
+    // Refresh lists in parallel
     await Promise.all([
       loadApplications(appFilter),
       loadPuppies(puppySearchRef.current?.value || ''),
@@ -585,6 +591,25 @@ async function approveAndAssign() {
   }
 }
 
+/* ========== Simple handlers for Approve/Deny row actions ========== */
+async function approveApp(id: string) {
+  const { error } = await supabase
+    .from('applications')
+    .update({ status: 'approved' })
+    .eq('id', id);
+  if (error) alert(error.message);
+  else await loadApplications(appFilter);
+}
+
+async function denyApp(id: string) {
+  const { error } = await supabase
+    .from('applications')
+    .update({ status: 'denied' })
+    .eq('id', id);
+  if (error) alert(error.message);
+  else await loadApplications(appFilter);
+}
+ 
   /* ========== Form Handlers ========== */
   // Puppies
   /* ANCHOR: onAddPuppy */
