@@ -532,43 +532,58 @@ export default function AdminDashboardPage() {
     ]);
   }
   /* ========== Simple handlers for Approve/Deny row actions ========== */
-async function approveApp(id: string) {
-  const { error } = await supabase
-    .from('applications')
-    .update({ status: 'approved' })
-    .eq('id', id);
+async function approveAndAssign() {
+  if (!activeApp) return;
+  if (!selectedPupId) { setApproveMsg('Select a puppy to assign.'); return; }
+  setApproving(true);
+  setApproveMsg('');
 
-  if (error) {
-    alert(error.message);
-  } else {
-    await loadApplications(appFilter);
-  }
-}
-
-async function denyApp(id: string) {
-  const { error } = await supabase
-    .from('applications')
-    .update({ status: 'denied' })
-    .eq('id', id);
-
-  if (error) {
-    alert(error.message);
-  } else {
-    await loadApplications(appFilter);
-  }
-}
-        loadPuppies(puppySearchRef.current?.value || ''),
-      ]);
-      setApproveOpen(false);
-      setActiveApp(null);
-      setSelectedPupId('');
-      setApproveMsg('');
-    } catch (e: any) {
-      setApproveMsg(e?.message || 'Approval failed.');
-    } finally {
-      setApproving(false);
+  try {
+    // Reserve + link to application_id if that column exists
+    let pupError: any = null;
+    {
+      const { error } = await supabase
+        .from('puppies')
+        .update({ status: 'Reserved', application_id: (activeApp as any).id })
+        .eq('id', selectedPupId)
+        .eq('status', 'Available');
+      pupError = error;
     }
+
+    // Fallback: just reserve if linking fails due to missing column
+    if (pupError) {
+      const { error: fallbackErr } = await supabase
+        .from('puppies')
+        .update({ status: 'Reserved' })
+        .eq('id', selectedPupId)
+        .eq('status', 'Available');
+      if (fallbackErr) throw fallbackErr;
+    }
+
+    // Mark application approved
+    const { error: appErr } = await supabase
+      .from('applications')
+      .update({ status: 'approved' })
+      .eq('id', (activeApp as any).id);
+    if (appErr) throw appErr;
+
+    // ✅ Refresh lists in parallel
+    await Promise.all([
+      loadApplications(appFilter),
+      loadPuppies(puppySearchRef.current?.value || ''),
+    ]);
+
+    // Reset UI
+    setApproveOpen(false);
+    setActiveApp(null);
+    setSelectedPupId('');
+    setApproveMsg('');
+  } catch (e: any) {
+    setApproveMsg(e?.message || 'Approval failed.');
+  } finally {
+    setApproving(false);
   }
+}
 
   /* ========== Form Handlers ========== */
   // Puppies
