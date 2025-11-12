@@ -531,37 +531,32 @@ export default function AdminDashboardPage() {
       })(),
     ]);
   }
-  async function approveAndAssign() {
-    if (!activeApp) return;
-    if (!selectedPupId) { setApproveMsg('Select a puppy to assign.'); return; }
-    setApproving(true);
-    setApproveMsg('');
-    try {
-      let pupError: any = null;
-      {
-        const { error } = await supabase
-          .from('puppies')
-          .update({ status: 'Reserved', application_id: (activeApp as any).id })
-          .eq('id', selectedPupId)
-          .eq('status', 'Available');
-        pupError = error;
-      }
-      if (pupError) {
-        const { error: fallbackErr } = await supabase
-          .from('puppies')
-          .update({ status: 'Reserved' })
-          .eq('id', selectedPupId)
-          .eq('status', 'Available');
-        if (fallbackErr) throw fallbackErr;
-      }
-      const { error: appErr } = await supabase
-        .from('applications')
-        .update({ status: 'approved' })
-        .eq('id', (activeApp as any).id);
-      if (appErr) throw appErr;
+  /* ========== Simple handlers for Approve/Deny row actions ========== */
+async function approveApp(id: string) {
+  const { error } = await supabase
+    .from('applications')
+    .update({ status: 'approved' })
+    .eq('id', id);
 
-      await Promise.all([
-        loadApplications(appFilter),
+  if (error) {
+    alert(error.message);
+  } else {
+    await loadApplications(appFilter);
+  }
+}
+
+async function denyApp(id: string) {
+  const { error } = await supabase
+    .from('applications')
+    .update({ status: 'denied' })
+    .eq('id', id);
+
+  if (error) {
+    alert(error.message);
+  } else {
+    await loadApplications(appFilter);
+  }
+}
         loadPuppies(puppySearchRef.current?.value || ''),
       ]);
       setApproveOpen(false);
