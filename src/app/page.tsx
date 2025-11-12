@@ -2,387 +2,359 @@
 
 /* ============================================
    CHANGELOG
-   - 2025-11-12: Fix malformed CDN URLs (esm.sh primary, jsDelivr fallback)
-   - 2025-11-12: Guard missing env → Demo Mode (no throw)
-   - 2025-11-12: Remove hard import of 'next/link' for sandbox; use <a>
-   - 2025-11-12: Chihuahua‑themed landing with tabs, signup (OTP), quick cards
-   - 2025-11-12: Add visible Debug panel + self‑checks (non‑throwing)
-   - 2025-11-12: Extra UI tests for quick cards + tab labels
-   - 2025-11-12: **Prevent pre-bundle fetches** by constructing CDN URLs at runtime
+   - 2025-11-12: New public portal landing page (clean, modern, Chihuahua-themed)
+   - 2025-11-12: Tabs with inline SVG icons (Available Puppies, My Puppy, Documents, Payments, Transportation, Message, Profile)
+   - 2025-11-12: Supabase sign-up box on landing (runtime dynamic import; no build-time deps)
+   - 2025-11-12: Quick-action cards (Application to Adopt, Financing, FAQ, Support)
+   - 2025-11-12: Litters moved to separate "Available Puppies" dashboard (linked)
+   - 2025-11-12 (Rev E): REMOVE bad merge construct causing "Expected a semicolon".
+                         Use simple const tabs = [...] and safe routing for /messages.
+   ============================================
+   NOTE: Put this at `src/app/page.tsx` (portal root). If you instead serve under `/portal`,
+         change BASE = '/portal' below.
    ============================================ */
 
 import React, { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
-/**
- * Supabase client (browser-only) with robust CDN imports
- * - Avoids local path issues (e.g., '@/lib/supabase/client')
- * - esm.sh primary, jsDelivr fallback
- * - IMPORTANT: build-time bundlers sometimes try to prefetch URL imports.
- *   We construct the URLs at runtime (string concat) to avoid build-time fetches.
- * - If env missing, returns null (Demo Mode; UI explains)
- */
+/* ============================================
+   ANCHOR: SUPABASE (dynamic import, alias-free)
+   ============================================ */
 
 type AnyClient = any
 let __sb: AnyClient | null = null
 
-// CDN URL builders (runtime-only; prevents build from prefetching)
-const ESM_HOST = 'esm.sh'
-const JSDL_HOST = 'cdn.jsdelivr.net'
-const ESM_SUPABASE_V2 = `https://${ESM_HOST}/@supabase/supabase-js@2?bundle&target=es2022`
-const JSDL_SUPABASE_V2 = `https://${JSDL_HOST}/npm/@supabase/supabase-js@2/+esm`
-
 function getSupabaseEnv() {
   const g: any = (typeof window !== 'undefined' ? window : globalThis) as any
-  const hasProc = typeof process !== 'undefined' && (process as any)?.env
-  const url = hasProc
-    ? (process as any).env.NEXT_PUBLIC_SUPABASE_URL
-    : (g.NEXT_PUBLIC_SUPABASE_URL || g.__ENV?.NEXT_PUBLIC_SUPABASE_URL || '')
-  const key = hasProc
-    ? (process as any).env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    : (g.NEXT_PUBLIC_SUPABASE_ANON_KEY || g.__ENV?.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
+  const hasProc = typeof process !== 'undefined' && (process as any) && (process as any).env
+  const url = hasProc ? (process as any).env.NEXT_PUBLIC_SUPABASE_URL : (g.NEXT_PUBLIC_SUPABASE_URL || g.__ENV?.NEXT_PUBLIC_SUPABASE_URL || '')
+  const key = hasProc ? (process as any).env.NEXT_PUBLIC_SUPABASE_ANON_KEY : (g.NEXT_PUBLIC_SUPABASE_ANON_KEY || g.__ENV?.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
   return { url: String(url || ''), key: String(key || '') }
 }
 
-async function importSupabaseSdk() {
-  try {
-    // Primary: esm.sh (bundled ESM) — build-safe dynamic string
-    // @ts-ignore - external URL dynamic import
-    const mod: any = await import(ESM_SUPABASE_V2)
-    if (typeof mod?.createClient === 'function') return mod
-  } catch {}
-  try {
-    // Fallback: jsDelivr ESM — build-safe dynamic string
-    // @ts-ignore - external URL dynamic import
-    const mod2: any = await import(JSDL_SUPABASE_V2)
-    if (typeof mod2?.createClient === 'function') return mod2
-  } catch {}
-  return null
-}
-
-async function getBrowserClient(): Promise<AnyClient | null> {
+async function getBrowserClient(): Promise<AnyClient> {
   if (__sb) return __sb
   const { url, key } = getSupabaseEnv()
-  if (!url || !key) return null // Demo Mode: env not present in sandbox
-  const sdk = await importSupabaseSdk()
-  if (!sdk) return null
-  __sb = sdk.createClient(url, key)
-  return __sb
+  if (!url || !key) throw new Error('Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+  try {
+    const mod: any = await import('https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
+    __sb = mod.createClient(url, key)
+  } catch {
+    const mod2: any = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm')
+    __sb = (mod2 as any).createClient(url, key)
+  }
+  return __sb!
 }
 
 /* ============================================
-   Page Component
+   ANCHOR: CONSTANTS
    ============================================ */
-export default function PortalHomePage() {
-  const [email, setEmail] = useState('')
-  const [signing, setSigning] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [demoMode, setDemoMode] = useState(false)
-  const [debugOpen, setDebugOpen] = useState(false)
-  const [tests, setTests] = useState<Record<string, any>>({})
+const BASE = '' as const // change to '/portal' only if this file lives at src/app/portal/page.tsx
 
-  const tabs = useMemo(() => ([
-    { href: '/available-puppies', label: 'Available Puppies', icon: PawIcon },
-    { href: '/dashboard',        label: 'My Puppy',          icon: HeartIcon },
-    { href: '/documents',        label: 'Documents',         icon: DocIcon },
-    { href: '/payments',         label: 'Payments',          icon: CardIcon },
-    { href: '/transportation',   label: 'Transportation',    icon: CarIcon },
-    { href: '/messages',         label: 'Message',           icon: ChatIcon },
-    { href: '/profile',          label: 'Profile',           icon: UserIcon },
-  ]), []) => ([
-    { href: '/portal/available', label: 'Available Puppies', icon: PawIcon },
-    { href: '/portal/my-puppy', label: 'My Puppy', icon: HeartIcon },
-    { href: '/portal/documents', label: 'Documents', icon: DocIcon },
-    { href: '/portal/payments', label: 'Payments', icon: CardIcon },
-    { href: '/portal/transportation', label: 'Transportation', icon: CarIcon },
-    { href: '/portal/messages', label: 'Message', icon: ChatIcon },
-    { href: '/portal/profile', label: 'Profile', icon: UserIcon },
-  ]), [])
+const THEME = {
+  bg: '#f7e8d7',
+  panel: '#fff9f2',
+  ink: '#2e2a24',
+  muted: '#6f6257',
+  brand: '#b5835a',
+  brandAlt: '#9a6c49',
+  ok: '#2fa36b',
+}
 
-  useEffect(() => {
-    const { url, key } = getSupabaseEnv()
-    setDemoMode(!url || !key)
-    devSelfTests().then(setTests).catch(()=>{})
-  }, [])
+/* ============================================
+   ANCHOR: ICONS (inline SVG)
+   ============================================ */
+const IconPaw = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden fill="currentColor" {...props}>
+    <path d="M12 13c-2.6 0-5 1.9-5 4.2C7 19.4 8.6 21 10.7 21h2.6C15.4 21 17 19.4 17 17.2 17 14.9 14.6 13 12 13zm-5.4-2.1c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm10.8 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.5 9.7c1.3 0 2.3-1.2 2.3-2.7S10.8 4.3 9.5 4.3 7.2 5.5 7.2 7s1 2.7 2.3 2.7zm5 0c1.3 0 2.3-1.2 2.3-2.7s-1-2.7-2.3-2.7-2.3 1.2-2.3 2.7 1 2.7 2.3 2.7z"/>
+  </svg>
+)
+const IconDoc   = (p: any) => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M6 2h7l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1v4h4"/></svg>
+const IconCard  = (p: any) => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2H3V7zm0 4h18v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6zm3 5h4v2H6v-2z"/></svg>
+const IconTruck = (p: any) => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M3 7h11v7h2.5l2.2-3H21v6h-1a2 2 0 1 1-4 0H8a2 2 0 1 1-4 0H3V7zm14 8a2 2 0 0 1 2 2h-4a2 2 0 0 1 2-2zM6 17a2 2 0 0 1 2 2H4a2 2 0 0 1 2-2z"/></svg>
+const IconChat  = (p: any) => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M4 4h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4V6a2 2 0 0 1 2-2z"/></svg>
+const IconUser  = (p: any) => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5C21 16.5 17 14 12 14z"/></svg>
+const IconPuppy = (p: any) => (
+  <svg viewBox="0 0 64 64" width={18} height={18} fill="currentColor" {...p}>
+    <path d="M20 16c-5 0-9 4-9 9 0 6 3 9 3 12 0 3 2 5 5 5h1c2 5 6 8 12 8s10-3 12-8h1c3 0 5-2 5-5 0-3 3-6 3-12 0-5-4-9-9-9-4 0-7 2-9 5-2-3-5-5-9-5zM26 32a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm12 0a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM24 41c4 3 12 3 16 0 1-1 3 0 2 2-2 4-18 4-20 0-1-2 1-3 2-2z"/>
+  </svg>
+)
+
+/* ============================================
+   ANCHOR: NAV TABS (routes only; each tab has its own page)
+   ============================================ */
+const tabs = [
+  { key: 'available', label: 'Available Puppies', href: `${BASE}/available-puppies`, Icon: IconPuppy },
+  { key: 'mypuppy',   label: 'My Puppy',          href: `${BASE}/my-puppy`,         Icon: IconPaw   },
+  { key: 'docs',      label: 'Documents',         href: `${BASE}/documents`,        Icon: IconDoc   },
+  { key: 'payments',  label: 'Payments',          href: `${BASE}/payments`,         Icon: IconCard  },
+  { key: 'transport', label: 'Transportation',    href: `${BASE}/transportation`,   Icon: IconTruck },
+  { key: 'message',   label: 'Message',           href: `${BASE}/messages`,         Icon: IconChat  },
+  { key: 'profile',   label: 'Profile',           href: `${BASE}/profile`,          Icon: IconUser  },
+] as const
+
+type SignUpState = { name: string; email: string; pass: string; msg: string; busy: boolean }
+type TestResult = { name: string; status: 'pass'|'fail'|'skip'; detail?: string }
+
+/* ============================================
+   ANCHOR: PAGE
+   ============================================ */
+export default function PortalHome() {
+  const pathname = usePathname()
+  const [s, setS] = useState<SignUpState>({ name: '', email: '', pass: '', msg: '', busy: false })
+
+  const activeKey = useMemo(() => {
+    const match = tabs.find(t => pathname?.startsWith(t.href))
+    return match?.key ?? 'home'
+  }, [pathname])
 
   async function onSignUp(e: React.FormEvent) {
     e.preventDefault()
-    setMsg('')
-    setSigning(true)
+    setS(v => ({ ...v, msg: '', busy: true }))
     try {
-      const sb = await getBrowserClient()
-      if (!sb) {
-        setMsg('Demo Mode: sign-in disabled. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your hosting env.')
-        return
-      }
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        setMsg('Enter a valid email address.')
-        return
-      }
-      const { error } = await sb.auth.signInWithOtp({ email })
+      const { url, key } = getSupabaseEnv()
+      if (!url || !key) throw new Error('Missing Supabase env (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY)')
+      if (!s.email || !s.pass) throw new Error('Please enter email and password')
+
+      const supabase = await getBrowserClient()
+      const { error } = await supabase.auth.signUp({
+        email: s.email,
+        password: s.pass,
+        options: { data: { full_name: s.name } },
+      })
       if (error) throw error
-      setMsg('Check your email for the sign-in link!')
+      setS({ name: '', email: '', pass: '', msg: 'Account created. Please check your email to verify.', busy: false })
     } catch (err: any) {
-      setMsg(err?.message || 'Could not send sign-in link.')
-    } finally {
-      setSigning(false)
+      setS(v => ({ ...v, msg: err?.message || 'Sign up failed.', busy: false }))
     }
   }
 
+  const [showDev, setShowDev] = useState(false)
+  useEffect(() => {
+    try {
+      const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+      setShowDev(qs?.get('dev') === '1')
+    } catch {}
+  }, [])
+
   return (
-    <main className="wrap">
-      {/* SIDEBAR */}
-      <aside className="sidebar">
+    <main>
+      {/* =================== HEADER =================== */}
+      <header className="hdr">
         <div className="brand">
-          <div className="pupHead" aria-hidden />
-          <div className="brandText">
-            <div className="title">My Puppy</div>
-            <div className="subtitle">Portal</div>
+          <div className="pupmark" aria-hidden>
+            <span className="pawbubble"/>
+            <span className="pawbubble"/>
+            <span className="pawbubble"/>
+          </div>
+          <div className="title">
+            <div className="line1">My Puppy</div>
+            <div className="line2">Portal</div>
           </div>
         </div>
-        <nav className="tabs" data-testid="tabs" data-count={tabs.length}>
-          {tabs.map(({ href, label, icon: Icon }) => (
-            <a key={href} className="tab" href={href} data-testid={`tab-${label.replace(/\s+/g,'-').toLowerCase()}`}>
-              <Icon />
-              <span>{label}</span>
-            </a>
+
+        <nav className="tabs">
+          {tabs.map(({ key, label, href, Icon }) => (
+            <Link key={key} href={href} className={`tab ${activeKey===key ? 'active' : ''}`}>
+              <Icon /><span>{label}</span>
+            </Link>
           ))}
         </nav>
-        <div className="footNote">Southwest Virginia Chihuahua</div>
-      </aside>
+      </header>
 
-      {/* MAIN */}
-      <section className="main">
-        <header className="hero">
-          <div className="heroLeft">
-            <h1>Welcome to My Puppy Portal</h1>
-            <p className="lead">
-              Track your pup’s journey from whelping to gotcha day. View documents, make payments,
-              schedule transportation, and message the breeder — all in one place.
-            </p>
+      {/* =================== HERO =================== */}
+      <section className="hero">
+        <div className="heroInner">
+          <div className="heroText">
+            <h1>Welcome to <em>My Puppy Portal</em></h1>
+            <p className="lead">Your central hub to follow your Chihuahua puppy’s journey — from applications and payments to weekly milestones, documents, and transport.</p>
           </div>
-          <div className="heroRight">
-            <form className="signup" onSubmit={onSignUp} aria-label="Sign up for portal access">
-              <div className="signupTitle">Create your account</div>
-              <label htmlFor="email">Email</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e)=>setEmail(e.currentTarget.value)}
-                aria-required="true"
-              />
-              <button className="btn primary" type="submit" disabled={signing} data-testid="btn-signup">
-                {signing ? 'Sending link…' : 'Send sign-in link'}
-              </button>
-              {msg && <div className="note" role="status">{msg}</div>}
-              {demoMode && (
-                <div className="note muted" role="note" data-testid="demo-mode">Demo Mode enabled</div>
-              )}
-            </form>
-          </div>
-        </header>
 
-        {/* WHAT IS THE PORTAL */}
-        <section className="about">
-          <h2>What is the Puppy Portal?</h2>
-          <p>
-            A secure dashboard for applicants and buyers. After you apply and are approved, your puppy’s
-            profile appears with weekly updates — weights, milestones, socialization, and age‑appropriate
-            fun facts (weeks 1–8). You’ll also find your agreements, payment history, and transport options.
-          </p>
-        </section>
+          <form className="signup" onSubmit={onSignUp}>
+            <div className="signupHd"><IconPaw /> <span>Create your account</span></div>
+            <label>Full Name</label>
+            <input value={s.name} onChange={e=>setS(v=>({ ...v, name: e.target.value }))} placeholder="First Last" autoComplete="name" />
+            <label>Email</label>
+            <input type="email" value={s.email} onChange={e=>setS(v=>({ ...v, email: e.target.value }))} placeholder="you@example.com" autoComplete="email" required />
+            <label>Password</label>
+            <input type="password" value={s.pass} onChange={e=>setS(v=>({ ...v, pass: e.target.value }))} placeholder="••••••••" autoComplete="new-password" required />
+            <button className="btn primary" type="submit" disabled={s.busy}>{s.busy ? 'Creating…' : 'Sign Up'}</button>
+            {s.msg && <div className="note">{s.msg}</div>}
+            <div className="mini">Already have an account? <Link href={`${BASE}/login`}>Sign in</Link></div>
 
-        {/* QUICK ACTION CARDS */}
-        <section className="cardGrid" data-testid="quick-cards" data-count={4}>
-          $1/application$2 title="Application to Adopt" icon={<DocIcon />}>Start your application and tell us about your home, schedule, and preferences.</QuickCard>
-          <QuickCard data-testid="qc-finance" href="/financing" title="Financing Options" icon={<CardIcon />}>See deposit options and simple payment plans.</QuickCard>
-          <QuickCard data-testid="qc-faq" href="/faq" title="Frequently Asked Questions" icon={<HelpIcon />}>Answers about care, timing, registries (AKC/CKC/ACA), and more.</QuickCard>
-          <QuickCard data-testid="qc-support" href="/support" title="Support" icon={<ChatIcon />}>Need help? Send us a message — we usually reply quickly.</QuickCard>
-        </section>
-
-        {/* DEBUG PANEL (non-throwing) */}
-        <section className="debugWrap">
-          <button className="debugToggle" onClick={()=>setDebugOpen(v=>!v)} aria-expanded={debugOpen}>
-            {debugOpen ? 'Hide' : 'Show'} Debug
-          </button>
-          {debugOpen && (
-            <div className="debugPanel" data-testid="debug">
-              <div><b>Env present:</b> {tests.envPresent ? 'yes' : 'no'}</div>
-              {'esmHasCreateClient' in tests && (<div><b>esm.sh createClient:</b> {String(tests.esmHasCreateClient)}</div>)}
-              {'jsdelivrHasCreateClient' in tests && (<div><b>jsDelivr createClient:</b> {String(tests.jsdelivrHasCreateClient)}</div>)}
-              {tests.esmError && (<pre className="err">{tests.esmError}</pre>)}
-              {tests.jsdelivrError && (<pre className="err">{tests.jsdelivrError}</pre>)}
-              {tests.selfTestError && (<pre className="err">{tests.selfTestError}</pre>)}
-              <div style={{marginTop:8}}>
-                <b>UI assertions</b>
-                <ul>
-                  <li data-testid="t-tabs-7">Tabs count is 7: <b>{tests.tabs7 ? 'PASS' : 'FAIL'}</b></li>
-                  <li data-testid="t-hero-text">Hero text present: <b>{tests.heroText ? 'PASS' : 'FAIL'}</b></li>
-                  <li data-testid="t-demo-mode">Demo banner shown when env missing: <b>{tests.demoBannerOk ? 'PASS' : 'FAIL'}</b></li>
-                  <li data-testid="t-quick-4">Quick cards count is 4: <b>{tests.quick4 ? 'PASS' : 'FAIL'}</b></li>
-                  <li data-testid="t-tab-labels">All tab labels present: <b>{tests.tabLabelsOk ? 'PASS' : 'FAIL'}</b></li>
-                  <li data-testid="t-signup-btn">Signup button present: <b>{tests.signupBtn ? 'PASS' : 'FAIL'}</b></li>
-                  <li data-testid="t-tab-hrefs">Tab hrefs valid: <b>{tests.tabHrefsOk ? 'PASS' : 'FAIL'}</b></li>
-                  <li data-testid="t-quick-hrefs">Quick card hrefs valid: <b>{tests.quickHrefsOk ? 'PASS' : 'FAIL'}</b></li>
-                </ul>
+            {(!getSupabaseEnv().url || !getSupabaseEnv().key) && (
+              <div className="note" style={{marginTop:8}}>
+                <b>Setup required:</b> Define <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
               </div>
-            </div>
-          )}
-        </section>
+            )}
+          </form>
+        </div>
       </section>
 
-      {/* STYLES */}
-      <style jsx global>{`
+      {/* =================== WHAT TO EXPECT =================== */}
+      <section className="about">
+        <div className="wrap">
+          <h2>What is the Puppy Portal?</h2>
+          <p>A friendly, secure dashboard for Southwest Virginia Chihuahua families. Track weekly weights and milestones, view and sign your documents, manage payments, schedule transportation, and chat with us — all in one place.</p>
+        </div>
+      </section>
+
+      {/* =================== QUICK ACTION CARDS =================== */}
+      <section className="cards">
+        <div className="wrap grid">
+          <ActionCard icon={<IconDoc />}  title="Application to Adopt"        body="Start or review your application."                         href={`${BASE}/application`} cta="Open Application" />
+          <ActionCard icon={<IconCard />} title="Financing Options"           body="See deposit info and payment plans."                      href={`${BASE}/financing`}   cta="View Financing" />
+          <ActionCard icon={<IconPaw />}  title="Frequently Asked Questions"  body="Answers about care, timelines, and more."                 href={`${BASE}/faq`}         cta="Read FAQs" />
+          <ActionCard icon={<IconChat />} title="Support"                     body="Need help? Message the breeder."                          href={`${BASE}/messages`}    cta="Contact Us" />
+        </div>
+      </section>
+
+      {/* =================== DEV SELF-TESTS =================== */}
+      {showDev && <DevSelfTests />}
+
+      <footer className="ft">
+        <div className="wrap">
+          <div className="ftInner">
+            <span className="mini">© {new Date().getFullYear()} Southwest Virginia Chihuahua</span>
+            <span className="mini">Friendly • Welcoming • High-Tech</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* =================== STYLES =================== */}
+      <style jsx>{`
         :root{
-          --bg:#fbf8f4; --panel:#ffffff; --panelAlt:#fff8ef; --ink:#2e2a24; --muted:#6f6257;
-          --brand:#b5835a; --brandHi:#c89566; --ok:#2fa36b; --warn:#d28512; --ring:rgba(181,131,90,.25);
+          --bg:${THEME.bg};--panel:${THEME.panel};--ink:${THEME.ink};--muted:${THEME.muted};
+          --brand:${THEME.brand};--brandAlt:${THEME.brandAlt};--ok:${THEME.ok};
         }
-        html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
-        a{color:inherit;text-decoration:none}
-
-        .wrap{min-height:100vh;display:grid;grid-template-columns:300px 1fr}
-        .sidebar{background:var(--panel);border-right:1px solid #eadfda;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
-        .brand{display:flex;align-items:center;gap:12px;padding:18px 16px;border-bottom:1px solid #f0e6df}
-        .pupHead{width:40px;height:40px;border-radius:12px;background:conic-gradient(from 210deg at 50% 50%,#b5835a, #9a6c49, #b5835a);box-shadow:inset 0 0 0 4px #fff}
-        .brandText .title{font-weight:800;letter-spacing:.2px}
-        .brandText .subtitle{text-align:center;font-weight:500;color:var(--muted);margin-top:2px}
-
-        .tabs{padding:10px 10px 16px;display:grid;gap:6px}
-        .tab{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid #efe6df;background:#fff}
-        .tab:hover{background:var(--panelAlt);border-color:#eadfda}
-        .tab svg{width:18px;height:18px;opacity:.9}
-
-        .footNote{margin-top:auto;padding:12px 16px;font-size:.85rem;color:var(--muted);border-top:1px solid #f0e6df}
-
-        .main{padding:28px}
-        .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:20px;align-items:stretch}
-        .heroLeft h1{margin:0 0 10px;font-size:2rem}
-        .lead{margin:0;background:linear-gradient(180deg,#fff8ef,#ffffff);padding:14px;border:1px solid #f0e6da;border-radius:14px}
-
-        .signup{background:#fff;border:1px solid #eadfda;border-radius:16px;padding:16px;display:grid;gap:8px;box-shadow:0 10px 24px rgba(0,0,0,.04)}
-        .signupTitle{font-weight:700}
-        label{font-size:.9rem;margin-top:6px}
-        input{padding:10px;border:1px solid #ddd;border-radius:10px;outline:0}
-        input:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
-        .btn{appearance:none;border:1px solid var(--brand);background:var(--brand);color:#fff;padding:10px 12px;border-radius:10px;cursor:pointer}
-        .btn.primary:hover{filter:brightness(.98)}
-        .note{font-size:.9rem;background:#fff8ef;border:1px solid #eadfda;padding:8px 10px;border-radius:10px}
-        .note.muted{background:#f8f5f1;color:var(--muted)}
-
-        .about{margin-top:22px}
-        .about h2{margin:0 0 6px}
-        .about p{margin:0;color:var(--muted)}
-
-        .cardGrid{margin-top:16px;display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
-        .card{grid-column:span 12;background:#fff;border:1px solid #eadfda;border-radius:16px;padding:14px;display:grid;gap:6px}
-        .card .hd{display:flex;align-items:center;gap:10px;font-weight:700}
-        .card .desc{color:var(--muted)}
-        @media(min-width:900px){.card.span3{grid-column:span 3}}
-
-        .debugWrap{margin-top:24px}
-        .debugToggle{background:#fff;border:1px dashed #d9cfc7;border-radius:10px;padding:8px 10px;cursor:pointer}
-        .debugPanel{margin-top:10px;background:#fff;border:1px solid #eadfda;border-radius:12px;padding:12px}
-        .err{white-space:pre-wrap;background:#fff1f1;border:1px solid #f0cccc;padding:8px;border-radius:8px}
+        main{min-height:100vh;background:
+          radial-gradient(60% 100% at 100% 0%, #fff6ee 0%, transparent 60%),
+          radial-gradient(60% 100% at 0% 0%, #fff2e6 0%, transparent 60%),
+          var(--bg);color:var(--ink)}
+        .wrap{max-width:1200px;margin:0 auto;padding:0 16px}
+        .hdr{position:sticky;top:0;z-index:10;backdrop-filter:saturate(1.1) blur(8px);
+             background:linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.6));
+             border-bottom:1px solid #eddccd;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px}
+        .brand{display:flex;align-items:center;gap:12px}
+        .pupmark{position:relative;width:42px;height:42px;border-radius:12px;
+                 background:linear-gradient(135deg, var(--brand), var(--brandAlt));box-shadow:inset 0 0 0 4px #fff}
+        .pawbubble{position:absolute;width:8px;height:8px;background:#fff;border-radius:50%;opacity:.7}
+        .pawbubble:nth-child(1){top:10px;left:10px}.pawbubble:nth-child(2){top:14px;left:22px}.pawbubble:nth-child(3){top:22px;left:16px}
+        .title{line-height:1}.title .line1{font-weight:800;letter-spacing:.2px}.title .line2{text-align:center;font-size:.9rem;color:var(--muted)}
+        .tabs{display:flex;gap:6px;flex-wrap:wrap}
+        .tab{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.7);border:1px solid #eddccd;color:var(--ink);text-decoration:none;transition:transform .12s ease, background .12s ease}
+        .tab:hover{transform:translateY(-1px);background:#fff}
+        .tab.active{background:linear-gradient(135deg,var(--brand),var(--brandAlt)); color:#fff; border-color:transparent}
+        .hero{padding:36px 16px}
+        .heroInner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1.2fr .8fr;gap:24px;align-items:stretch}
+        @media (max-width: 900px){ .heroInner{grid-template-columns:1fr} }
+        .heroText h1{font-size:clamp(28px,3.2vw,44px);margin:0 0 8px}
+        .heroText h1 em{font-style:normal;color:var(--brand)}
+        .lead{color:var(--muted);font-size:1.05rem;margin:0}
+        .signup{background:rgba(255,255,255,.68);border:1px solid #eddccd;border-radius:16px;padding:16px;backdrop-filter:blur(10px); box-shadow:0 6px 28px rgba(0,0,0,.06)}
+        .signupHd{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;color:var(--brand)}
+        .signup label{display:block;margin-top:8px;font-size:.9rem}
+        .signup input{width:100%;padding:10px;border:1px solid #e6d7c7;border-radius:10px;background:#fff}
+        .signup input:focus{outline:none;box-shadow:0 0 0 4px rgba(181,131,90,.2);border-color:var(--brand)}
+        .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer}
+        .btn.primary{margin-top:12px;background:linear-gradient(135deg,var(--brand),var(--brandAlt));border-color:transparent;color:#fff}
+        .note{margin-top:8px;background:#fff;border:1px dashed #e6d7c7;padding:8px;border-radius:8px;color:var(--muted)}
+        .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
+        .about{padding:8px 16px 0}.about .wrap{max-width:900px}.about h2{margin:0 0 6px}.about p{margin:0;color:var(--muted)}
+        .cards{padding:18px 16px 42px}
+        .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;max-width:1200px;margin:0 auto}
+        .card{grid-column:span 12;background:var(--panel);border:1px solid #eddccd;border-radius:16px;padding:16px;box-shadow:0 10px 28px rgba(0,0,0,.05)}
+        @media (min-width:900px){ .span6{grid-column:span 6} }
+        .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);backdrop-filter:blur(6px)}
+        .ft .ftInner{max-width:1200px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;justify-content:space-between;color:var(--muted)}
+        .tests{max-width:1200px;margin:0 auto 24px; padding:0 16px}
+        .tests .panel{background:#fff;border:1px solid #eddccd;border-radius:12px;padding:12px}
+        .tests .row{display:flex;gap:10px;align-items:center;border:1px solid #f1e7dc;border-radius:10px;padding:8px;margin:6px 0;background:#fff}
+        .tests .ok{color:#1e6a46}.tests .bad{color:#a33}
       `}</style>
     </main>
   )
 }
 
 /* ============================================
-   Components
+   ANCHOR: REUSABLE CARD
    ============================================ */
-function QuickCard({ href, title, icon, children, ...rest }:{ href:string; title:string; icon:React.ReactNode; children:React.ReactNode } & React.HTMLAttributes<HTMLAnchorElement>){
+function ActionCard({ icon, title, body, href, cta }:{ icon: React.ReactNode; title: string; body: string; href: string; cta: string }){
   return (
-    <a href={href} className="card span3" {...rest}>
-      <div className="hd">{icon}<span>{title}</span></div>
-      <div className="desc">{children}</div>
-    </a>
+    <div className="card span6">
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+        <div style={{color:THEME.brand}}>{icon}</div>
+        <h3 style={{margin:0}}>{title}</h3>
+      </div>
+      <p style={{margin:'6px 0 12px', color: THEME.muted}}>{body}</p>
+      <Link href={href} className="btn" style={{textDecoration:'none'}}> {cta} </Link>
+    </div>
   )
 }
 
-/* Icons: small, cute, Chihuahua‑adjacent */
-function PawIcon(){return (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M5.5 10.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm13 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9 8c1.1 0 2-.9 2-2S10.1 4 9 4 7 4.9 7 6s.9 2 2 2zm6 0c1.1 0 2-.9 2-2S16.1 4 15 4s-2 .9-2 2 .9 2 2 2zM12 10c-3.3 0-6 2.2-6 5 0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2 0-2.8-2.7-5-6-5z"/></svg>
-)}
-function HeartIcon(){return (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12.1 21.35l-1.1-1.02C5.1 14.9 2 12.07 2 8.5 2 6 4 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.59 4.81 14.26 4 16 4 18.5 4 20.5 6 20.5 8.5c0 3.57-3.1 6.4-8.9 11.83z"/></svg>
-)}
-function DocIcon(){return (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM8 14h8v2H8v-2zm0-4h8v2H8V10zm6-6.5L20.5 10H14V3.5z"/></svg>
-)}
-function CardIcon(){return (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M2 6c0-1.1.9-2 2-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm2 1v2h16V7H4zm0 5v5h16v-5H4z"/></svg>
-)}
-function CarIcon(){return (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M5 11l1.5-4.5A2 2 0 018.4 5h7.2a2 2 0 011.9 1.5L19 11v6a1 1 0 01-1 1h-1a2 2 0 01-4 0H11a2 2 0 01-4 0H6a1 1 0 01-1-1v-6zm2.2-4l-1 3h11.6l-1-3H7.2z"/></svg>
-)}
-function ChatIcon(){return (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M4 4h16a2 2 0 012 2v9a2 2 0 01-2 2H9l-5 3V6a2 2 0 012-2z"/></svg>
-)}
-function HelpIcon(){return (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 15a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm1-5.9V12h-2v-1.5c0-1.7 2-1.9 2.7-3.4.5-1-1-1.6-1.9-1.6-1 0-1.7.5-2 .9l-1.5-1.3C9 3.9 10.4 3 12 3c1.8 0 3.6 1 3.9 2.7.5 2.2-2.9 2.8-2.9 5.4z"/></svg>
-)}
-function UserIcon(){return (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z"/></svg>
-)}
-
 /* ============================================
-   Dev Self-Tests (non-throwing) + UI assertions
+   ANCHOR: DEV SELF-TESTS (simple “test cases”)
+   Visit with ?dev=1 to toggle.
    ============================================ */
-async function devSelfTests(){
-  const results: Record<string, any> = {}
-  try {
-    const env = getSupabaseEnv()
-    results.envPresent = !!(env.url && env.key)
-    if (!results.envPresent) {
-      console.warn('[Puppy Portal] Demo Mode: env vars not found, auth disabled.')
-    } else {
-      // Try both CDNs without throwing; use runtime-built URLs so bundler won't prefetch
+function DevSelfTests(){
+  const [{ results, running }, setState] = useState<{results: TestResult[]; running: boolean}>({ results: [], running: true })
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const out: TestResult[] = []
+
+      const { url, key } = getSupabaseEnv()
+      out.push({ name: 'env vars present', status: (!url || !key) ? 'fail' : 'pass', detail: (!url || !key) ? 'Set NEXT_PUBLIC_SUPABASE_URL & NEXT_PUBLIC_SUPABASE_ANON_KEY' : undefined })
+
       try {
-        // @ts-ignore
-        const mod: any = await import(ESM_SUPABASE_V2)
-        results.esmHasCreateClient = typeof mod.createClient === 'function'
-      } catch (e) {
-        results.esmError = String(e)
+        const mod: any = await import('https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
+        out.push({ name: 'dynamic import supabase-js', status: mod?.createClient ? 'pass' : 'fail' })
+      } catch (e: any) {
+        out.push({ name: 'dynamic import supabase-js', status: 'fail', detail: e?.message })
       }
-      try {
-        // @ts-ignore
-        const mod2: any = await import(JSDL_SUPABASE_V2)
-        results.jsdelivrHasCreateClient = typeof mod2.createClient === 'function'
-      } catch (e) {
-        results.jsdelivrError = String(e)
+
+      // Tabs test cases (so we never regress the bad merge again)
+      out.push({ name: 'tabs length == 7', status: tabs.length === 7 ? 'pass' : 'fail', detail: `len=${tabs.length}` })
+      out.push({ name: "has '/messages' tab", status: tabs.some(t => t.href.endsWith('/messages')) ? 'pass' : 'fail' })
+
+      if (!url || !key) {
+        out.push({ name: 'client initialized', status: 'skip', detail: 'missing env' })
+        out.push({ name: 'auth.getSession()', status: 'skip', detail: 'missing env' })
+      } else {
+        try {
+          const sb = await getBrowserClient()
+          out.push({ name: 'client initialized', status: sb ? 'pass' : 'fail' })
+          const { data, error } = await sb.auth.getSession()
+          out.push({ name: 'auth.getSession()', status: error ? 'fail' : 'pass', detail: error?.message || (data?.session ? 'session present' : 'no session (ok)') })
+        } catch (e: any) {
+          out.push({ name: 'client initialized', status: 'fail', detail: e?.message })
+          out.push({ name: 'auth.getSession()', status: 'skip', detail: 'init failed' })
+        }
       }
-    }
-    // UI assertions (non-throwing)
-    const nav = document.querySelector('[data-testid="tabs"]')
-    const count = nav?.getAttribute('data-count')
-    results.tabs7 = count === '7'
-    results.heroText = /Welcome to My Puppy Portal/i.test(document.body.textContent || '')
-    const demoBanner = document.querySelector('[data-testid="demo-mode"]')
-    results.demoBannerOk = !!demoBanner || results.envPresent // banner shows only when env missing
 
-    const qcWrap = document.querySelector('[data-testid="quick-cards"]')
-    results.quick4 = qcWrap?.getAttribute('data-count') === '4'
+      if (!cancelled) setState({ results: out, running: false })
+    })()
+    return () => { cancelled = true }
+  }, [])
 
-    const wantLabels = ['Available Puppies','My Puppy','Documents','Payments','Transportation','Message','Profile']
-    results.tabLabelsOk = wantLabels.every(lbl => !!document.querySelector(`[data-testid="tab-${lbl.replace(/\s+/g,'-').toLowerCase()}"]`))
-
-    // Added tests
-    results.signupBtn = !!document.querySelector('[data-testid="btn-signup"]')
-    const tabAnchors = Array.from(document.querySelectorAll('.tabs .tab')) as HTMLAnchorElement[]
-    results.tabHrefsOk = tabAnchors.every(a =>
-      /^\/(available-puppies|dashboard|documents|payments|transportation|messages|profile)$/.test(a.getAttribute('href') || '')
-    )$/.test(a.getAttribute('href') || ''))
-    const quickAnchors = Array.from(document.querySelectorAll('[data-testid="quick-cards"] a')) as HTMLAnchorElement[]
-    results.quickHrefsOk = quickAnchors.every(a =>
-      /^(\/application|\/financing|\/faq|\/support)$/.test(a.getAttribute('href') || '')
-    )$/.test(a.getAttribute('href') || ''))
-  } catch (e) {
-    results.selfTestError = String(e)
-  } finally {
-    ;(globalThis as any).__PORTAL_TESTS = results
-    return results
-  }
+  return (
+    <section className="tests">
+      <div className="panel">
+        <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
+        <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to toggle. These are smoke tests.</div>
+        {running && <div className="row">Running tests…</div>}
+        {results.map((r,i) => (
+          <div key={i} className="row">
+            <span style={{minWidth:180,fontWeight:600}}>{r.name}</span>
+            <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
+              {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }
