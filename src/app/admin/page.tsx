@@ -6,6 +6,7 @@
    - 2025-11-11: Fix: newline-safe Recent Activity via NL constant
    - 2025-11-11: Add Puppy uses Sire/Dam dropdowns from dogs table
    - 2025-11-11: Buyers tab: Add + Edit + Delete (full CRUD)
+   - 2025-11-11: Applications: Review/Approve drawer with puppy assignment
    ============================================ */
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -16,7 +17,7 @@ type Puppy = {
   id: string;
   name: string | null;
   price: number | null;
-  status: 'Available' | 'Reserved' | 'Sold';
+  status: 'Available' | 'Reserved' | 'Sold' | null;
   gender: 'Male' | 'Female' | null;
   registry: 'AKC' | 'CKC' | 'ACA' | null;
   dob: string | null;
@@ -24,10 +25,12 @@ type Puppy = {
   photos: any[] | null;
   sire_id: string | null;
   dam_id: string | null;
+  application_id?: string | null; // may not exist yet; code guards for it
   created_at?: string | null;
 };
 type Application = {
   id: string;
+  user_id?: string | null; // optional if present in your table
   buyer_name: string | null;
   email: string | null;
   phone: string | null;
@@ -61,11 +64,12 @@ type MessageRow = {
 };
 type DocRow = {
   id: string;
-  buyer_id: string | null;
-  puppy_id: string | null;
-  label: string | null;
+  application_id?: string | null; // might not exist in your table yet
+  buyer_id?: string | null;
+  puppy_id?: string | null;
+  label?: string | null;
   file_key: string | null;
-  uploaded_at: string | null;
+  uploaded_at?: string | null;
 };
 type Transport = {
   id: string;
@@ -152,6 +156,15 @@ export default function AdminDashboardPage() {
   const [reportSignals, setReportSignals] = useState<string[]>([]);
   const [paymentsAscii, setPaymentsAscii] = useState<string>('');
 
+  // Approve Drawer
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [activeApp, setActiveApp] = useState<Application | null>(null);
+  const [availablePups, setAvailablePups] = useState<Puppy[]>([]);
+  const [selectedPupId, setSelectedPupId] = useState<string>('');
+  const [appDocUrl, setAppDocUrl] = useState<string>('');
+  const [approving, setApproving] = useState(false);
+  const [approveMsg, setApproveMsg] = useState<string>('');
+
   /* ========== Helpers ========== */
   function fmtMoney(n: number | null | undefined) {
     if (n == null || Number.isNaN(n)) return '-';
@@ -217,6 +230,14 @@ export default function AdminDashboardPage() {
     }
     const { data } = await rq;
     setPuppies((data as Puppy[]) || []);
+  }
+  async function loadAvailableOnly() {
+    const { data } = await supabase.from('puppies')
+      .select('id,name,status,gender,registry,price,dob,ready_date,photos,application_id')
+      .eq('status', 'Available')
+      .order('dob', { ascending: true })
+      .limit(200);
+    setAvailablePups((data as Puppy[]) || []);
   }
 
   async function loadDogs() {
@@ -306,7 +327,108 @@ export default function AdminDashboardPage() {
     }).join(NL);
   }
 
-  /* ========== Handlers ========== */
+  /* ========== Approve Drawer Flow ========== */
+  async function findApplicationDocUrl(app: Application): Promise<string> {
+    // Try 1: documents.application_id = app.id (if column exists)
+    try {
+      const q1 = await supabase
+        .from('documents')
+        .select('file_key,uploaded_at')
+        .eq('application_id', app.id)
+        .order('uploaded_at', { ascending: false })
+        .limit(1);
+      if (!q1.error && q1.data?.[0]?.file_key) {
+        const pub = await supabase.storage.from('docs').getPublicUrl(q1.data[0].file_key);
+        if (!pub.error) return pub.data.publicUrl || '';
+      }
+    } catch {/* ignored */}
+    // Try 2: by buyer_id if user_id is present and label looks like an application
+    try {
+      if (app.user_id) {
+        const q2 = await supabase
+          .from('documents')
+          .select('file_key,uploaded_at,label')
+          .eq('buyer_id', app.user_id)
+          .ilike('label', '%Application%')
+          .order('uploaded_at', { ascending: false })
+          .limit(1);
+        if (!q2.error && q2.data?.[0]?.file_key) {
+          const pub = await supabase.storage.from('docs').getPublicUrl(q2.data[0].file_key);
+          if (!pub.error) return pub.data.publicUrl || '';
+        }
+      }
+    } catch {/* ignored */}
+    return '';
+  }
+
+  async function onOpenApprove(app: Application) {
+    setActiveApp(app);
+    setApproveMsg('');
+    setSelectedPupId('');
+    setAppDocUrl('');
+    setApproveOpen(true);
+    await Promise.all([
+      loadAvailableOnly(),
+      (async () => { const url = await findApplicationDocUrl(app); if (url) setAppDocUrl(url); })()
+    ]);
+  }
+
+  async function approveAndAssign() {
+    if (!activeApp) return;
+    if (!selectedPupId) { setApproveMsg('Select a puppy to assign.'); return; }
+    setApproving(true);
+    setApproveMsg('');
+
+    try {
+      // Try to reserve + link (if application_id exists). If it errors (unknown column), fallback to just reserving.
+      let pupError: any = null;
+      {
+        const { error } = await supabase
+          .from('puppies')
+          .update({ status: 'Reserved', application_id: activeApp.id as any })
+          .eq('id', selectedPupId)
+          .eq('status', 'Available');
+        pupError = error;
+      }
+      if (pupError) {
+        const { error: fallbackErr } = await supabase
+          .from('puppies')
+          .update({ status: 'Reserved' })
+          .eq('id', selectedPupId)
+          .eq('status', 'Available');
+        if (fallbackErr) throw fallbackErr;
+      }
+
+      const { error: appErr } = await supabase
+        .from('applications')
+        .update({ status: 'approved' })
+        .eq('id', activeApp.id);
+      if (appErr) throw appErr;
+
+      await Promise.all([loadApplications(appFilter), loadPuppies(puppySearchRef.current?.value || '')]);
+      setApproveOpen(false);
+      setActiveApp(null);
+      setSelectedPupId('');
+      setApproveMsg(''); // success
+    } catch (e: any) {
+      setApproveMsg(e?.message || 'Approval failed.');
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  /* ========== Simple handlers for old Approve/Deny fallbacks ========== */
+  async function approveApp(id: string) {
+    // Kept for “Deny” row action + quick approve without assignment
+    const { error } = await supabase.from('applications').update({ status: 'approved' }).eq('id', id);
+    if (error) alert(error.message); else loadApplications(appFilter);
+  }
+  async function denyApp(id: string) {
+    const { error } = await supabase.from('applications').update({ status: 'denied' }).eq('id', id);
+    if (error) alert(error.message); else loadApplications(appFilter);
+  }
+
+  /* ========== Form Handlers (existing) ========== */
   // Puppies
   async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setPuppyMsg('');
@@ -335,16 +457,6 @@ export default function AdminDashboardPage() {
     if (!confirm('Delete this puppy?')) return;
     const { error } = await supabase.from('puppies').delete().eq('id', id);
     if (error) alert(error.message); else loadPuppies(puppySearchRef.current?.value || '');
-  }
-
-  // Applications
-  async function approveApp(id: string) {
-    const { error } = await supabase.from('applications').update({ status: 'approved' }).eq('id', id);
-    if (error) alert(error.message); else loadApplications(appFilter);
-  }
-  async function denyApp(id: string) {
-    const { error } = await supabase.from('applications').update({ status: 'denied' }).eq('id', id);
-    if (error) alert(error.message); else loadApplications(appFilter);
   }
 
   // Payments
@@ -606,7 +718,7 @@ export default function AdminDashboardPage() {
                             <td>{p.registry || '-'}</td>
                             <td>{p.gender || '-'}</td>
                             <td>{fmtMoney(p.price)}</td>
-                            <td><Badge status={p.status} /></td>
+                            <td><Badge status={p.status || undefined} /></td>
                             <td><div className="actions">
                               <a className="btn" href={`/admin/puppies/${p.id}`}>Edit</a>
                               <button className="btn" onClick={()=>onDeletePuppy(p.id)}>Delete</button>
@@ -684,10 +796,14 @@ export default function AdminDashboardPage() {
                         <td>{a.buyer_name || '-'}</td><td>{a.email || '-'}</td><td>{a.phone || '-'}</td>
                         <td><Badge status={a.status || 'submitted'} /></td>
                         <td>{a.submitted_at ? new Date(a.submitted_at).toLocaleString() : '-'}</td>
-                        <td><div className="actions">
-                          <button className="btn" onClick={()=>approveApp(a.id)}>Approve</button>
-                          <button className="btn" onClick={()=>denyApp(a.id)}>Deny</button>
-                        </div></td>
+                        <td>
+                          <div className="actions">
+                            <button className="btn" onClick={()=>onOpenApprove(a)}>Review / Approve</button>
+                            <button className="btn" onClick={()=>denyApp(a.id)}>Deny</button>
+                            {/* quick approve fallback */}
+                            {/* <button className="btn" onClick={()=>approveApp(a.id)}>Quick Approve</button> */}
+                          </div>
+                        </td>
                       </tr>
                     ))}</tbody>
                   </table>
@@ -883,7 +999,7 @@ export default function AdminDashboardPage() {
                     <thead><tr><th>Label</th><th>Buyer</th><th>Puppy</th><th>File</th><th>Uploaded</th></tr></thead>
                     <tbody>{docs.map(d=>(
                       <tr key={d.id}>
-                        <td>{d.label || '-'}</td><td>{d.buyer_id || '-'}</td><td>{d.puppy_id || '-'}</td>
+                        <td>{d.label || '-'}</td><td>{(d as any).buyer_id || '-'}</td><td>{(d as any).puppy_id || '-'}</td>
                         <td><OpenDocLink supabase={supabase as any} file_key={d.file_key || ''} /></td>
                         <td>{d.uploaded_at ? new Date(d.uploaded_at).toLocaleString() : '-'}</td>
                       </tr>
@@ -956,6 +1072,57 @@ export default function AdminDashboardPage() {
         </section>
       </div>
 
+      {/* Approve Drawer */}
+      {approveOpen && activeApp && (
+        <div className="drawer" role="dialog" aria-modal="true">
+          <div className="drawer-panel">
+            <div className="drawer-hd">
+              <h2>Review & Approve</h2>
+              <button className="x" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }}>×</button>
+            </div>
+            <div className="drawer-body">
+              <section className="section">
+                <h3>Application</h3>
+                <div className="kv">
+                  <div><label>Name</label><span>{activeApp.buyer_name || '—'}</span></div>
+                  <div><label>Email</label><span>{activeApp.email || '—'}</span></div>
+                  <div><label>Phone</label><span>{activeApp.phone || '—'}</span></div>
+                  <div><label>Status</label><span>{activeApp.status || '—'}</span></div>
+                  <div><label>Submitted</label><span>{activeApp.submitted_at ? new Date(activeApp.submitted_at).toLocaleString() : '—'}</span></div>
+                </div>
+                {appDocUrl ? (
+                  <div style={{marginTop:8}}>
+                    <a className="btn" href={appDocUrl} target="_blank" rel="noreferrer">Open Application PDF</a>
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="section">
+                <h3>Assign Puppy (sets status to Reserved)</h3>
+                <div className="assign">
+                  <select value={selectedPupId} onChange={e=>setSelectedPupId(e.target.value)}>
+                    <option value="">— Select an Available puppy —</option>
+                    {availablePups.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name || 'Unnamed'} • {p.gender || '—'} • {p.registry || '—'} • {fmtMoney(p.price)}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="btn primary" disabled={!selectedPupId || approving} onClick={approveAndAssign}>
+                    {approving ? 'Approving…' : 'Approve & Assign'}
+                  </button>
+                </div>
+                {approveMsg && <div className="notice" style={{marginTop:10}}>{approveMsg}</div>}
+                <p className="crumbs" style={{marginTop:8}}>
+                  This will set the puppy’s status to <b>Reserved</b> and mark the application <b>approved</b>.
+                </p>
+              </section>
+            </div>
+          </div>
+          <div className="scrim" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }} />
+        </div>
+      )}
+
       {/* Styles */}
       <style jsx global>{`
         :root{
@@ -1009,6 +1176,21 @@ export default function AdminDashboardPage() {
         .stat{display:flex;align-items:center;gap:12px}
         .dot{width:10px;height:10px;border-radius:50%;background:var(--brand)}
         .kpi{font-size:1.6rem;font-weight:700}
+
+        /* Drawer */
+        .drawer{position:fixed;inset:0;display:flex;justify-content:flex-end;z-index:60}
+        .scrim{position:absolute;inset:0;background:rgba(0,0,0,.25)}
+        .drawer-panel{position:relative;width:min(600px,95vw);height:100%;background:#fff;border-left:1px solid #e8ded2;box-shadow:-8px 0 24px rgba(0,0,0,.08);display:flex;flex-direction:column}
+        .drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #f0e6da}
+        .x{font-size:22px;line-height:1;border:0;background:transparent;cursor:pointer;padding:4px 8px}
+        .drawer-body{padding:12px 14px;overflow:auto}
+        .section{margin-bottom:16px}
+        .section h3{margin:0 0 8px}
+        .kv{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 14px}
+        .kv label{display:block;font-size:.85rem;color:var(--muted)}
+        .kv span{display:block}
+        .assign{display:flex;gap:10px;align-items:center}
+        .assign select{flex:1;min-width:220px;padding:8px 10px;border:1px solid #e3d6c9;border-radius:10px}
       `}</style>
     </main>
   );
