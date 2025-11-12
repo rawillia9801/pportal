@@ -7,6 +7,7 @@
    - 2025-11-11: Add Puppy uses Sire/Dam dropdowns from dogs table
    - 2025-11-11: Buyers tab: Add + Edit + Delete (full CRUD)
    - 2025-11-11: Applications: Review/Approve drawer with puppy assignment
+   - 2025-11-12: Fix Approve Drawer z-index & scrim order; prevent accidental dismiss
    - 2025-11-12: Fix onAddPuppy duplicate inserts/extra braces
    ============================================ */
 import React, { useEffect, useRef, useState } from 'react';
@@ -1105,8 +1106,13 @@ export default function AdminDashboardPage() {
 
       {/* Approve Drawer */}
       {approveOpen && activeApp && (
-        <div className="drawer" role="dialog" aria-modal="true">
-          <div className="drawer-panel">
+        <div className="drawer" role="dialog" aria-modal="true" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }}>
+          {/* Scrim FIRST so it paints UNDER the panel */}
+          <div className="scrim" />
+          <div
+            className="drawer-panel"
+            onClick={(e)=>e.stopPropagation()} // prevent clicks inside panel from closing
+          >
             <div className="drawer-hd">
               <h2>Review & Approve</h2>
               <button className="x" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }}>×</button>
@@ -1150,7 +1156,6 @@ export default function AdminDashboardPage() {
               </section>
             </div>
           </div>
-          <div className="scrim" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }} />
         </div>
       )}
 
@@ -1209,9 +1214,9 @@ export default function AdminDashboardPage() {
         .kpi{font-size:1.6rem;font-weight:700}
 
         /* Drawer */
-        .drawer{position:fixed;inset:0;display:flex;justify-content:flex-end;z-index:60}
-        .scrim{position:absolute;inset:0;background:rgba(0,0,0,.25)}
-        .drawer-panel{position:relative;width:min(600px,95vw);height:100%;background:#fff;border-left:1px solid #e8ded2;box-shadow:-8px 0 24px rgba(0,0,0,.08);display:flex;flex-direction:column}
+        .drawer{position:fixed;inset:0;display:flex;justify-content:flex-end;z-index:1000} /* raise overlay */
+        .scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:1}
+        .drawer-panel{position:relative;width:min(600px,95vw);height:100%;background:#fff;border-left:1px solid #e8ded2;box-shadow:-8px 0 24px rgba(0,0,0,.08);display:flex;flex-direction:column;z-index:2}
         .drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #f0e6da}
         .x{font-size:22px;line-height:1;border:0;background:transparent;cursor:pointer;padding:4px 8px}
         .drawer-body{padding:12px 14px;overflow:auto}
