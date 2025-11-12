@@ -7,6 +7,7 @@
    - 2025-11-11: Add Puppy uses Sire/Dam dropdowns from dogs table
    - 2025-11-11: Buyers tab: Add + Edit + Delete (full CRUD)
    - 2025-11-11: Applications: Review/Approve drawer with puppy assignment
+   - 2025-11-12: Fix onAddPuppy duplicate inserts/extra braces
    ============================================ */
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -25,12 +26,12 @@ type Puppy = {
   photos: any[] | null;
   sire_id: string | null;
   dam_id: string | null;
-  application_id?: string | null; // may not exist yet; code guards for it
+  application_id?: string | null;
   created_at?: string | null;
 };
 type Application = {
   id: string;
-  user_id?: string | null; // optional if present in your table
+  user_id?: string | null;
   buyer_name: string | null;
   email: string | null;
   phone: string | null;
@@ -64,7 +65,7 @@ type MessageRow = {
 };
 type DocRow = {
   id: string;
-  application_id?: string | null; // might not exist in your table yet
+  application_id?: string | null;
   buyer_id?: string | null;
   puppy_id?: string | null;
   label?: string | null;
@@ -183,14 +184,15 @@ export default function AdminDashboardPage() {
     const cls = norm === 'sold' ? 'danger' : norm === 'reserved' ? 'warn' : 'ok';
     return <span className={`badge ${cls}`}>{status || '-'}</span>;
   }
-function toPublicUrl(key: string): string {
-  try {
-    const { data } = supabase.storage.from('docs').getPublicUrl(key);
-    return data?.publicUrl ?? '';
-  } catch {
-    return '';
+  function toPublicUrl(key: string): string {
+    try {
+      const { data } = supabase.storage.from('docs').getPublicUrl(key);
+      return data?.publicUrl ?? '';
+    } catch {
+      return '';
+    }
   }
-}
+
   /* ========== Loaders ========== */
   async function loadOverview() {
     try {
@@ -452,50 +454,37 @@ function toPublicUrl(key: string): string {
 
   /* ========== Form Handlers (existing) ========== */
   // Puppies
-/* ANCHOR: onAddPuppy */
-/* ANCHOR: onAddPuppy */
-async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
-  e.preventDefault();
-  setPuppyMsg('');
+  /* ANCHOR: onAddPuppy */
+  async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPuppyMsg('');
 
-  const fd = new FormData(e.currentTarget);
-  const firstPhoto = (fd.get('photo') as string | null)?.trim();
-  const photos = firstPhoto ? [firstPhoto] : [];
+    const fd = new FormData(e.currentTarget);
+    const firstPhoto = (fd.get('photo') as string | null)?.trim();
+    const photos = firstPhoto ? [firstPhoto] : [];
 
-  const row = {
-    name: (fd.get('name') as string) || null,
-    price: fd.get('price') ? Number(fd.get('price')) : null,
-    status: ((fd.get('status') as string) || 'Available') as Puppy['status'],
-    gender: (fd.get('gender') as Puppy['gender']) || null,
-    registry: (fd.get('registry') as Puppy['registry']) || null,
-    dob: (fd.get('dob') as string) || null,
-    ready_date: (fd.get('ready_date') as string) || null,
-    photos,
-    sire_id: (fd.get('sire_id') as string) || null,
-    dam_id: (fd.get('dam_id') as string) || null,
-  };
+    const row = {
+      name: (fd.get('name') as string) || null,
+      price: fd.get('price') ? Number(fd.get('price')) : null,
+      status: ((fd.get('status') as string) || 'Available') as Puppy['status'],
+      gender: (fd.get('gender') as Puppy['gender']) || null,
+      registry: (fd.get('registry') as Puppy['registry']) || null,
+      dob: (fd.get('dob') as string) || null,
+      ready_date: (fd.get('ready_date') as string) || null,
+      photos,
+      sire_id: (fd.get('sire_id') as string) || null,
+      dam_id: (fd.get('dam_id') as string) || null,
+    };
 
-  const { error } = await supabase.from('puppies').insert(row);
-  setPuppyMsg(error ? error.message : 'Saved.');
-
-  if (!error) {
-    (e.currentTarget as HTMLFormElement).reset();
-    await loadPuppies(puppySearchRef.current?.value || '');
-  }
     const { error } = await supabase.from('puppies').insert(row);
     setPuppyMsg(error ? error.message : 'Saved.');
+
     if (!error) {
       (e.currentTarget as HTMLFormElement).reset();
       await loadPuppies(puppySearchRef.current?.value || '');
     }
   }
-    const { error } = await supabase.from('puppies').insert(row);
-    setPuppyMsg(error ? error.message : 'Saved.');
-    if (!error) {
-      (e.currentTarget as HTMLFormElement).reset();
-      await loadPuppies(puppySearchRef.current?.value || '');
-    }
-  }
+
   async function onDeletePuppy(id: string) {
     if (!confirm('Delete this puppy?')) return;
     const { error } = await supabase.from('puppies').delete().eq('id', id);
@@ -843,7 +832,6 @@ async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
                           <div className="actions">
                             <button className="btn" onClick={()=>onOpenApprove(a)}>Review / Approve</button>
                             <button className="btn" onClick={()=>denyApp(a.id)}>Deny</button>
-                            {/* quick approve fallback */}
                             {/* <button className="btn" onClick={()=>approveApp(a.id)}>Quick Approve</button> */}
                           </div>
                         </td>
