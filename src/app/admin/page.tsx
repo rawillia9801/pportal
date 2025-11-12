@@ -9,6 +9,10 @@
    - 2025-11-11: Applications: Review/Approve drawer with puppy assignment
    - 2025-11-12: Fix Approve Drawer z-index & scrim order; prevent accidental dismiss
    - 2025-11-12: Fix onAddPuppy duplicate inserts/extra braces
+   - 2025-11-12: Buyers: click Name to edit; show payments (multi-line) + total
+   - 2025-11-12: Buyers: Multi-Puppy purchases with per-puppy deposit (buyer_puppies)
+   - 2025-11-12: Care/Transport per puppy (vaccinations, deworming, transport costs)
+   - 2025-11-12: New 'Breeding Program' tab with Dam/Sire yearly metrics + sales
    ============================================ */
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -27,9 +31,12 @@ type Puppy = {
   photos: any[] | null;
   sire_id: string | null;
   dam_id: string | null;
+  litter_id?: string | null;
   application_id?: string | null;
   created_at?: string | null;
 };
+type Dog = { id: string; name: string; sex: 'Male' | 'Female'; active?: boolean | null };
+
 type Application = {
   id: string;
   user_id?: string | null;
@@ -45,7 +52,17 @@ type Buyer = {
   email: string | null;
   phone: string | null;
   is_repeat: boolean | null;
+  multiple_puppies?: boolean | null;
   created_at: string | null;
+};
+type BuyerPuppy = {
+  id: string;
+  buyer_id: string;
+  puppy_id: string;
+  deposit_amount: number | null;
+  deposit_date: string | null; // date
+  created_at?: string | null;
+  puppy?: Puppy;
 };
 type Payment = {
   id: string;
@@ -81,18 +98,47 @@ type Transport = {
   city: string | null;
   state: string | null;
   date: string | null; // YYYY-MM-DD
+  miles?: number | null;
+  gas_cost?: number | null;
+  tolls_cost?: number | null;
+  hotel_cost?: number | null;
+  other_cost?: number | null;
   note: string | null;
   created_at: string | null;
 };
-type Dog = { id: string; name: string; sex: 'Male' | 'Female' };
+type Vaccination = {
+  id: string;
+  puppy_id: string;
+  date: string | null;
+  vaccine: string | null;
+  lot?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+};
+type Deworming = {
+  id: string;
+  puppy_id: string;
+  date: string | null;
+  product: string | null;
+  dose?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+};
+type Litter = {
+  id: string;
+  code: string | null;
+  dam_id?: string | null;
+  sire_id?: string | null;
+  whelp_date?: string | null;
+  notes?: string | null;
+};
 
-/* ========== Config ========== */
 const ADMIN_EMAIL = 'rawillia9809@gmail.com';
 const NL = String.fromCharCode(10);
 
 type TabKey =
   | 'overview' | 'puppies' | 'litters' | 'applications' | 'buyers'
-  | 'payments' | 'messages' | 'documents' | 'transport' | 'reports' | 'settings';
+  | 'payments' | 'messages' | 'documents' | 'transport' | 'reports' | 'breeding' | 'settings';
 
 /* ========== Page ========== */
 export default function AdminDashboardPage() {
@@ -118,13 +164,13 @@ export default function AdminDashboardPage() {
   const [puppyMsg, setPuppyMsg] = useState<string>('');
   const puppySearchRef = useRef<HTMLInputElement>(null);
 
-  // Dogs (for Sire/Dam dropdowns)
+  // Dogs
   const [dogs, setDogs] = useState<Dog[]>([]);
   const maleDogs = dogs.filter(d => d.sex === 'Male');
   const femaleDogs = dogs.filter(d => d.sex === 'Female');
 
   // Litters
-  const [litters, setLitters] = useState<any[]>([]);
+  const [litters, setLitters] = useState<Litter[]>([]);
   const [litterMsg, setLitterMsg] = useState<string>('');
 
   // Applications
@@ -136,6 +182,11 @@ export default function AdminDashboardPage() {
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [buyerMsg, setBuyerMsg] = useState<string>('');
   const [editBuyer, setEditBuyer] = useState<Buyer | null>(null);
+
+  // Buyer detail (purchases, payments, care/transport)
+  const [buyerPurchases, setBuyerPurchases] = useState<BuyerPuppy[]>([]);
+  const [buyerPayments, setBuyerPayments] = useState<Payment[]>([]);
+  const buyerPurchaseRowsRef = useRef<Array<{ puppy_id: string; deposit_amount: string; deposit_date: string }>>([]);
 
   // Payments
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -158,6 +209,20 @@ export default function AdminDashboardPage() {
   const [reportSignals, setReportSignals] = useState<string[]>([]);
   const [paymentsAscii, setPaymentsAscii] = useState<string>('');
 
+  // Breeding Program
+  const [breedingDamRows, setBreedingDamRows] = useState<Array<{
+    dam_id: string;
+    dam_name: string;
+    year: number;
+    pups: number;
+    male: number;
+    female: number;
+    sales: number;
+  }>>([]);
+  const [breedingTotalsByDam, setBreedingTotalsByDam] = useState<Array<{
+    dam_id: string; dam_name: string; pups: number; sales: number;
+  }>>([]);
+
   // Approve Drawer
   const [approveOpen, setApproveOpen] = useState(false);
   const [activeApp, setActiveApp] = useState<Application | null>(null);
@@ -177,7 +242,7 @@ export default function AdminDashboardPage() {
       overview: 'Overview', puppies: 'Puppies', litters: 'Litters',
       applications: 'Applications', buyers: 'Buyers', payments: 'Payments',
       messages: 'Messages', documents: 'Documents', transport: 'Transportation',
-      reports: 'Reports', settings: 'Settings'
+      reports: 'Reports', breeding: 'Breeding Program', settings: 'Settings'
     } as const)[t];
   }
   function Badge({ status }: { status?: string | null }) {
@@ -249,20 +314,18 @@ export default function AdminDashboardPage() {
       .limit(200);
     setAvailablePups((data as Puppy[]) || []);
   }
-
   async function loadDogs() {
     const { data, error } = await supabase
       .from('dogs')
-      .select('id,name,sex')
+      .select('id,name,sex,active')
       .eq('active', true)
       .order('name', { ascending: true });
     if (!error) setDogs((data as Dog[]) || []);
   }
-
   async function loadLitters() {
     const { data } = await supabase.from('litters').select('*')
       .order('whelp_date', { ascending: false }).limit(200);
-    setLitters(data || []);
+    setLitters((data as Litter[]) || []);
   }
   async function loadApplications(filter: 'all' | 'submitted' | 'approved' | 'denied') {
     let rq = supabase.from('applications').select('*')
@@ -340,9 +403,88 @@ export default function AdminDashboardPage() {
       .join(NL);
   }
 
+  /* ========== Buyers: detail loaders ========== */
+  async function loadBuyerPurchases(buyerId: string) {
+    // Join buyer_puppies -> puppies
+    const { data, error } = await supabase
+      .from('buyer_puppies')
+      .select('id,buyer_id,puppy_id,deposit_amount,deposit_date,created_at,puppy:puppies(id,name,gender,registry,price,dam_id,sire_id,litter_id,dob,status)')
+      .eq('buyer_id', buyerId)
+      .order('created_at', { ascending: false });
+    if (!error) setBuyerPurchases((data as any as BuyerPuppy[]) || []);
+  }
+  async function loadBuyerPayments(buyerId: string) {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('buyer_id', buyerId)
+      .order('paid_at', { ascending: false });
+    if (!error) setBuyerPayments((data as Payment[]) || []);
+  }
+
+  /* ========== Breeding Program ========== */
+  async function loadBreedingMetrics() {
+    // We’ll compute in two passes to keep queries simple and RLS-friendly.
+
+    // 1) Get dams and puppies (dam-based), with gender + dob year + price + puppy_id
+    const { data: pups } = await supabase
+      .from('puppies')
+      .select('id, dam_id, gender, dob, price');
+
+    const byDamYear = new Map<string, { dam_id: string; year: number; pups: number; male: number; female: number; sales: number }>();
+    const damTotals = new Map<string, { dam_id: string; pups: number; sales: number }>();
+
+    // Helper: sum of payments per puppy
+    const { data: pay } = await supabase
+      .from('payments')
+      .select('puppy_id, amount, paid_at');
+
+    const payByPuppy = new Map<string, number>();
+    (pay || []).forEach(p => {
+      if (!p.puppy_id) return;
+      const curr = payByPuppy.get(p.puppy_id) || 0;
+      payByPuppy.set(p.puppy_id, curr + (Number(p.amount) || 0));
+    });
+
+    (pups || []).forEach((p: any) => {
+      const damId = p.dam_id as string | null;
+      if (!damId) return;
+      const year = p.dob ? new Date(p.dob).getFullYear() : new Date().getFullYear();
+      const key = `${damId}:${year}`;
+      const g = (p.gender || '').toLowerCase() === 'male' ? 'male' : (p.gender || '').toLowerCase() === 'female' ? 'female' : 'na';
+      const prev = byDamYear.get(key) || { dam_id: damId, year, pups: 0, male: 0, female: 0, sales: 0 };
+      prev.pups += 1;
+      if (g === 'male') prev.male += 1;
+      if (g === 'female') prev.female += 1;
+      const puppySales = payByPuppy.get(p.id) || 0;
+      prev.sales += puppySales;
+      byDamYear.set(key, prev);
+
+      const tot = damTotals.get(damId) || { dam_id: damId, pups: 0, sales: 0 };
+      tot.pups += 1;
+      tot.sales += puppySales;
+      damTotals.set(damId, tot);
+    });
+
+    // Map dam_id -> name
+    const { data: dams } = await supabase.from('dogs').select('id,name,sex').eq('sex', 'Female');
+    const damName = new Map<string, string>();
+    (dams || []).forEach(d => damName.set(d.id, d.name));
+
+    setBreedingDamRows(
+      Array.from(byDamYear.values())
+        .map(r => ({ ...r, dam_name: damName.get(r.dam_id || '') || '(Unknown Dam)' }))
+        .sort((a, b) => a.dam_name.localeCompare(b.dam_name) || b.year - a.year)
+    );
+    setBreedingTotalsByDam(
+      Array.from(damTotals.values())
+        .map(r => ({ ...r, dam_name: damName.get(r.dam_id || '') || '(Unknown Dam)' }))
+        .sort((a, b) => a.dam_name.localeCompare(b.dam_name))
+    );
+  }
+
   /* ========== Approve Drawer Flow ========== */
   async function findApplicationDocUrl(app: Application): Promise<string> {
-    // Try 1: documents.application_id = app.id
     try {
       const q1 = await supabase
         .from('documents')
@@ -350,15 +492,12 @@ export default function AdminDashboardPage() {
         .eq('application_id', app.id)
         .order('uploaded_at', { ascending: false })
         .limit(1);
-
       const key1 = q1.data?.[0]?.file_key as string | undefined;
       if (key1) {
         const url1 = toPublicUrl(key1);
         if (url1) return url1;
       }
-    } catch { /* ignored */ }
-
-    // Try 2: fallback by buyer/user id with a loose label match
+    } catch {}
     try {
       const buyerId = (app as any).user_id || (app as any).buyer_id || null;
       if (buyerId) {
@@ -369,18 +508,15 @@ export default function AdminDashboardPage() {
           .ilike('label', '%Application%')
           .order('uploaded_at', { ascending: false })
           .limit(1);
-
         const key2 = q2.data?.[0]?.file_key as string | undefined;
         if (key2) {
           const url2 = toPublicUrl(key2);
           if (url2) return url2;
         }
       }
-    } catch { /* ignored */ }
-
+    } catch {}
     return '';
   }
-
   async function onOpenApprove(app: Application) {
     setActiveApp(app);
     setApproveMsg('');
@@ -395,15 +531,12 @@ export default function AdminDashboardPage() {
       })(),
     ]);
   }
-
   async function approveAndAssign() {
     if (!activeApp) return;
     if (!selectedPupId) { setApproveMsg('Select a puppy to assign.'); return; }
     setApproving(true);
     setApproveMsg('');
-
     try {
-      // Reserve + link to application_id if the column exists; otherwise fallback to just reserve
       let pupError: any = null;
       {
         const { error } = await supabase
@@ -421,7 +554,6 @@ export default function AdminDashboardPage() {
           .eq('status', 'Available');
         if (fallbackErr) throw fallbackErr;
       }
-
       const { error: appErr } = await supabase
         .from('applications')
         .update({ status: 'approved' })
@@ -443,27 +575,15 @@ export default function AdminDashboardPage() {
     }
   }
 
-  /* ========== Simple handlers for old Approve/Deny fallbacks ========== */
-  async function approveApp(id: string) {
-    const { error } = await supabase.from('applications').update({ status: 'approved' }).eq('id', id);
-    if (error) alert(error.message); else loadApplications(appFilter);
-  }
-  async function denyApp(id: string) {
-    const { error } = await supabase.from('applications').update({ status: 'denied' }).eq('id', id);
-    if (error) alert(error.message); else loadApplications(appFilter);
-  }
-
-  /* ========== Form Handlers (existing) ========== */
+  /* ========== Form Handlers ========== */
   // Puppies
   /* ANCHOR: onAddPuppy */
   async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPuppyMsg('');
-
     const fd = new FormData(e.currentTarget);
     const firstPhoto = (fd.get('photo') as string | null)?.trim();
     const photos = firstPhoto ? [firstPhoto] : [];
-
     const row = {
       name: (fd.get('name') as string) || null,
       price: fd.get('price') ? Number(fd.get('price')) : null,
@@ -476,16 +596,13 @@ export default function AdminDashboardPage() {
       sire_id: (fd.get('sire_id') as string) || null,
       dam_id: (fd.get('dam_id') as string) || null,
     };
-
     const { error } = await supabase.from('puppies').insert(row);
     setPuppyMsg(error ? error.message : 'Saved.');
-
     if (!error) {
       (e.currentTarget as HTMLFormElement).reset();
       await loadPuppies(puppySearchRef.current?.value || '');
     }
   }
-
   async function onDeletePuppy(id: string) {
     if (!confirm('Delete this puppy?')) return;
     const { error } = await supabase.from('puppies').delete().eq('id', id);
@@ -546,7 +663,7 @@ export default function AdminDashboardPage() {
     if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadDocuments(); }
   }
 
-  // Transport
+  // Transport (global tab form – includes cost fields)
   async function onSaveTransport(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setTransportMsg('');
     const fd = new FormData(e.currentTarget);
@@ -557,6 +674,11 @@ export default function AdminDashboardPage() {
       city: (fd.get('city') as string) || null,
       state: (fd.get('state') as string) || null,
       date: (fd.get('date') as string) || null,
+      miles: fd.get('miles') ? Number(fd.get('miles')) : null,
+      gas_cost: fd.get('gas_cost') ? Number(fd.get('gas_cost')) : null,
+      tolls_cost: fd.get('tolls_cost') ? Number(fd.get('tolls_cost')) : null,
+      hotel_cost: fd.get('hotel_cost') ? Number(fd.get('hotel_cost')) : null,
+      other_cost: fd.get('other_cost') ? Number(fd.get('other_cost')) : null,
       note: (fd.get('note') as string) || null
     };
     const { error } = await supabase.from('transportations').insert(row);
@@ -564,7 +686,7 @@ export default function AdminDashboardPage() {
     if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadTransports(); }
   }
 
-  // Buyers
+  // Buyers CRUD
   async function onAddBuyer(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setBuyerMsg('');
     const fd = new FormData(e.currentTarget);
@@ -572,7 +694,8 @@ export default function AdminDashboardPage() {
       full_name: (fd.get('full_name') as string) || null,
       email: (fd.get('email') as string) || null,
       phone: (fd.get('phone') as string) || null,
-      is_repeat: (fd.get('is_repeat') as string) === 'on'
+      is_repeat: (fd.get('is_repeat') as string) === 'on',
+      multiple_puppies: (fd.get('multiple_puppies') as string) === 'on'
     };
     const { error } = await supabase.from('buyers').insert(row);
     setBuyerMsg(error ? error.message : 'Buyer added.');
@@ -586,7 +709,8 @@ export default function AdminDashboardPage() {
       full_name: (fd.get('full_name') as string) || null,
       email: (fd.get('email') as string) || null,
       phone: (fd.get('phone') as string) || null,
-      is_repeat: (fd.get('is_repeat') as string) === 'on'
+      is_repeat: (fd.get('is_repeat') as string) === 'on',
+      multiple_puppies: (fd.get('multiple_puppies') as string) === 'on'
     };
     const { error } = await supabase.from('buyers').update(row).eq('id', editBuyer.id);
     setBuyerMsg(error ? error.message : 'Buyer updated.');
@@ -600,6 +724,81 @@ export default function AdminDashboardPage() {
       if (editBuyer?.id === id) setEditBuyer(null);
       await loadBuyers();
     }
+  }
+
+  // Buyer purchases (join rows)
+  async function addBuyerPurchaseRow() {
+    buyerPurchaseRowsRef.current.push({ puppy_id: '', deposit_amount: '', deposit_date: '' });
+    // force re-render
+    setBuyerPurchases([...buyerPurchases]);
+  }
+  function removeBuyerPurchaseRow(idx: number) {
+    buyerPurchaseRowsRef.current.splice(idx, 1);
+    setBuyerPurchases([...buyerPurchases]);
+  }
+  async function saveBuyerPurchaseRows(buyerId: string) {
+    for (const row of buyerPurchaseRowsRef.current) {
+      if (!row.puppy_id) continue;
+      const payload = {
+        buyer_id: buyerId,
+        puppy_id: row.puppy_id,
+        deposit_amount: row.deposit_amount ? Number(row.deposit_amount) : null,
+        deposit_date: row.deposit_date || null
+      };
+      const { error } = await supabase.from('buyer_puppies').insert(payload);
+      if (error) { setBuyerMsg(error.message); return; }
+    }
+    buyerPurchaseRowsRef.current = [];
+    await loadBuyerPurchases(buyerId);
+    setBuyerMsg('Purchases saved.');
+  }
+  async function deleteBuyerPurchase(id: string, buyerId: string) {
+    if (!confirm('Remove this puppy from buyer?')) return;
+    const { error } = await supabase.from('buyer_puppies').delete().eq('id', id);
+    if (error) { alert(error.message); return; }
+    await loadBuyerPurchases(buyerId);
+  }
+
+  // Care: Vaccination & Deworming tied to a puppy
+  async function addVaccination(puppy_id: string, fd: FormData) {
+    const row = {
+      puppy_id,
+      date: (fd.get('v_date') as string) || null,
+      vaccine: (fd.get('v_vaccine') as string) || null,
+      lot: (fd.get('v_lot') as string) || null,
+      notes: (fd.get('v_notes') as string) || null
+    };
+    const { error } = await supabase.from('puppy_vaccinations').insert(row);
+    if (error) throw error;
+  }
+  async function addDeworming(puppy_id: string, fd: FormData) {
+    const row = {
+      puppy_id,
+      date: (fd.get('d_date') as string) || null,
+      product: (fd.get('d_product') as string) || null,
+      dose: (fd.get('d_dose') as string) || null,
+      notes: (fd.get('d_notes') as string) || null
+    };
+    const { error } = await supabase.from('puppy_dewormings').insert(row);
+    if (error) throw error;
+  }
+  async function addTransportForPuppy(buyer_id: string, puppy_id: string, fd: FormData) {
+    const row = {
+      buyer_id,
+      puppy_id,
+      method: (fd.get('t_method') as string) || null,
+      city: (fd.get('t_city') as string) || null,
+      state: (fd.get('t_state') as string) || null,
+      date: (fd.get('t_date') as string) || null,
+      miles: fd.get('t_miles') ? Number(fd.get('t_miles')) : null,
+      gas_cost: fd.get('t_gas') ? Number(fd.get('t_gas')) : null,
+      tolls_cost: fd.get('t_tolls') ? Number(fd.get('t_tolls')) : null,
+      hotel_cost: fd.get('t_hotel') ? Number(fd.get('t_hotel')) : null,
+      other_cost: fd.get('t_other') ? Number(fd.get('t_other')) : null,
+      note: (fd.get('t_note') as string) || null
+    };
+    const { error } = await supabase.from('transportations').insert(row);
+    if (error) throw error;
   }
 
   /* ========== Effects ========== */
@@ -621,7 +820,7 @@ export default function AdminDashboardPage() {
         await Promise.all([
           loadOverview(), loadPuppies(), loadDogs(), loadLitters(), loadApplications('all'),
           loadBuyers(), loadPayments(), loadMessages(), loadDocuments(),
-          loadTransports(), refreshReports()
+          loadTransports(), refreshReports(), loadBreedingMetrics()
         ]);
       } finally { setLoadingGate(false); }
     })();
@@ -657,7 +856,7 @@ export default function AdminDashboardPage() {
           </div>
           <nav className="nav">
             <h4>Manage</h4>
-            {(['overview','puppies','litters','applications','buyers','payments','messages','documents','transport','reports','settings'] as TabKey[])
+            {(['overview','puppies','litters','applications','buyers','payments','messages','documents','transport','reports','breeding','settings'] as TabKey[])
               .map(k => (
                 <button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>
                   <span className="icon" />{titleFor(k)}
@@ -724,7 +923,6 @@ export default function AdminDashboardPage() {
                       </select>
                     </div>
                   </div>
-
                   <div className="actions" style={{marginTop:12}}>
                     <button className="btn primary" type="submit">Save Puppy</button>
                     <span className="crumbs">{puppyMsg}</span>
@@ -772,13 +970,27 @@ export default function AdminDashboardPage() {
               <div className="card span4">
                 <h3 style={{margin:0,marginBottom:8}}>Add Litter</h3>
                 <form onSubmit={async(e)=>{ e.preventDefault(); setLitterMsg(''); const fd=new FormData(e.currentTarget);
-                  const row:any={ code:fd.get('code'), dam:fd.get('dam'), sire:fd.get('sire'), whelp_date:fd.get('whelp_date'), notes:fd.get('notes') };
+                  const row:any={
+                    code:fd.get('code'),
+                    dam_id: fd.get('dam_id') || null,
+                    sire_id: fd.get('sire_id') || null,
+                    whelp_date:fd.get('whelp_date'),
+                    notes:fd.get('notes')
+                  };
                   const { error } = await supabase.from('litters').insert(row);
-                  setLitterMsg(error?error.message:'Saved.'); if(!error){ (e.currentTarget as HTMLFormElement).reset(); await loadLitters(); }
+                  setLitterMsg(error?error.message:'Saved.'); if(!error){ (e.currentTarget as HTMLFormElement).reset(); await loadLitters(); await loadBreedingMetrics(); }
                 }}>
                   <label>Code</label><input name="code" placeholder="2025-EMB×BUB-01" required />
-                  <label>Dam</label><input name="dam" placeholder="e.g., Ember" />
-                  <label>Sire</label><input name="sire" placeholder="e.g., Bubba Roe" />
+                  <label>Dam</label>
+                  <select name="dam_id" defaultValue="">
+                    <option value="">—</option>
+                    {femaleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                  <label>Sire</label>
+                  <select name="sire_id" defaultValue="">
+                    <option value="">—</option>
+                    {maleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
                   <label>Whelp Date</label><input type="date" name="whelp_date" />
                   <label>Notes</label><textarea name="notes" rows={3} />
                   <div className="actions" style={{marginTop:12}}>
@@ -794,7 +1006,9 @@ export default function AdminDashboardPage() {
                     <thead><tr><th>Code</th><th>Dam</th><th>Sire</th><th>Whelp Date</th><th>Notes</th></tr></thead>
                     <tbody>{litters.map((l:any)=>(
                       <tr key={l.id}>
-                        <td>{l.code || '-'}</td><td>{l.dam || '-'}</td><td>{l.sire || '-'}</td>
+                        <td>{l.code || '-'}</td>
+                        <td>{dogs.find(d=>d.id===l.dam_id)?.name || '-'}</td>
+                        <td>{dogs.find(d=>d.id===l.sire_id)?.name || '-'}</td>
                         <td>{l.whelp_date ? new Date(l.whelp_date).toLocaleDateString() : '-'}</td>
                         <td>{l.notes || ''}</td>
                       </tr>
@@ -833,7 +1047,6 @@ export default function AdminDashboardPage() {
                           <div className="actions">
                             <button className="btn" onClick={()=>onOpenApprove(a)}>Review / Approve</button>
                             <button className="btn" onClick={()=>denyApp(a.id)}>Deny</button>
-                            {/* <button className="btn" onClick={()=>approveApp(a.id)}>Quick Approve</button> */}
                           </div>
                         </td>
                       </tr>
@@ -855,6 +1068,7 @@ export default function AdminDashboardPage() {
                   <label>Email</label><input name="email" type="email" placeholder="name@example.com" />
                   <label>Phone</label><input name="phone" placeholder="(555) 555-5555" />
                   <label className="chk"><input type="checkbox" name="is_repeat" /> <span>Repeat Buyer</span></label>
+                  <label className="chk"><input type="checkbox" name="multiple_puppies" /> <span>Multiple Puppies</span></label>
                   <div className="actions" style={{marginTop:12}}>
                     <button className="btn primary" type="submit">Save Buyer</button>
                     <span className="crumbs">{buyerMsg}</span>
@@ -874,14 +1088,28 @@ export default function AdminDashboardPage() {
                       <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Repeat</th><th>Created</th><th/></tr></thead>
                       <tbody>{buyers.map(b=>(
                         <tr key={b.id}>
-                          <td>{b.full_name || '-'}</td>
+                          <td>
+                            {/* Click name to edit */}
+                            <button className="linklike" onClick={async()=>{
+                              setEditBuyer(b);
+                              await Promise.all([
+                                loadBuyerPurchases(b.id),
+                                loadBuyerPayments(b.id)
+                              ]);
+                            }}>
+                              {b.full_name || '-'}
+                            </button>
+                          </td>
                           <td>{b.email || '-'}</td>
                           <td>{b.phone || '-'}</td>
                           <td>{b.is_repeat ? 'Yes' : 'No'}</td>
                           <td>{b.created_at ? new Date(b.created_at).toLocaleDateString() : '-'}</td>
                           <td>
                             <div className="actions">
-                              <button className="btn" onClick={()=>setEditBuyer(b)}>Edit</button>
+                              <button className="btn" onClick={async()=>{
+                                setEditBuyer(b);
+                                await Promise.all([loadBuyerPurchases(b.id), loadBuyerPayments(b.id)]);
+                              }}>Edit</button>
                               <button className="btn" onClick={()=>onDeleteBuyer(b.id)}>Delete</button>
                             </div>
                           </td>
@@ -901,6 +1129,8 @@ export default function AdminDashboardPage() {
                       <button className="btn" onClick={()=>setEditBuyer(null)}>Close</button>
                     </div>
                   </div>
+
+                  {/* Buyer basics */}
                   <form onSubmit={onUpdateBuyer} style={{marginTop:8,display:'grid',gap:12}}>
                     <div className="row">
                       <div className="col6">
@@ -915,18 +1145,160 @@ export default function AdminDashboardPage() {
                         <label>Phone</label>
                         <input name="phone" defaultValue={editBuyer.phone || ''} />
                       </div>
-                      <div className="col6" style={{display:'flex',alignItems:'flex-end'}}>
+                      <div className="col3" style={{display:'flex',alignItems:'flex-end'}}>
                         <label className="chk" style={{margin:0}}>
-                          <input type="checkbox" name="is_repeat" defaultChecked={!!editBuyer.is_repeat} /> <span>Repeat Buyer</span>
+                          <input type="checkbox" name="is_repeat" defaultChecked={!!editBuyer.is_repeat} /> <span>Repeat</span>
+                        </label>
+                      </div>
+                      <div className="col3" style={{display:'flex',alignItems:'flex-end'}}>
+                        <label className="chk" style={{margin:0}}>
+                          <input type="checkbox" name="multiple_puppies" defaultChecked={!!editBuyer.multiple_puppies} /> <span>Multiple Puppies</span>
                         </label>
                       </div>
                     </div>
                     <div className="actions">
                       <button className="btn primary" type="submit">Update</button>
-                      <button className="btn" type="button" onClick={()=>onDeleteBuyer(editBuyer.id)}>Delete</button>
                       <span className="crumbs">{buyerMsg}</span>
                     </div>
                   </form>
+
+                  {/* Purchases (puppies for this buyer) */}
+                  <div className="subsection">
+                    <h4 style={{margin:'8px 0'}}>Puppies Purchased</h4>
+                    {buyerPurchases.length===0 ? <div className="notice">None yet.</div> : (
+                      <table>
+                        <thead><tr><th>Puppy</th><th>Gender</th><th>Registry</th><th>DOB</th><th>Deposit</th><th>Deposit Date</th><th/></tr></thead>
+                        <tbody>{buyerPurchases.map(p=>(
+                          <tr key={p.id}>
+                            <td>{p.puppy?.name || p.puppy_id}</td>
+                            <td>{p.puppy?.gender || '-'}</td>
+                            <td>{p.puppy?.registry || '-'}</td>
+                            <td>{p.puppy?.dob ? new Date(p.puppy.dob).toLocaleDateString() : '-'}</td>
+                            <td>{fmtMoney(p.deposit_amount)}</td>
+                            <td>{p.deposit_date ? new Date(p.deposit_date).toLocaleDateString() : '-'}</td>
+                            <td><button className="btn" onClick={()=>deleteBuyerPurchase(p.id, editBuyer.id)}>Remove</button></td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    )}
+
+                    {/* Add additional puppies for this buyer */}
+                    <div className="notice" style={{marginTop:8}}>
+                      <b>Add Puppy for Buyer</b>
+                      <div className="row" style={{marginTop:8}}>
+                        {/* dynamic rows */}
+                        {buyerPurchaseRowsRef.current.map((row, idx)=>(
+                          <div key={idx} className="col12" style={{border:'1px dashed #e0d8d0', padding:10, borderRadius:8, marginBottom:8}}>
+                            <div className="row">
+                              <div className="col6">
+                                <label>Puppy</label>
+                                <select defaultValue="" onChange={e=>{ row.puppy_id = e.target.value; }}>
+                                  <option value="">— Select Puppy —</option>
+                                  {puppies.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                      {(p.name || 'Unnamed')} • {p.gender || '—'} • {p.registry || '—'} • {fmtMoney(p.price)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="col3">
+                                <label>Deposit ($)</label>
+                                <input inputMode="decimal" onChange={e=>{ row.deposit_amount = e.target.value; }} placeholder="0.00" />
+                              </div>
+                              <div className="col3">
+                                <label>Deposit Date</label>
+                                <input type="date" onChange={e=>{ row.deposit_date = e.target.value; }} />
+                              </div>
+                            </div>
+                            <div className="actions" style={{marginTop:8}}>
+                              <button className="btn" onClick={()=>removeBuyerPurchaseRow(idx)} type="button">Remove Row</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="actions">
+                        <button className="btn" type="button" onClick={addBuyerPurchaseRow}>+ Add Row</button>
+                        <button className="btn primary" type="button" onClick={()=>saveBuyerPurchaseRows(editBuyer.id)}>Save Rows</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payments list + total */}
+                  <div className="subsection">
+                    <h4 style={{margin:'8px 0'}}>Payments</h4>
+                    {buyerPayments.length===0 ? <div className="notice">No payments recorded.</div> : (
+                      <div className="notice" style={{whiteSpace:'pre-wrap'}}>
+                        {buyerPayments.map(p => `• ${fmtMoney(p.amount)} • ${p.method || '—'} • ${p.note || ''} • ${p.paid_at ? new Date(p.paid_at).toLocaleString() : '—'}`).join(NL)}
+                      </div>
+                    )}
+                    <div className="crumbs" style={{marginTop:6}}>
+                      Total: {fmtMoney(buyerPayments.reduce((s,p)=>s+(Number(p.amount)||0),0))}
+                    </div>
+                  </div>
+
+                  {/* Care & Transport per purchased puppy */}
+                  {buyerPurchases.length > 0 && (
+                    <div className="subsection">
+                      <h4 style={{margin:'8px 0'}}>Care & Transport (per puppy)</h4>
+                      {buyerPurchases.map(bp => (
+                        <div key={bp.id} className="notice" style={{marginBottom:10}}>
+                          <div style={{fontWeight:600, marginBottom:6}}>
+                            {(bp.puppy?.name || bp.puppy_id)} — {bp.puppy?.gender || '—'} {bp.puppy?.registry ? `• ${bp.puppy.registry}` : ''}
+                          </div>
+                          <form onSubmit={async(e)=>{ e.preventDefault(); const fd=new FormData(e.currentTarget); try {
+                            await addVaccination(bp.puppy_id, fd);
+                            (e.currentTarget as HTMLFormElement).reset();
+                            alert('Vaccination saved.');
+                          } catch(err:any){ alert(err.message || 'Save failed'); } }} style={{display:'grid', gap:8, marginBottom:6}}>
+                            <div style={{fontWeight:600}}>Vaccination</div>
+                            <div className="row">
+                              <div className="col3"><label>Date</label><input type="date" name="v_date" /></div>
+                              <div className="col4"><label>Vaccine</label><input name="v_vaccine" placeholder="DHPP / Rabies / etc." /></div>
+                              <div className="col2"><label>Lot #</label><input name="v_lot" /></div>
+                              <div className="col3"><label>Notes</label><input name="v_notes" /></div>
+                            </div>
+                            <div className="actions"><button className="btn" type="submit">Save Vaccination</button></div>
+                          </form>
+
+                          <form onSubmit={async(e)=>{ e.preventDefault(); const fd=new FormData(e.currentTarget); try {
+                            await addDeworming(bp.puppy_id, fd);
+                            (e.currentTarget as HTMLFormElement).reset();
+                            alert('Deworming saved.');
+                          } catch(err:any){ alert(err.message || 'Save failed'); } }} style={{display:'grid', gap:8, marginBottom:6}}>
+                            <div style={{fontWeight:600}}>Deworming</div>
+                            <div className="row">
+                              <div className="col3"><label>Date</label><input type="date" name="d_date" /></div>
+                              <div className="col4"><label>Product</label><input name="d_product" placeholder="Pyrantel / Fenbendazole / etc." /></div>
+                              <div className="col2"><label>Dose</label><input name="d_dose" /></div>
+                              <div className="col3"><label>Notes</label><input name="d_notes" /></div>
+                            </div>
+                            <div className="actions"><button className="btn" type="submit">Save Deworming</button></div>
+                          </form>
+
+                          <form onSubmit={async(e)=>{ e.preventDefault(); const fd=new FormData(e.currentTarget); try {
+                            await addTransportForPuppy(editBuyer.id, bp.puppy_id, fd);
+                            (e.currentTarget as HTMLFormElement).reset();
+                            alert('Transport saved.');
+                          } catch(err:any){ alert(err.message || 'Save failed'); } }} style={{display:'grid', gap:8}}>
+                            <div style={{fontWeight:600}}>Transport</div>
+                            <div className="row">
+                              <div className="col3"><label>Date</label><input type="date" name="t_date" /></div>
+                              <div className="col3"><label>Method</label><select name="t_method"><option>Pickup</option><option>Ground Delivery</option><option>Flight Nanny</option></select></div>
+                              <div className="col3"><label>City</label><input name="t_city" /></div>
+                              <div className="col3"><label>State</label><input name="t_state" /></div>
+                              <div className="col3"><label>Miles</label><input inputMode="numeric" name="t_miles" /></div>
+                              <div className="col3"><label>Gas ($)</label><input inputMode="decimal" name="t_gas" /></div>
+                              <div className="col2"><label>Tolls ($)</label><input inputMode="decimal" name="t_tolls" /></div>
+                              <div className="col2"><label>Hotel ($)</label><input inputMode="decimal" name="t_hotel" /></div>
+                              <div className="col2"><label>Other ($)</label><input inputMode="decimal" name="t_other" /></div>
+                            </div>
+                            <label>Notes</label><input name="t_note" />
+                            <div className="actions"><button className="btn" type="submit">Save Transport</button></div>
+                          </form>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1056,6 +1428,13 @@ export default function AdminDashboardPage() {
                     <div className="col6"><label>State</label><input name="state" /></div>
                   </div>
                   <label>Date</label><input type="date" name="date" />
+                  <div className="row">
+                    <div className="col3"><label>Miles</label><input name="miles" inputMode="numeric" /></div>
+                    <div className="col3"><label>Gas ($)</label><input name="gas_cost" inputMode="decimal" /></div>
+                    <div className="col3"><label>Tolls ($)</label><input name="tolls_cost" inputMode="decimal" /></div>
+                    <div className="col3"><label>Hotel ($)</label><input name="hotel_cost" inputMode="decimal" /></div>
+                  </div>
+                  <label>Other Cost ($)</label><input name="other_cost" inputMode="decimal" />
                   <label>Note</label><textarea name="note" rows={3} />
                   <div className="actions" style={{marginTop:12}}>
                     <button className="btn primary" type="submit">Save</button>
@@ -1067,12 +1446,17 @@ export default function AdminDashboardPage() {
                 <h3 style={{margin:0,marginBottom:8}}>Transport Requests</h3>
                 {transports.length===0 ? <div className="notice">No transport requests found.</div> : (
                   <table>
-                    <thead><tr><th>Buyer</th><th>Puppy</th><th>Method</th><th>City/State</th><th>Date</th><th>Note</th></tr></thead>
+                    <thead><tr><th>Buyer</th><th>Puppy</th><th>Method</th><th>City/State</th><th>Date</th><th>Miles</th><th>Costs</th><th>Note</th></tr></thead>
                     <tbody>{transports.map(t=>(
                       <tr key={t.id}>
                         <td>{t.buyer_id || '-'}</td><td>{t.puppy_id || '-'}</td><td>{t.method || '-'}</td>
                         <td>{t.city || '-'}, {t.state || '-'}</td>
                         <td>{t.date ? new Date(t.date).toLocaleDateString() : '-'}</td>
+                        <td>{t.miles ?? '-'}</td>
+                        <td>{['gas','tolls','hotel','other'].map(k=>{
+                          const map:any={gas:t.gas_cost,tolls:t.tolls_cost,hotel:t.hotel_cost,other:t.other_cost};
+                          return `${k}:${map[k] ? fmtMoney(map[k]) : '-'}`;
+                        }).join(' • ')}</td>
                         <td>{t.note || ''}</td>
                       </tr>
                     ))}</tbody>
@@ -1088,6 +1472,55 @@ export default function AdminDashboardPage() {
               <div className="card span6"><h3 style={{margin:0,marginBottom:8}}>30-Day Summary</h3><div className="notice">{reportSummary}</div></div>
               <div className="card span6"><h3 style={{margin:0,marginBottom:8}}>Top Signals</h3><ul style={{margin:0,paddingLeft:18}}>{reportSignals.map((s,i)=>(<li key={i}>{s}</li>))}</ul></div>
               <div className="card span12"><h3 style={{margin:0,marginBottom:8}}>Payments by Day (ASCII)</h3><pre style={{whiteSpace:'pre-wrap',margin:0}}>{paymentsAscii}</pre></div>
+            </div>
+          )}
+
+          {/* BREEDING PROGRAM */}
+          {tab==='breeding' && (
+            <div className="grid">
+              <div className="card span12">
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                  <h3 style={{margin:0}}>Dam Metrics (by Year)</h3>
+                  <div className="actions"><button className="btn" onClick={loadBreedingMetrics}>Refresh</button></div>
+                </div>
+                {breedingDamRows.length===0 ? <div className="notice">No data.</div> : (
+                  <table>
+                    <thead><tr><th>Dam</th><th>Year</th><th>Puppies</th><th>Male</th><th>Female</th><th>Sales</th></tr></thead>
+                    <tbody>
+                      {breedingDamRows.map((r,i)=>(
+                        <tr key={i}>
+                          <td>{r.dam_name}</td>
+                          <td>{r.year}</td>
+                          <td>{r.pups}</td>
+                          <td>{r.male}</td>
+                          <td>{r.female}</td>
+                          <td>{fmtMoney(r.sales)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <div className="card span12">
+                <h3 style={{margin:0,marginBottom:8}}>Totals by Dam (All-Time)</h3>
+                {breedingTotalsByDam.length===0 ? <div className="notice">No data.</div> : (
+                  <table>
+                    <thead><tr><th>Dam</th><th>Total Puppies</th><th>Total Sales</th></tr></thead>
+                    <tbody>
+                      {breedingTotalsByDam.map((r,i)=>(
+                        <tr key={i}>
+                          <td>{r.dam_name}</td>
+                          <td>{r.pups}</td>
+                          <td>{fmtMoney(r.sales)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                <div className="crumbs" style={{marginTop:8}}>
+                  Sales totals are computed from recorded payments joined to each puppy’s dam.
+                </div>
+              </div>
             </div>
           )}
 
@@ -1107,12 +1540,8 @@ export default function AdminDashboardPage() {
       {/* Approve Drawer */}
       {approveOpen && activeApp && (
         <div className="drawer" role="dialog" aria-modal="true" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }}>
-          {/* Scrim FIRST so it paints UNDER the panel */}
           <div className="scrim" />
-          <div
-            className="drawer-panel"
-            onClick={(e)=>e.stopPropagation()} // prevent clicks inside panel from closing
-          >
+          <div className="drawer-panel" onClick={(e)=>e.stopPropagation()}>
             <div className="drawer-hd">
               <h2>Review & Approve</h2>
               <button className="x" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }}>×</button>
@@ -1178,6 +1607,7 @@ export default function AdminDashboardPage() {
         .nav button:hover{background:var(--panelAlt)}
         .nav button.active{background:var(--brand);color:#fff}
         .nav .icon{width:18px;height:18px;border-radius:4px;background:var(--brand);opacity:.15}
+        .linklike{background:none;border:none;padding:0;color:var(--brand);cursor:pointer;text-decoration:underline}
         .spacer{flex:1}
         .authBtns{padding:12px;border-top:1px solid #eee;display:flex;gap:8px}
         .btn{appearance:none;border:1px solid #e0d8d0;background:#fff;color:var(--ink);padding:8px 10px;border-radius:10px;cursor:pointer;text-decoration:none}
@@ -1190,9 +1620,9 @@ export default function AdminDashboardPage() {
         .card{grid-column:span 12;background:var(--panel);border:1px solid #e7e0d9;border-radius:14px;padding:16px}
         @media (min-width:900px){
           .span4{grid-column:span 4}.span6{grid-column:span 6}.span8{grid-column:span 8}.span12{grid-column:span 12}
-          .col6{grid-column:span 6}.col4{grid-column:span 4}.col12{grid-column:span 12}
+          .col6{grid-column:span 6}.col4{grid-column:span 4}.col3{grid-column:span 3}.col2{grid-column:span 2}.col12{grid-column:span 12}
         }
-        .row .col6,.row .col4,.row .col12{grid-column:span 12}
+        .row .col6,.row .col4,.row .col3,.row .col2,.row .col12{grid-column:span 12}
         table{width:100%;border-collapse:separate;border-spacing:0 8px}
         thead th{font-size:.85rem;color:var(--muted);text-align:left;padding:8px 10px}
         tbody td{background:#fff;padding:10px;border-top:1px solid #eee;border-bottom:1px solid #eee}
@@ -1209,12 +1639,13 @@ export default function AdminDashboardPage() {
         .badge.warn{background:rgba(210,133,18,.12);color:#6f470e}
         .badge.danger{background:rgba(198,55,55,.12);color:#7a2222}
         .notice{padding:10px 12px;border-left:4px solid var(--brand);background:#fff;border:1px solid #eee;border-radius:8px;margin:8px 0}
+        .subsection{margin-top:16px}
         .stat{display:flex;align-items:center;gap:12px}
         .dot{width:10px;height:10px;border-radius:50%;background:var(--brand)}
         .kpi{font-size:1.6rem;font-weight:700}
 
         /* Drawer */
-        .drawer{position:fixed;inset:0;display:flex;justify-content:flex-end;z-index:1000} /* raise overlay */
+        .drawer{position:fixed;inset:0;display:flex;justify-content:flex-end;z-index:1000}
         .scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:1}
         .drawer-panel{position:relative;width:min(600px,95vw);height:100%;background:#fff;border-left:1px solid #e8ded2;box-shadow:-8px 0 24px rgba(0,0,0,.08);display:flex;flex-direction:column;z-index:2}
         .drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #f0e6da}
