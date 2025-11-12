@@ -321,50 +321,60 @@ function toPublicUrl(key: string): string {
   function asciiBarByDay(rows: any[]) {
     const map = new Map<string, number>();
     for (const r of rows) {
-      const d = new Date(r.paid_at); d.setHours(0,0,0,0);
+      const d = new Date(r.paid_at);
+      d.setHours(0, 0, 0, 0);
       const key = d.toISOString().slice(0, 10);
       map.set(key, (map.get(key) || 0) + (Number(r.amount) || 0));
     }
-    const days = Array.from(map.entries()).sort(([a],[b]) => a.localeCompare(b));
+    const days = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
     if (!days.length) return 'No data.';
-    const max = Math.max(...days.map(([,v]) => v));
-    return days.map(([day,val]) => {
-      const len = max ? Math.round((val/max)*40) : 0;
-      return `${day} | ${'#'.repeat(len)} ${fmtMoney(val)}`;
-    }).join(NL);
+    const max = Math.max(...days.map(([, v]) => v));
+    return days
+      .map(([day, val]) => {
+        const len = max ? Math.round((val / max) * 40) : 0;
+        return `${day} | ${'#'.repeat(len)} ${fmtMoney(val)}`;
+      })
+      .join(NL);
   }
 
   /* ========== Approve Drawer Flow ========== */
   async function findApplicationDocUrl(app: Application): Promise<string> {
-    // Try 1: documents.application_id = app.id (if column exists)
+    // Try 1: documents.application_id = app.id
     try {
       const q1 = await supabase
         .from('documents')
-        .select('file_key,uploaded_at')
+        .select('file_key')
         .eq('application_id', app.id)
         .order('uploaded_at', { ascending: false })
         .limit(1);
-      if (!q1.error && q1.data?.[0]?.file_key) {
+
+      const key1 = q1.data?.[0]?.file_key as string | undefined;
+      if (key1) {
+        const url1 = toPublicUrl(key1);
+        if (url1) return url1;
       }
-    } catch {/* ignored */}
-    // Try 2: by buyer_id if user_id is present and label looks like an application
+    } catch { /* ignored */ }
+
+    // Try 2: fallback by buyer/user id with a loose label match
     try {
-      if (app.user_id) {
+      const buyerId = (app as any).user_id || (app as any).buyer_id || null;
+      if (buyerId) {
         const q2 = await supabase
           .from('documents')
-          .select('file_key,uploaded_at,label')
-          .eq('buyer_id', app.user_id)
+          .select('file_key')
+          .eq('buyer_id', buyerId)
           .ilike('label', '%Application%')
           .order('uploaded_at', { ascending: false })
           .limit(1);
-        if (!q2.error && q2.data?.[0]?.file_key) {
-const key2 = q2.data?.[0]?.file_key as string | undefined;
-if (key2) {
-  const url2 = toPublicUrl(key2); // uses the helper you already added
-  if (url2) return url2;
-}
+
+        const key2 = q2.data?.[0]?.file_key as string | undefined;
+        if (key2) {
+          const url2 = toPublicUrl(key2);
+          if (url2) return url2;
+        }
       }
-    } catch {/* ignored */}
+    } catch { /* ignored */ }
+
     return '';
   }
 
@@ -376,7 +386,10 @@ if (key2) {
     setApproveOpen(true);
     await Promise.all([
       loadAvailableOnly(),
-      (async () => { const url = await findApplicationDocUrl(app); if (url) setAppDocUrl(url); })()
+      (async () => {
+        const url = await findApplicationDocUrl(app);
+        if (url) setAppDocUrl(url);
+      })(),
     ]);
   }
 
@@ -387,12 +400,12 @@ if (key2) {
     setApproveMsg('');
 
     try {
-      // Try to reserve + link (if application_id exists). If it errors (unknown column), fallback to just reserving.
+      // Reserve + link to application_id if the column exists; otherwise fallback to just reserve
       let pupError: any = null;
       {
         const { error } = await supabase
           .from('puppies')
-          .update({ status: 'Reserved', application_id: activeApp.id as any })
+          .update({ status: 'Reserved', application_id: (activeApp as any).id })
           .eq('id', selectedPupId)
           .eq('status', 'Available');
         pupError = error;
@@ -409,14 +422,17 @@ if (key2) {
       const { error: appErr } = await supabase
         .from('applications')
         .update({ status: 'approved' })
-        .eq('id', activeApp.id);
+        .eq('id', (activeApp as any).id);
       if (appErr) throw appErr;
 
-      await Promise.all([loadApplications(appFilter), loadPuppies(puppySearchRef.current?.value || '')]);
+      await Promise.all([
+        loadApplications(appFilter),
+        loadPuppies(puppySearchRef.current?.value || ''),
+      ]);
       setApproveOpen(false);
       setActiveApp(null);
       setSelectedPupId('');
-      setApproveMsg(''); // success
+      setApproveMsg('');
     } catch (e: any) {
       setApproveMsg(e?.message || 'Approval failed.');
     } finally {
@@ -426,7 +442,6 @@ if (key2) {
 
   /* ========== Simple handlers for old Approve/Deny fallbacks ========== */
   async function approveApp(id: string) {
-    // Kept for “Deny” row action + quick approve without assignment
     const { error } = await supabase.from('applications').update({ status: 'approved' }).eq('id', id);
     if (error) alert(error.message); else loadApplications(appFilter);
   }
@@ -451,8 +466,15 @@ if (key2) {
       ready_date: (fd.get('ready_date') as string) || null,
       photos,
       sire_id: (fd.get('sire_id') as string) || null,
-      dam_id: (fd.get('dam_id') as string) || null
+      dam_id: (fd.get('dam_id') as string) || null,
     };
+    const { error } = await supabase.from('puppies').insert(row);
+    setPuppyMsg(error ? error.message : 'Saved.');
+    if (!error) {
+      (e.currentTarget as HTMLFormElement).reset();
+      await loadPuppies(puppySearchRef.current?.value || '');
+    }
+  }
     const { error } = await supabase.from('puppies').insert(row);
     setPuppyMsg(error ? error.message : 'Saved.');
     if (!error) {
