@@ -424,9 +424,7 @@ export default function AdminDashboardPage() {
 
   /* ========== Breeding Program ========== */
   async function loadBreedingMetrics() {
-    // We’ll compute in two passes to keep queries simple and RLS-friendly.
-
-    // 1) Get dams and puppies (dam-based), with gender + dob year + price + puppy_id
+    // 1) Dam-year rollups
     const { data: pups } = await supabase
       .from('puppies')
       .select('id, dam_id, gender, dob, price');
@@ -483,133 +481,133 @@ export default function AdminDashboardPage() {
     );
   }
 
- /* ========== Approve Drawer Flow ========== */
-async function findApplicationDocUrl(app: Application): Promise<string> {
-  // Try 1: link by application_id
-  try {
-    const q1 = await supabase
-      .from('documents')
-      .select('file_key')
-      .eq('application_id', app.id)
-      .order('uploaded_at', { ascending: false })
-      .limit(1);
-    const key1 = q1.data?.[0]?.file_key as string | undefined;
-    if (key1) {
-      const url1 = toPublicUrl(key1);
-      if (url1) return url1;
-    }
-  } catch { /* ignored */ }
-
-  // Try 2: fallback by buyer/user id w/ label match
-  try {
-    const buyerId = (app as any).user_id || (app as any).buyer_id || null;
-    if (buyerId) {
-      const q2 = await supabase
+  /* ========== Approve Drawer Flow ========== */
+  async function findApplicationDocUrl(app: Application): Promise<string> {
+    // Try 1: link by application_id
+    try {
+      const q1 = await supabase
         .from('documents')
         .select('file_key')
-        .eq('buyer_id', buyerId)
-        .ilike('label', '%Application%')
+        .eq('application_id', app.id)
         .order('uploaded_at', { ascending: false })
         .limit(1);
-      const key2 = q2.data?.[0]?.file_key as string | undefined;
-      if (key2) {
-        const url2 = toPublicUrl(key2);
-        if (url2) return url2;
+      const key1 = q1.data?.[0]?.file_key as string | undefined;
+      if (key1) {
+        const url1 = toPublicUrl(key1);
+        if (url1) return url1;
       }
+    } catch { /* ignored */ }
+
+    // Try 2: fallback by buyer/user id w/ label match
+    try {
+      const buyerId = (app as any).user_id || (app as any).buyer_id || null;
+      if (buyerId) {
+        const q2 = await supabase
+          .from('documents')
+          .select('file_key')
+          .eq('buyer_id', buyerId)
+          .ilike('label', '%Application%')
+          .order('uploaded_at', { ascending: false })
+          .limit(1);
+        const key2 = q2.data?.[0]?.file_key as string | undefined;
+        if (key2) {
+          const url2 = toPublicUrl(key2);
+          if (url2) return url2;
+        }
+      }
+    } catch { /* ignored */ }
+
+    return '';
+  }
+
+  async function onOpenApprove(app: Application) {
+    setActiveApp(app);
+    setApproveMsg('');
+    setSelectedPupId('');
+    setAppDocUrl('');
+    setApproveOpen(true);
+
+    await Promise.all([
+      loadAvailableOnly(),
+      (async () => {
+        const url = await findApplicationDocUrl(app);
+        if (url) setAppDocUrl(url);
+      })(),
+    ]);
+  }
+
+  async function approveAndAssign() {
+    if (!activeApp) return;
+    if (!selectedPupId) { setApproveMsg('Select a puppy to assign.'); return; }
+    setApproving(true);
+    setApproveMsg('');
+
+    try {
+      // Reserve + link to application_id if that column exists
+      let pupError: any = null;
+      {
+        const { error } = await supabase
+          .from('puppies')
+          .update({ status: 'Reserved', application_id: (activeApp as any).id })
+          .eq('id', selectedPupId)
+          .eq('status', 'Available');
+        pupError = error;
+      }
+
+      // Fallback: just reserve if linking fails due to missing column
+      if (pupError) {
+        const { error: fallbackErr } = await supabase
+          .from('puppies')
+          .update({ status: 'Reserved' })
+          .eq('id', selectedPupId)
+          .eq('status', 'Available');
+        if (fallbackErr) throw fallbackErr;
+      }
+
+      // Mark application approved
+      const { error: appErr } = await supabase
+        .from('applications')
+        .update({ status: 'approved' })
+        .eq('id', (activeApp as any).id);
+      if (appErr) throw appErr;
+
+      // Refresh lists in parallel
+      await Promise.all([
+        loadApplications(appFilter),
+        loadPuppies(puppySearchRef.current?.value || ''),
+      ]);
+
+      // Reset UI
+      setApproveOpen(false);
+      setActiveApp(null);
+      setSelectedPupId('');
+      setApproveMsg('');
+    } catch (e: any) {
+      setApproveMsg(e?.message || 'Approval failed.');
+    } finally {
+      setApproving(false);
     }
-  } catch { /* ignored */ }
+  }
 
-  return '';
-}
-
-async function onOpenApprove(app: Application) {
-  setActiveApp(app);
-  setApproveMsg('');
-  setSelectedPupId('');
-  setAppDocUrl('');
-  setApproveOpen(true);
-
-  await Promise.all([
-    loadAvailableOnly(),
-    (async () => {
-      const url = await findApplicationDocUrl(app);
-      if (url) setAppDocUrl(url);
-    })(),
-  ]);
-}
-
-async function approveAndAssign() {
-  if (!activeApp) return;
-  if (!selectedPupId) { setApproveMsg('Select a puppy to assign.'); return; }
-  setApproving(true);
-  setApproveMsg('');
-
-  try {
-    // Reserve + link to application_id if that column exists
-    let pupError: any = null;
-    {
-      const { error } = await supabase
-        .from('puppies')
-        .update({ status: 'Reserved', application_id: (activeApp as any).id })
-        .eq('id', selectedPupId)
-        .eq('status', 'Available');
-      pupError = error;
-    }
-
-    // Fallback: just reserve if linking fails due to missing column
-    if (pupError) {
-      const { error: fallbackErr } = await supabase
-        .from('puppies')
-        .update({ status: 'Reserved' })
-        .eq('id', selectedPupId)
-        .eq('status', 'Available');
-      if (fallbackErr) throw fallbackErr;
-    }
-
-    // Mark application approved
-    const { error: appErr } = await supabase
+  /* ========== Simple handlers for Approve/Deny row actions ========== */
+  async function approveApp(id: string) {
+    const { error } = await supabase
       .from('applications')
       .update({ status: 'approved' })
-      .eq('id', (activeApp as any).id);
-    if (appErr) throw appErr;
-
-    // Refresh lists in parallel
-    await Promise.all([
-      loadApplications(appFilter),
-      loadPuppies(puppySearchRef.current?.value || ''),
-    ]);
-
-    // Reset UI
-    setApproveOpen(false);
-    setActiveApp(null);
-    setSelectedPupId('');
-    setApproveMsg('');
-  } catch (e: any) {
-    setApproveMsg(e?.message || 'Approval failed.');
-  } finally {
-    setApproving(false);
+      .eq('id', id);
+    if (error) alert(error.message);
+    else await loadApplications(appFilter);
   }
-}
 
-/* ========== Simple handlers for Approve/Deny row actions ========== */
-async function approveApp(id: string) {
-  const { error } = await supabase
-    .from('applications')
-    .update({ status: 'approved' })
-    .eq('id', id);
-  if (error) alert(error.message);
-  else await loadApplications(appFilter);
-}
+  async function denyApp(id: string) {
+    const { error } = await supabase
+      .from('applications')
+      .update({ status: 'denied' })
+      .eq('id', id);
+    if (error) alert(error.message);
+    else await loadApplications(appFilter);
+  }
 
-async function denyApp(id: string) {
-  const { error } = await supabase
-    .from('applications')
-    .update({ status: 'denied' })
-    .eq('id', id);
-  if (error) alert(error.message);
-  else await loadApplications(appFilter);
-}
- 
   /* ========== Form Handlers ========== */
   // Puppies
   /* ANCHOR: onAddPuppy */
@@ -1574,11 +1572,11 @@ async function denyApp(id: string) {
 
       {/* Approve Drawer */}
       {approveOpen && activeApp && (
-        <div className="drawer" role="dialog" aria-modal="true" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }}>
-          <div className="scrim" />
+        <div className="drawer" role="dialog" aria-modal="true" aria-labelledby="approve-title">
+          <div className="scrim" aria-hidden />
           <div className="drawer-panel" onClick={(e)=>e.stopPropagation()}>
             <div className="drawer-hd">
-              <h2>Review & Approve</h2>
+              <h2 id="approve-title">Review & Approve</h2>
               <button className="x" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }}>×</button>
             </div>
             <div className="drawer-body">
@@ -1681,7 +1679,7 @@ async function denyApp(id: string) {
 
         /* Drawer */
         .drawer{position:fixed;inset:0;display:flex;justify-content:flex-end;z-index:1000}
-        .scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:1}
+        .scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:1;pointer-events:none} /* no outside-click dismissal */
         .drawer-panel{position:relative;width:min(600px,95vw);height:100%;background:#fff;border-left:1px solid #e8ded2;box-shadow:-8px 0 24px rgba(0,0,0,.08);display:flex;flex-direction:column;z-index:2}
         .drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #f0e6da}
         .x{font-size:22px;line-height:1;border:0;background:transparent;cursor:pointer;padding:4px 8px}
