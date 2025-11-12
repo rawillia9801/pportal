@@ -183,7 +183,14 @@ export default function AdminDashboardPage() {
     const cls = norm === 'sold' ? 'danger' : norm === 'reserved' ? 'warn' : 'ok';
     return <span className={`badge ${cls}`}>{status || '-'}</span>;
   }
-
+function toPublicUrl(key: string): string {
+  try {
+    const { data } = supabase.storage.from('docs').getPublicUrl(key);
+    return data?.publicUrl ?? '';
+  } catch {
+    return '';
+  }
+}
   /* ========== Loaders ========== */
   async function loadOverview() {
     try {
@@ -338,8 +345,6 @@ export default function AdminDashboardPage() {
         .order('uploaded_at', { ascending: false })
         .limit(1);
       if (!q1.error && q1.data?.[0]?.file_key) {
-        const pub = await supabase.storage.from('docs').getPublicUrl(q1.data[0].file_key);
-        if (!pub.error) return pub.data.publicUrl || '';
       }
     } catch {/* ignored */}
     // Try 2: by buyer_id if user_id is present and label looks like an application
