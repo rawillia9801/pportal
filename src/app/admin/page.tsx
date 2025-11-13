@@ -6,10 +6,9 @@
    - 2025-11-12: Buyers tab (list + detail panel)
    - 2025-11-12: Supabase wiring for buyers, puppies,
                  payments, transport_requests
-   - 2025-11-12 (Rev D): Fix duplicate key in ADMIN_TABS.
-                         Sidebar locked to left via CSS grid.
-                         Manual Add Puppy + Add Payment for
-                         past sales, richer payment details.
+   - 2025-11-12 (Rev E): Sidebar locked to left
+                         at all screen sizes (no
+                         responsive top-row tabs).
    ============================================ */
 
 import React, { useEffect, useState } from 'react'
@@ -268,21 +267,6 @@ export default function AdminDashboard() {
           }
           .comingSoon h1 {
             margin-bottom: 8px;
-          }
-
-          @media (max-width: 900px) {
-            main.adminLayout {
-              grid-template-columns: 1fr;
-            }
-            .adminSidebar {
-              flex-direction: row;
-              align-items: center;
-              justify-content: space-between;
-            }
-            .adminTabs {
-              flex-direction: row;
-              flex-wrap: wrap;
-            }
           }
         `}</style>
       </section>
