@@ -2,22 +2,20 @@
 
 /* ============================================
    CHANGELOG
-   - 2025-11-12: New public portal landing page (clean, modern, Chihuahua-themed)
-   - 2025-11-12: Tabs with inline SVG icons (Available Puppies, My Puppy, Docs, Payments, Transport, Message, Profile)
-   - 2025-11-12: Supabase sign-up box on landing
-   - 2025-11-12: Four quick-action cards (Application, Financing, FAQ, Support)
-   - 2025-11-13: Updated hero copy + about section copy
-   - 2025-11-13: Centered action buttons inside cards
-   - 2025-11-13: Footer tagline -> “Virginia's Premier Chihuahua Breeder.”
-   ============================================ */
+   - 2025-11-13: Rebuilt public Puppy Portal landing
+                 to match admin styling
+   - 2025-11-13: Left sidebar navigation + centered
+                 hero + signup card
+   - 2025-11-13: Supabase sign-up (email/password)
+   ============================================
+   ANCHOR: PUPPY_PORTAL_PAGE
+*/
 
-import React, { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import React, { useState } from 'react'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 /* ============================================
-   ANCHOR: SUPABASE (browser client)
+   SUPABASE HELPER
    ============================================ */
 
 type AnyClient = SupabaseClient<any, 'public', any>
@@ -44,780 +42,587 @@ function getSupabaseEnv() {
   return { url: String(url || ''), key: String(key || '') }
 }
 
-async function getBrowserClient(): Promise<AnyClient> {
+function getBrowserClient(): AnyClient | null {
   if (__sb) return __sb
   const { url, key } = getSupabaseEnv()
-  if (!url || !key) {
-    throw new Error(
-      'Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY'
-    )
-  }
+  if (!url || !key) return null
   __sb = createClient(url, key)
   return __sb
 }
 
 /* ============================================
-   ANCHOR: CONSTANTS
+   COMPONENT
    ============================================ */
-// Change to '/portal' only if this file lives at src/app/portal/page.tsx
-const BASE = ''
 
-// Brand palette (SWVA Chihuahua)
-const THEME = {
-  bg: '#0b1120', // darker background for contrast
-  panel: '#020617',
-  ink: '#f9fafb',
-  muted: '#9ca3af',
-  brand: '#e0a96d',
-  brandAlt: '#c47a35',
-  ok: '#22c55e',
-}
+export default function PuppyPortalLanding() {
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-/* ============================================
-   ANCHOR: ICONS (inline SVG, no deps)
-   ============================================ */
-const IconPaw = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden fill="currentColor" {...props}>
-    <path d="M12 13c-2.6 0-5 1.9-5 4.2C7 19.4 8.6 21 10.7 21h2.6C15.4 21 17 19.4 17 17.2 17 14.9 14.6 13 12 13zm-5.4-2.1c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm10.8 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.5 9.7c1.3 0 2.3-1.2 2.3-2.7S10.8 4.3 9.5 4.3 7.2 5.5 7.2 7s1 2.7 2.3 2.7zm5 0c1.3 0 2.3-1.2 2.3-2.7s-1-2.7-2.3-2.7-2.3 1.2-2.3 2.7 1 2.7 2.3 2.7z"/>
-  </svg>
-)
-const IconDoc = (p: any) => (
-  <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M6 2h7l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1v4h4"/></svg>
-)
-const IconCard = (p: any) => (
-  <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2H3V7zm0 4h18v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6zm3 5h4v2H6v-2z"/></svg>
-)
-const IconTruck = (p: any) => (
-  <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M3 7h11v7h2.5l2.2-3H21v6h-1a2 2 0 1 1-4 0H8a2 2 0 1 1-4 0H3V7zm14 8a2 2 0 0 1 2 2h-4a2 2 0 0 1 2-2zM6 17a2 2 0 0 1 2 2H4a2 2 0 0 1 2-2z"/></svg>
-)
-const IconChat = (p: any) => (
-  <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M4 4h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4V6a2 2 0 0 1 2-2z"/></svg>
-)
-const IconUser = (p: any) => (
-  <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5C21 16.5 17 14 12 14z"/></svg>
-)
-const IconPuppy = (p: any) => (
-  <svg viewBox="0 0 64 64" width={18} height={18} fill="currentColor" {...p}>
-    <path d="M20 16c-5 0-9 4-9 9 0 6 3 9 3 12 0 3 2 5 5 5h1c2 5 6 8 12 8s10-3 12-8h1c3 0 5-2 5-5 0-3 3-6 3-12 0-5-4-9-9-9-4 0-7 2-9 5-2-3-5-5-9-5zM26 32a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm12 0a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM24 41c4 3 12 3 16 0 1-1 3 0 2 2-2 4-18 4-20 0-1-2 1-3 2-2z"/>
-  </svg>
-)
-
-/* ============================================
-   ANCHOR: NAV TABS (routes only)
-   ============================================ */
-const tabs = [
-  { key: 'available', label: 'Available Puppies', href: `${BASE}/available-puppies`, Icon: IconPuppy },
-  { key: 'mypuppy', label: 'My Puppy', href: `${BASE}/my-puppy`, Icon: IconPaw },
-  { key: 'docs', label: 'Documents', href: `${BASE}/documents`, Icon: IconDoc },
-  { key: 'payments', label: 'Payments', href: `${BASE}/payments`, Icon: IconCard },
-  { key: 'transport', label: 'Transportation', href: `${BASE}/transportation`, Icon: IconTruck },
-  { key: 'message', label: 'Message', href: `${BASE}/messages`, Icon: IconChat },
-  { key: 'profile', label: 'Profile', href: `${BASE}/profile`, Icon: IconUser },
-] as const
-
-type SignUpState = { name: string; email: string; pass: string; msg: string; busy: boolean }
-type TestResult = { name: string; status: 'pass' | 'fail' | 'skip'; detail?: string }
-type TabKey = (typeof tabs)[number]['key'] | 'home'
-
-function activeKeyFromPathname(pathname?: string | null): TabKey {
-  if (!pathname) return 'home'
-  const t = tabs.find((t) => pathname.startsWith(t.href))
-  return (t?.key as TabKey) ?? 'home'
-}
-
-/* ============================================
-   ANCHOR: PAGE COMPONENT
-   ============================================ */
-export default function PortalHome() {
-  const pathname = usePathname()
-  const [s, setS] = useState<SignUpState>({
-    name: '',
-    email: '',
-    pass: '',
-    msg: '',
-    busy: false,
-  })
-
-  const activeKey = useMemo(() => activeKeyFromPathname(pathname), [pathname])
-
-  async function onSignUp(e: React.FormEvent) {
+  async function handleSignUp(e: React.FormEvent) {
     e.preventDefault()
-    setS((v) => ({ ...v, msg: '', busy: true }))
-    try {
-      const { url, key } = getSupabaseEnv()
-      if (!url || !key)
-        throw new Error(
-          'Missing Supabase env (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY)'
-        )
-      if (!s.email || !s.pass) throw new Error('Please enter email and password')
+    setError(null)
+    setMessage(null)
 
-      const supabase = await getBrowserClient()
-      const { error } = await supabase.auth.signUp({
-        email: s.email,
-        password: s.pass,
-        options: { data: { full_name: s.name } },
+    if (!email || !password) {
+      setError('Please enter an email and password.')
+      return
+    }
+
+    const client = getBrowserClient()
+    if (!client) {
+      setError(
+        'Sign-up is temporarily unavailable. Please contact Southwest Virginia Chihuahua directly to create your account.'
+      )
+      return
+    }
+
+    try {
+      setLoading(true)
+      const { error } = await client.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName || null,
+          },
+        },
       })
-      if (error) throw error
-      setS({
-        name: '',
-        email: '',
-        pass: '',
-        msg: 'Account created. Please check your email to verify.',
-        busy: false,
-      })
+
+      if (error) {
+        setError(error.message || 'Unable to create your account right now.')
+        return
+      }
+
+      setMessage(
+        'Check your email to confirm your account. Once confirmed, you can sign in to your Puppy Portal.'
+      )
+      setFullName('')
+      setEmail('')
+      setPassword('')
     } catch (err: any) {
-      setS((v) => ({ ...v, msg: err?.message || 'Sign up failed.', busy: false }))
+      setError(err?.message || 'Unexpected error during sign-up.')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const [showDev, setShowDev] = useState(false)
-  useEffect(() => {
-    try {
-      const qs =
-        typeof window !== 'undefined'
-          ? new URLSearchParams(window.location.search)
-          : null
-      setShowDev(qs?.get('dev') === '1')
-    } catch {
-      /* ignore */
-    }
-  }, [])
+  /* ------------ SHARED STYLES ------------ */
+
+  const layoutStyle: React.CSSProperties = {
+    minHeight: '100vh',
+    display: 'flex',
+    background:
+      'radial-gradient(60% 100% at 100% 0%, #020617 0%, transparent 60%),' +
+      'radial-gradient(60% 100% at 0% 0%, #111827 0%, transparent 60%),' +
+      '#020617',
+    color: '#f9fafb',
+    fontFamily:
+      'system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+  }
+
+  const sidebarStyle: React.CSSProperties = {
+    width: 250,
+    padding: '18px 14px',
+    boxSizing: 'border-box',
+    borderRight: '1px solid #1f2937',
+    background: 'linear-gradient(180deg,#020617,#020617,#111827)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 18,
+  }
+
+  const brandRowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  }
+
+  const logoStyle: React.CSSProperties = {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    background: 'linear-gradient(135deg,#e0a96d,#c47a35)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 20,
+  }
+
+  const tabsContainerStyle: React.CSSProperties = {
+    marginTop: 14,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  }
+
+  // Larger, easier-to-click tab buttons (same feel as admin)
+  const tabBaseStyle: React.CSSProperties = {
+    border: '1px solid #1f2937',
+    background: '#020617',
+    color: '#e5e7eb',
+    borderRadius: 12,
+    padding: '11px 13px',
+    textAlign: 'left',
+    fontSize: '0.95rem',
+    cursor: 'pointer',
+    transition:
+      'background .12s ease, transform .12s ease, box-shadow .12s ease, border-color .12s ease',
+  }
+
+  const tabActiveStyle: React.CSSProperties = {
+    ...tabBaseStyle,
+    background: 'linear-gradient(135deg,#e0a96d,#c47a35)',
+    color: '#111827',
+    borderColor: 'transparent',
+    fontWeight: 600,
+    boxShadow: '0 6px 18px rgba(0,0,0,0.6)',
+  }
+
+  const mainStyle: React.CSSProperties = {
+    flex: 1,
+    padding: '24px 22px 32px',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+  }
+
+  // simple active tab highlight (client-side only, no routing yet)
+  const [activeTab, setActiveTab] = useState<string>('my_puppy')
+
+  const NAV_ITEMS: { key: string; label: string; icon: string }[] = [
+    { key: 'available_puppies', label: 'Available Puppies', icon: '🐾' },
+    { key: 'my_puppy', label: 'My Puppy', icon: '🐶' },
+    { key: 'documents', label: 'Documents', icon: '📄' },
+    { key: 'payments', label: 'Payments', icon: '💳' },
+    { key: 'transport', label: 'Transportation', icon: '🚚' },
+    { key: 'message', label: 'Message', icon: '💬' },
+    { key: 'profile', label: 'Profile', icon: '👤' },
+  ]
 
   return (
-    <main>
-      {/* =================== HEADER =================== */}
-      <header className="hdr">
-        <div className="brand">
-          <div className="pupmark" aria-hidden>
-            <span className="pawbubble" />
-            <span className="pawbubble" />
-            <span className="pawbubble" />
-          </div>
-          <div className="title">
-            <div className="line1">My Puppy</div>
-            <div className="line2">Portal</div>
+    <main style={layoutStyle}>
+      {/* LEFT SIDEBAR NAV */}
+      <aside style={sidebarStyle}>
+        <div style={brandRowStyle}>
+          <div style={logoStyle}>🐾</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '.95rem' }}>
+              My Puppy Portal
+            </div>
+            <div style={{ fontSize: '.8rem', color: '#e5e7eb' }}>
+              Virginia&apos;s Premier Chihuahua Breeder
+            </div>
           </div>
         </div>
 
-        <nav className="tabs">
-          {tabs.map(({ key, label, href, Icon }) => (
-            <Link key={key} href={href} className={`tab ${activeKey === key ? 'active' : ''}`}>
-              <Icon />
-              <span>{label}</span>
-            </Link>
+        <nav style={tabsContainerStyle}>
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              style={
+                activeTab === item.key ? tabActiveStyle : tabBaseStyle
+              }
+              onClick={() => setActiveTab(item.key)}
+            >
+              <span style={{ marginRight: 8 }}>{item.icon}</span>
+              {item.label}
+            </button>
           ))}
         </nav>
-      </header>
+      </aside>
 
-      {/* =================== HERO =================== */}
-      <section className="hero">
-        <div className="heroInner">
-          <div className="heroText">
-            <h1>Welcome to your Personal Puppy Portal!</h1>
-            <p className="lead">
-              This is your central hub to follow every step of your Chihuahua&apos;s journey.
-              You can track applications, manage payments, celebrate weekly milestones,
-              access key documents, and arrange transportation — all right here.
+      {/* MAIN CONTENT AREA */}
+      <section style={mainStyle}>
+        {/* HERO + SIGNUP */}
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: '0 auto',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 32,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          {/* LEFT: Hero text */}
+          <div style={{ flex: '1 1 360px', minWidth: 0 }}>
+            <h1
+              style={{
+                fontSize: '2.8rem',
+                lineHeight: 1.1,
+                marginBottom: 16,
+              }}
+            >
+              Welcome to your Personal Puppy Portal!
+            </h1>
+            <p
+              style={{
+                maxWidth: 560,
+                color: '#e5e7eb',
+                fontSize: 15,
+                lineHeight: 1.5,
+                marginBottom: 28,
+              }}
+            >
+              This is your central hub to follow every step of your
+              Chihuahua&apos;s journey. You can track applications, manage
+              payments, celebrate weekly milestones, access key documents,
+              and arrange transportation — all right here.
             </p>
+
+            <div style={{ maxWidth: 560 }}>
+              <h2
+                style={{
+                  fontSize: 18,
+                  marginBottom: 8,
+                  fontWeight: 600,
+                }}
+              >
+                Your Puppy Portal
+              </h2>
+              <p style={{ fontSize: 14, color: '#e5e7eb', marginBottom: 8 }}>
+                Think of the Puppy Portal as your personal, secure hub for
+                everything related to your new Chihuahua! It&apos;s designed
+                especially for our Southwest Virginia Chihuahua families to
+                make your experience seamless and exciting.
+              </p>
+              <ul
+                style={{
+                  fontSize: 14,
+                  color: '#e5e7eb',
+                  paddingLeft: 18,
+                  marginBottom: 8,
+                }}
+              >
+                <li>Track your puppy&apos;s weekly weights and milestones</li>
+                <li>View and sign your documents</li>
+                <li>Manage payments</li>
+                <li>Schedule transportation</li>
+                <li>Chat directly with us</li>
+              </ul>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: '#e5e7eb',
+                  marginBottom: 0,
+                }}
+              >
+                It&apos;s your entire puppy journey, all in one convenient
+                place!
+              </p>
+            </div>
           </div>
 
-          {/* Sign Up card */}
-          <form className="signup" onSubmit={onSignUp}>
-            <div className="signupHd">
-              <IconPaw /> <span>Create your account</span>
-            </div>
-            <label>Full Name</label>
-            <input
-              value={s.name}
-              onChange={(e) => setS((v) => ({ ...v, name: e.target.value }))}
-              placeholder="First Last"
-              autoComplete="name"
-            />
-            <label>Email</label>
-            <input
-              type="email"
-              value={s.email}
-              onChange={(e) => setS((v) => ({ ...v, email: e.target.value }))}
-              placeholder="you@example.com"
-              autoComplete="email"
-              required
-            />
-            <label>Password</label>
-            <input
-              type="password"
-              value={s.pass}
-              onChange={(e) => setS((v) => ({ ...v, pass: e.target.value }))}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              required
-            />
-            <button className="btn primary" type="submit" disabled={s.busy}>
-              {s.busy ? 'Creating…' : 'Sign Up'}
-            </button>
-            {s.msg && <div className="note">{s.msg}</div>}
-            <div className="mini">
-              Already have an account? <Link href={`${BASE}/login`}>Sign in</Link>
-            </div>
-
-            {(!getSupabaseEnv().url || !getSupabaseEnv().key) && (
-              <div className="note" style={{ marginTop: 8 }}>
-                <b>Setup required:</b> Define <code>NEXT_PUBLIC_SUPABASE_URL</code> and{' '}
-                <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in your environment.
+          {/* RIGHT: Signup card (centered vertically in this row) */}
+          <div
+            style={{
+              flex: '0 0 360px',
+              maxWidth: 380,
+              width: '100%',
+            }}
+          >
+            <div
+              style={{
+                borderRadius: 18,
+                border: '1px solid #111827',
+                background:
+                  'radial-gradient(120% 200% at 0 0, rgba(224,169,109,0.18), transparent 55%), #020617',
+                boxShadow: '0 22px 45px rgba(0,0,0,0.75)',
+                padding: 18,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <span
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 999,
+                    background:
+                      'radial-gradient(120% 200% at 0 0, #e0a96d, #c47a35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 14,
+                  }}
+                >
+                  ★
+                </span>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 14,
+                  }}
+                >
+                  Create your account
+                </div>
               </div>
-            )}
-          </form>
-        </div>
-      </section>
 
-      {/* =================== WHAT TO EXPECT =================== */}
-      <section className="about">
-        <div className="wrap">
-          <h2>Your Puppy Portal</h2>
-          <p>
-            Think of the Puppy Portal as your personal, secure hub for everything related to your
-            new Chihuahua! It&apos;s designed especially for our Southwest Virginia Chihuahua
-            families to make your experience seamless and exciting.
-          </p>
-          <ul>
-            <li>Track your puppy&apos;s weekly weights and milestones</li>
-            <li>View and sign your documents</li>
-            <li>Manage payments</li>
-            <li>Schedule transportation</li>
-            <li>Chat directly with us</li>
-          </ul>
-          <p>It&apos;s your entire puppy journey, all in one convenient place!</p>
-        </div>
-      </section>
+              <form onSubmit={handleSignUp}>
+                <div style={{ marginBottom: 8 }}>
+                  <label
+                    style={{
+                      fontSize: 12,
+                      color: '#9ca3af',
+                      display: 'block',
+                      marginBottom: 2,
+                    }}
+                  >
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="First Last"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <label
+                    style={{
+                      fontSize: 12,
+                      color: '#9ca3af',
+                      display: 'block',
+                      marginBottom: 2,
+                    }}
+                  >
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label
+                    style={{
+                      fontSize: 12,
+                      color: '#9ca3af',
+                      display: 'block',
+                      marginBottom: 2,
+                    }}
+                  >
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
 
-      {/* =================== QUICK ACTION CARDS =================== */}
-      <section className="cards">
-        <div className="wrap grid">
-          <ActionCard
-            icon={<IconDoc />}
-            title="Application to Adopt"
-            body="Start or review your application."
-            href={`${BASE}/application`}
-            cta="Open Application"
-          />
-          <ActionCard
-            icon={<IconCard />}
-            title="Financing Options"
-            body="See deposit info and payment plans."
-            href={`${BASE}/financing`}
-            cta="View Financing"
-          />
-          <ActionCard
-            icon={<IconPaw />}
-            title="Frequently Asked Questions"
-            body="Answers about care, timelines, and more."
-            href={`${BASE}/faq`}
-            cta="Read FAQs"
-          />
-          <ActionCard
-            icon={<IconChat />}
-            title="Support"
-            body="Need help? Message the breeder."
-            href={`${BASE}/message`}
-            cta="Contact Us"
-          />
-        </div>
-      </section>
+                {error && (
+                  <div
+                    style={{
+                      marginBottom: 8,
+                      padding: 6,
+                      borderRadius: 8,
+                      border: '1px solid #7f1d1d',
+                      background: '#451a1a',
+                      color: '#fecaca',
+                      fontSize: 12,
+                    }}
+                  >
+                    {error}
+                  </div>
+                )}
 
-      {/* =================== DEV SELF-TESTS (toggle with ?dev=1) =================== */}
-      {showDev && <DevSelfTests />}
+                {message && (
+                  <div
+                    style={{
+                      marginBottom: 8,
+                      padding: 6,
+                      borderRadius: 8,
+                      border: '1px solid #14532d',
+                      background: '#052e16',
+                      color: '#bbf7d0',
+                      fontSize: 12,
+                    }}
+                  >
+                    {message}
+                  </div>
+                )}
 
-      <footer className="ft">
-        <div className="wrap">
-          <div className="ftInner">
-            <span className="mini">
-              © {new Date().getFullYear()} Southwest Virginia Chihuahua
-            </span>
-            <span className="mini">Virginia&apos;s Premier Chihuahua Breeder.</span>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    borderRadius: 999,
+                    border: '1px solid transparent',
+                    padding: '8px 0',
+                    background:
+                      'linear-gradient(135deg,#e0a96d,#c47a35)',
+                    color: '#111827',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    marginBottom: 6,
+                  }}
+                >
+                  {loading ? 'Creating account…' : 'Sign Up'}
+                </button>
+              </form>
+
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 12,
+                  color: '#9ca3af',
+                }}
+              >
+                Already have an account?{' '}
+                <span style={{ color: '#e0a96d' }}>Sign in</span>
+              </div>
+            </div>
           </div>
         </div>
-      </footer>
 
-      {/* ============================================ */}
-      {/* STYLES (styled-jsx) */}
-      {/* ============================================ */}
-      <style jsx>{`
-        :root {
-          --bg: ${THEME.bg};
-          --panel: ${THEME.panel};
-          --ink: ${THEME.ink};
-          --muted: ${THEME.muted};
-          --brand: ${THEME.brand};
-          --brandAlt: ${THEME.brandAlt};
-          --ok: ${THEME.ok};
-        }
-        main {
-          min-height: 100vh;
-          background:
-            radial-gradient(60% 100% at 100% 0%, #111827 0%, transparent 60%),
-            radial-gradient(60% 100% at 0% 0%, #020617 0%, transparent 60%),
-            var(--bg);
-          color: var(--ink);
-        }
-        .wrap {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 16px;
-        }
-
-        /* HEADER */
-        .hdr {
-          position: sticky;
-          top: 0;
-          z-index: 10;
-          backdrop-filter: saturate(1.1) blur(8px);
-          background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.9));
-          border-bottom: 1px solid #1f2937;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 14px;
-          padding: 12px 16px;
-        }
-        .brand {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .pupmark {
-          position: relative;
-          width: 42px;
-          height: 42px;
-          border-radius: 12px;
-          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          box-shadow: inset 0 0 0 3px #020617;
-        }
-        .pawbubble {
-          position: absolute;
-          width: 8px;
-          height: 8px;
-          background: #f9fafb;
-          border-radius: 50%;
-          opacity: 0.7;
-        }
-        .pawbubble:nth-child(1) {
-          top: 10px;
-          left: 10px;
-        }
-        .pawbubble:nth-child(2) {
-          top: 14px;
-          left: 22px;
-        }
-        .pawbubble:nth-child(3) {
-          top: 22px;
-          left: 16px;
-        }
-        .title {
-          line-height: 1;
-        }
-        .title .line1 {
-          font-weight: 800;
-          letter-spacing: 0.2px;
-        }
-        .title .line2 {
-          text-align: center;
-          font-size: 0.9rem;
-          color: var(--muted);
-        }
-
-        .tabs {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-        .tab {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 12px;
-          border-radius: 12px;
-          background: rgba(15, 23, 42, 0.9);
-          border: 1px solid #1f2937;
-          color: var(--ink);
-          text-decoration: none;
-          font-size: 0.9rem;
-          transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
-        }
-        .tab:hover {
-          transform: translateY(-1px);
-          background: #020617;
-        }
-        .tab.active {
-          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          color: #111827;
-          border-color: transparent;
-        }
-
-        /* HERO */
-        .hero {
-          padding: 36px 16px;
-        }
-        .heroInner {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: grid;
-          grid-template-columns: 1.2fr 0.8fr;
-          gap: 24px;
-          align-items: stretch;
-        }
-        @media (max-width: 900px) {
-          .heroInner {
-            grid-template-columns: 1fr;
-          }
-        }
-        .heroText h1 {
-          font-size: clamp(28px, 3.2vw, 44px);
-          margin: 0 0 10px;
-        }
-        .lead {
-          color: var(--muted);
-          font-size: 1.05rem;
-          margin: 0;
-        }
-
-        .signup {
-          background: rgba(15, 23, 42, 0.96);
-          border: 1px solid #1f2937;
-          border-radius: 16px;
-          padding: 16px;
-          backdrop-filter: blur(10px);
-          box-shadow: 0 6px 28px rgba(0, 0, 0, 0.6);
-        }
-        .signupHd {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-weight: 700;
-          margin-bottom: 8px;
-          color: var(--brand);
-        }
-        .signup label {
-          display: block;
-          margin-top: 8px;
-          font-size: 0.9rem;
-        }
-        .signup input {
-          width: 100%;
-          padding: 10px;
-          border: 1px solid #1f2937;
-          border-radius: 10px;
-          background: #020617;
-          color: var(--ink);
-          font-size: 0.9rem;
-        }
-        .signup input:focus {
-          outline: none;
-          box-shadow: 0 0 0 3px rgba(224, 169, 109, 0.3);
-          border-color: var(--brand);
-        }
-        .btn {
-          appearance: none;
-          border: 1px solid #1f2937;
-          background: #020617;
-          color: var(--ink);
-          padding: 10px 12px;
-          border-radius: 10px;
-          cursor: pointer;
-          font-size: 0.9rem;
-        }
-        .btn.primary {
-          margin-top: 12px;
-          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          border-color: transparent;
-          color: #111827;
-          font-weight: 600;
-        }
-        .note {
-          margin-top: 8px;
-          background: #020617;
-          border: 1px dashed #1f2937;
-          padding: 8px;
-          border-radius: 8px;
-          color: var(--muted);
-          font-size: 0.85rem;
-        }
-        .mini {
-          margin-top: 8px;
-          color: var(--muted);
-          font-size: 0.9rem;
-        }
-
-        /* ABOUT */
-        .about {
-          padding: 8px 16px 0;
-        }
-        .about .wrap {
-          max-width: 900px;
-        }
-        .about h2 {
-          margin: 0 0 6px;
-        }
-        .about p {
-          margin: 0 0 6px;
-          color: var(--muted);
-        }
-        .about ul {
-          margin: 4px 0 6px 20px;
-          padding: 0;
-          color: var(--muted);
-          font-size: 0.95rem;
-        }
-        .about li {
-          margin-bottom: 2px;
-        }
-
-        /* CARDS */
-        .cards {
-          padding: 18px 16px 42px;
-        }
-        .grid {
-          display: grid;
-          grid-template-columns: repeat(12, 1fr);
-          gap: 14px;
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-        .card {
-          grid-column: span 12;
-          background: var(--panel);
-          border: 1px solid #1f2937;
-          border-radius: 16px;
-          padding: 16px;
-          box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
-        }
-        @media (min-width: 900px) {
-          .span6 {
-            grid-column: span 6;
-          }
-        }
-
-        .ft {
-          border-top: 1px solid #1f2937;
-          background: rgba(15, 23, 42, 0.95);
-          backdrop-filter: blur(6px);
-        }
-        .ft .ftInner {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 12px 16px;
-          display: flex;
-          gap: 12px;
-          justify-content: space-between;
-          color: var(--muted);
-        }
-
-        /* DEV SELF-TESTS */
-        .tests {
-          max-width: 1200px;
-          margin: 0 auto 24px;
-          padding: 0 16px;
-        }
-        .tests .panel {
-          background: #020617;
-          border: 1px solid #1f2937;
-          border-radius: 12px;
-          padding: 12px;
-        }
-        .tests .row {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-          border: 1px solid #111827;
-          border-radius: 10px;
-          padding: 8px;
-          margin: 6px 0;
-          background: #020617;
-          font-size: 0.85rem;
-        }
-        .tests .ok {
-          color: #22c55e;
-        }
-        .tests .bad {
-          color: #f97316;
-        }
-        .tests code {
-          background: #0b1120;
-          padding: 0 4px;
-          border-radius: 4px;
-        }
-      `}</style>
+        {/* BOTTOM: QUICK ACTION CARDS */}
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: '40px auto 0',
+          }}
+        >
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fit,minmax(200px,1fr))',
+              gap: 16,
+            }}
+          >
+            <PortalActionCard
+              title="Application to Adopt"
+              description="Start or review your application."
+              buttonLabel="Open Application"
+            />
+            <PortalActionCard
+              title="Financing Options"
+              description="See deposit info and payment plans."
+              buttonLabel="View Financing"
+            />
+            <PortalActionCard
+              title="Frequently Asked Questions"
+              description="Answers about care, timelines, and more."
+              buttonLabel="Read FAQs"
+            />
+            <PortalActionCard
+              title="Support"
+              description="Need help? Message the breeder."
+              buttonLabel="Contact Support"
+            />
+          </div>
+        </div>
+      </section>
     </main>
   )
 }
 
 /* ============================================
-   ANCHOR: REUSABLE CARD
+   REUSABLE BITS
    ============================================ */
-function ActionCard({
-  icon,
-  title,
-  body,
-  href,
-  cta,
-}: {
-  icon: React.ReactNode
-  title: string
-  body: string
-  href: string
-  cta: string
-}) {
-  return (
-    <div className="card span6">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-        <div style={{ color: THEME.brand }}>{icon}</div>
-        <h3 style={{ margin: 0 }}>{title}</h3>
-      </div>
-      <p style={{ margin: '6px 0 12px', color: THEME.muted }}>{body}</p>
-      {/* Center the button horizontally */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
-        <Link href={href} className="btn" style={{ textDecoration: 'none' }}>
-          {cta}
-        </Link>
-      </div>
-    </div>
-  )
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '7px 8px',
+  borderRadius: 8,
+  border: '1px solid #1f2937',
+  background: '#020617',
+  color: '#f9fafb',
+  fontSize: 13,
+  outline: 'none',
 }
 
-/* ============================================
-   ANCHOR: DEV SELF-TESTS
-   Toggle by appending ?dev=1 to the URL so buyers never see it.
-   ============================================ */
-function DevSelfTests() {
-  const [{ results, running }, setState] = useState<{
-    results: TestResult[]
-    running: boolean
-  }>({ results: [], running: true })
+type PortalActionCardProps = {
+  title: string
+  description: string
+  buttonLabel: string
+}
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      const out: TestResult[] = []
-
-      // Test 1: Env present
-      const { url, key } = getSupabaseEnv()
-      if (!url || !key) {
-        out.push({
-          name: 'env vars present',
-          status: 'fail',
-          detail: 'Define NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY',
-        })
-      } else {
-        out.push({ name: 'env vars present', status: 'pass' })
-      }
-
-      // Test 2: Client init
-      if (!url || !key) {
-        out.push({ name: 'client initialized', status: 'skip', detail: 'missing env' })
-      } else {
-        try {
-          const sb = await getBrowserClient()
-          out.push({ name: 'client initialized', status: sb ? 'pass' : 'fail' })
-        } catch (e: any) {
-          out.push({
-            name: 'client initialized',
-            status: 'fail',
-            detail: e?.message,
-          })
-        }
-      }
-
-      // Test 3: auth.getSession (non-fatal)
-      try {
-        if (url && key) {
-          const sb = await getBrowserClient()
-          const { data, error } = await sb.auth.getSession()
-          out.push({
-            name: 'auth.getSession()',
-            status: error ? 'fail' : 'pass',
-            detail: error?.message || (data?.session ? 'session present' : 'no session (ok)'),
-          })
-        } else {
-          out.push({ name: 'auth.getSession()', status: 'skip', detail: 'missing env' })
-        }
-      } catch (e: any) {
-        out.push({
-          name: 'auth.getSession()',
-          status: 'fail',
-          detail: e?.message,
-        })
-      }
-
-      // Test 4: Tabs integrity
-      try {
-        const labels = tabs.map((t) => t.label)
-        const expected = [
-          'Available Puppies',
-          'My Puppy',
-          'Documents',
-          'Payments',
-          'Transportation',
-          'Message',
-          'Profile',
-        ]
-        const same =
-          expected.length === labels.length && expected.every((x, i) => x === labels[i])
-        out.push({
-          name: 'tabs order & labels',
-          status: same ? 'pass' : 'fail',
-          detail: same ? undefined : `got [${labels.join(', ')}]`,
-        })
-      } catch (e: any) {
-        out.push({
-          name: 'tabs order & labels',
-          status: 'fail',
-          detail: e?.message,
-        })
-      }
-
-      // Test 5: Path highlight helper
-      try {
-        const k = activeKeyFromPathname('/payments')
-        out.push({
-          name: 'activeKeyFromPathname("/payments")',
-          status: k === 'payments' ? 'pass' : 'fail',
-          detail: `got ${k}`,
-        })
-      } catch (e: any) {
-        out.push({
-          name: 'activeKeyFromPathname',
-          status: 'fail',
-          detail: e?.message,
-        })
-      }
-
-      if (!cancelled) setState({ results: out, running: false })
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
+function PortalActionCard({
+  title,
+  description,
+  buttonLabel,
+}: PortalActionCardProps) {
   return (
-    <section className="tests">
-      <div className="panel">
-        <h3 style={{ marginTop: 0 }}>Developer Self-Tests</h3>
-        <div className="mini" style={{ marginBottom: 8 }}>
-          Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not
-          end-to-end.
+    <div
+      style={{
+        borderRadius: 16,
+        border: '1px solid #1f2937',
+        background:
+          'radial-gradient(120% 220% at 0 0, rgba(224,169,109,0.16), transparent 55%), #020617',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
+        padding: 14,
+        minHeight: 150,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            marginBottom: 4,
+          }}
+        >
+          {title}
         </div>
-        {running && <div className="row">Running tests…</div>}
-        {results.map((r, i) => (
-          <div key={i} className="row">
-            <span style={{ minWidth: 220, fontWeight: 600 }}>{r.name}</span>
-            <span
-              className={
-                r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'
-              }
-            >
-              {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
-            </span>
-          </div>
-        ))}
+        <p
+          style={{
+            fontSize: 13,
+            color: '#e5e7eb',
+            margin: 0,
+          }}
+        >
+          {description}
+        </p>
       </div>
-    </section>
+      <div
+        style={{
+          marginTop: 10,
+          display: 'flex',
+          justifyContent: 'center',
+        }}
+      >
+        <button
+          type="button"
+          style={{
+            borderRadius: 999,
+            border: '1px solid transparent',
+            padding: '7px 14px',
+            background:
+              'linear-gradient(135deg,#e0a96d,#c47a35)',
+            color: '#111827',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          {buttonLabel}
+        </button>
+      </div>
+    </div>
   )
 }
