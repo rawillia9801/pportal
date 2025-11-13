@@ -286,7 +286,7 @@ export default function PortalHome() {
             title="Frequently Asked Questions"
             body="Answers about care, timelines, and more."
             href={`${BASE}/faq`}
-            cta="Read FAQs"
+    _       cta="Read FAQs"
           />
           <ActionCard
             icon={<IconChat />}
@@ -321,7 +321,7 @@ export default function PortalHome() {
           --muted:${THEME.muted};
           --brand:${THEME.brand};
           --brandAlt:${THEME.brandAlt};
-          --ok:${THEME.ok};
+_         --ok:${THEME.ok};
         }
         main{
           min-height:100vh;
@@ -348,7 +348,7 @@ export default function PortalHome() {
           padding:12px 16px;
         }
         .brand{display:flex;align-items:center;gap:12px}
-        .pupmark{position:relative;width:42px;height:42px;border-radius:12px;
+_       .pupmark{position:relative;width:42px;height:42px;border-radius:12px;
                  background:linear-gradient(135deg, var(--brand), var(--brandAlt));
                  box-shadow:inset 0 0 0 4px #fff;}
         .pawbubble{position:absolute;width:8px;height:8px;background:#fff;border-radius:50%;opacity:.7}
@@ -357,15 +357,15 @@ export default function PortalHome() {
         .pawbubble:nth-child(3){top:22px;left:16px}
         .title{line-height:1}
         .title .line1{font-weight:800;letter-spacing:.2px}
-        .title .line2{text-align:center;font-size:.9rem;color:var(--muted)}
+_       .title .line2{text-align:center;font-size:.9rem;color:var(--muted)}
 
         .tabs{display:flex;gap:6px;flex-wrap:wrap}
         .tab{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;
-             background:rgba(255,255,255,.7);border:1px solid #eddccd;color:var(--ink);
+_            background:rgba(255,255,255,.7);border:1px solid #eddccd;color:var(--ink);
              text-decoration:none;transition:transform .12s ease, background .12s ease}
         .tab:hover{transform:translateY(-1px);background:#fff}
         .tab.active{background:linear-gradient(135deg,var(--brand),var(--brandAlt)); color:#fff; border-color:transparent}
-G       @media (max-width: 900px){
+_       @media (max-width: 900px){
           .hdr{flex-direction:column; gap: 12px;}
           .tabs{justify-content:center;}
         }
@@ -379,8 +379,7 @@ G       @media (max-width: 900px){
           margin: 0 auto; /* ADDED */
         }
         .heroText h1{font-size:clamp(28px,3.2vw,44px);margin:0 0 8px}
-section>
-        .heroText h1 em{font-style:normal;color:var(--brand)}
+_       .heroText h1 em{font-style:normal;color:var(--brand)}
         .lead{color:var(--muted);font-size:1.05rem;margin:0}
 
         /* SIGNUP (MOVED) */
@@ -389,13 +388,13 @@ section>
           background:var(--panel); /* CHANGED for better dark mode */
           border:1px solid #eddccd;
           border-radius:16px;
-      _   padding:16px;
+          padding:16px;
           box-shadow:0 6px 28px rgba(0,0,0,.06);
           max-width: 450px; /* ADDED */
           margin: 0 auto; /* ADDED */
         }
         .signupHd{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;color:var(--brand)}
-s       .signup label{display:block;margin-top:8px;font-size:.9rem}
+        .signup label{display:block;margin-top:8px;font-size:.9rem}
         .signup input{
           width:100%;
           padding:10px;
@@ -405,10 +404,10 @@ s       .signup label{display:block;margin-top:8px;font-size:.9rem}
           color: var(--ink);
         }
         .signup input:focus{outline:none;box-shadow:0 0 0 4px rgba(181,131,90,.2);border-color:var(--brand)}
-We       .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer}
+        .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer}
         .btn.primary{margin-top:12px;background:linear-gradient(135deg,var(--brand),var(--brandAlt));border-color:transparent;color:#fff}
         .note{margin-top:8px;background:#fff;border:1px dashed #e6d7c7;padding:8px;border-radius:8px;color:var(--muted)}
-        .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
+A       .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
 
         /* ABOUT */
         .about{padding:8px 16px 0; text-align:center;}
@@ -416,37 +415,37 @@ We       .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:
         .about h2{margin:0 0 6px}
         .about p{margin:0;color:var(--muted)}
 
-Examples         /* CARDS */
+Indented         /* CARDS */
         .cards{padding:18px 16px 42px}
         .grid{
           display:grid;
           grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* CHANGED for responsive cards */
-        _   gap:14px;
+          gap:14px;
           max-width:1200px;
           margin:0 auto;
         }
         .card{
           background:var(--panel);
-          border:1px solid #eddccd;
+AN         border:1px solid #eddccd;
           border-radius:16px;
           padding:16px;
-  B       box-shadow:0 10px 28px rgba(0,0,0,.05);
+          box-shadow:0 10px 28px rgba(0,0,0,.05);
           display: flex; /* ADDED for better alignment */
           flex-direction: column; /* ADDED */
         }
         /* REMOVED .span6 and .card{grid-column} */
 
         .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);backdrop-filter:blur(6px)}
-  s     .ft .ftInner{max-width:1200px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;justify-content:space-between;color:var(--muted)}
+        .ft .ftInner{max-width:1200px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;justify-content:space-between;color:var(--muted)}
 
         /* DEV SELF-TESTS */
         .tests{max-width:1200px;margin:0 auto 24px; padding:0 16px}
         .tests .panel{background:#fff;border:1px solid #eddccd;border-radius:12px;padding:12px}
         .tests .row{display:flex;gap:10px;align-items:center;border:1px solid #f1e7dc;border-radius:10px;padding:8px;margin:6px 0;background:#fff}
-Look       .tests .ok{color:#1e6a46}
+        .tests .ok{color:#1e6a46}
         .tests .bad{color:#a33}
         .tests code{background:#fff3; padding:0 4px; border-radius:4px}
-      `}</style>
+_     `}</style>
     </main>
   )
 }
@@ -475,7 +474,7 @@ function ActionCard({ icon, title, body, href, cta }:{ icon: React.ReactNode; ti
 function DevSelfTests(){
   const [{ results, running }, setState] = useState<{results: TestResult[]; running: boolean}>({ results: [], running: true })
 
-s   useEffect(() => {
+  useEffect(() => {
     let cancelled = false
     ;(async () => {
       const out: TestResult[] = []
@@ -491,7 +490,7 @@ s   useEffect(() => {
       // Test 2: Dynamic import works (no crash in sandbox)
       try {
         // @ts-ignore
-        const mod: any = await import(/* webpackIgnore: true */ 'https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
+        const mod: any = await import(/* webpackIgnore: true */ 'https.://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
         out.push({ name: 'dynamic import supabase-js', status: mod?.createClient ? 'pass' : 'fail' })
       } catch (e: any) {
         out.push({ name: 'dynamic import supabase-js', status: 'fail', detail: e?.message })
@@ -504,8 +503,7 @@ s     } else {
         try {
           const sb = await getBrowserClient()
           out.push({ name: 'client initialized', status: sb ? 'pass' : 'fail' })
-section>
-        } catch (e: any) {
+Indented       } catch (e: any) {
           out.push({ name: 'client initialized', status: 'fail', detail: e?.message })
         }
       }
@@ -519,8 +517,8 @@ section>
         } else {
           out.push({ name: 'auth.getSession()', status: 'skip', detail: 'missing env' })
         }
-  .   } catch (e: any) {
-        out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
+      } catch (e: any) {
+  s     out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
       }
 
       // Test 5: Tabs integrity
@@ -528,7 +526,7 @@ section>
         const labels = tabs.map(t => t.label)
         const expected = ['Available Puppies','My Puppy','Documents','Payments','Transportation','Message','Profile']
         const same = expected.length === labels.length && expected.every((x,i)=>x===labels[i])
-s       out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
+s Next.js     out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
       } catch (e: any) {
         out.push({ name: 'tabs order & labels', status: 'fail', detail: e?.message })
       }
@@ -536,29 +534,29 @@ s       out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail
       // Test 6: Path highlight helper
       try {
         const k = activeKeyFromPathname('/payments')
-    s   out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
+Indented       out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
       } catch (e: any) {
         out.push({ name: 'activeKeyFromPathname', status: 'fail', detail: e?.message })
       }
-
+_
       if (!cancelled) setState({ results: out, running: false })
-    })()
+  s })()
     return () => { cancelled = true }
   }, [])
-
+_
     return (
     <section className="tests">
       <div className="panel">
-    ci   <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
-        <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
+    s   <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
+s       <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
         {running && <div className="row">Running tests…</div>}
-        {results.map((r,i) => (
+s       {results.map((r,i) => (
           <div key={i} className="row">
             <span style={{minWidth:180,fontWeight:600}}>{r.name}</span>
-Examples             <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
+_ s         <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
               {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
             </span>
-        _ </div>
+          </div>
         ))}
       </div>
     </section>
