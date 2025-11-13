@@ -1054,3 +1054,348 @@ export default function TransportationPage() {
 
         .panel {
           border-radius: 18px;
+                  .panel {
+          border-radius: 18px;
+          padding: 18px 20px 20px;
+          border: 1px solid var(--panelBorder);
+          background: radial-gradient(
+              140% 240% at 0 0,
+              rgba(224, 169, 109, 0.08),
+              transparent 50%
+            ),
+            #020617;
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
+        }
+
+        .panel h2 {
+          margin: 0 0 8px;
+          font-size: 18px;
+        }
+
+        .panel h3 {
+          margin: 14px 0 4px;
+          font-size: 14px;
+        }
+
+        .panel p {
+          margin: 0 0 8px;
+          font-size: 13px;
+          color: var(--muted);
+        }
+
+        .panel ul {
+          margin: 0 0 6px 18px;
+          padding: 0;
+          font-size: 13px;
+          color: var(--muted);
+        }
+
+        .panel li + li {
+          margin-top: 2px;
+        }
+
+        /* CALENDAR */
+
+        .calendar {
+          margin-top: 8px;
+          border-radius: 14px;
+          border: 1px solid #111827;
+          background: radial-gradient(
+              120% 220% at 100% 0,
+              rgba(224, 169, 109, 0.14),
+              transparent 60%
+            ),
+            #020617;
+          padding: 12px 12px 14px;
+        }
+
+        .calendarHeader {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+
+        .calNav {
+          width: 28px;
+          height: 28px;
+          border-radius: 999px;
+          border: 1px solid #1f2937;
+          background: #020617;
+          color: var(--ink);
+          cursor: pointer;
+          font-size: 18px;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .calNav:hover {
+          background: #02091a;
+        }
+
+        .calMonth {
+          font-weight: 600;
+          font-size: 14px;
+        }
+
+        .calendarWeekdays {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          font-size: 11px;
+          margin: 4px 0 4px;
+          color: var(--muted);
+        }
+
+        .weekday {
+          text-align: center;
+          padding: 2px 0;
+        }
+
+        .calendarGrid {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 4px;
+        }
+
+        .dayBtn {
+          border-radius: 10px;
+          border: 1px solid #111827;
+          background: #020617;
+          color: var(--ink);
+          font-size: 12px;
+          padding: 6px 0;
+          cursor: pointer;
+          min-height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.12s ease, border-color 0.12s ease,
+            transform 0.12s ease, color 0.12s ease;
+        }
+
+        .dayBtn.outside {
+          opacity: 0.25;
+        }
+
+        .dayBtn.booked {
+          background: #111827;
+          color: #4b5563;
+          cursor: not-allowed;
+        }
+
+        .dayBtn.selected {
+          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
+          border-color: transparent;
+          color: #111827;
+          transform: translateY(-1px);
+          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.8);
+        }
+
+        .dayBtn:not(:disabled):hover {
+          background: #020b24;
+        }
+
+        .calendarNote {
+          margin: 6px 0 0;
+          font-size: 11px;
+          color: var(--muted);
+        }
+
+        .calendarSelected {
+          margin: 2px 0 0;
+          font-size: 12px;
+        }
+
+        /* FORM STYLES */
+
+        .transportForm {
+          margin-top: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        fieldset.fieldGroup {
+          border-radius: 14px;
+          border: 1px solid #111827;
+          padding: 10px 12px 12px;
+          margin: 0;
+        }
+
+        fieldset.fieldGroup legend {
+          padding: 0 4px;
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .fieldLabel {
+          display: block;
+          font-size: 12px;
+          margin-bottom: 2px;
+          color: var(--muted);
+        }
+
+        .fieldRow {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .fieldRow > label {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .textInput,
+        .textArea {
+          width: 100%;
+          border-radius: 10px;
+          border: 1px solid #1f2937;
+          padding: 8px 10px;
+          background: #020617;
+          color: var(--ink);
+          font-size: 13px;
+          resize: vertical;
+        }
+
+        .textInput:focus,
+        .textArea:focus {
+          outline: none;
+          border-color: var(--brand);
+          box-shadow: 0 0 0 1px rgba(224, 169, 109, 0.7);
+        }
+
+        .radioRow,
+        .checkRow {
+          display: flex;
+          align-items: flex-start;
+          gap: 6px;
+          margin-top: 4px;
+          font-size: 13px;
+        }
+
+        .radioRow input,
+        .checkRow input {
+          margin-top: 2px;
+        }
+
+        .help {
+          margin: 0 0 4px;
+          font-size: 12px;
+          color: var(--muted);
+        }
+
+        .tinyList {
+          margin: 0 0 4px 18px;
+          padding: 0;
+          font-size: 12px;
+          color: var(--muted);
+        }
+
+        .tinyList li + li {
+          margin-top: 2px;
+        }
+
+        .btn {
+          appearance: none;
+          border-radius: 999px;
+          padding: 9px 14px;
+          border: 1px solid #1f2937;
+          background: #020617;
+          color: var(--ink);
+          font-size: 13px;
+          cursor: pointer;
+          align-self: flex-start;
+          margin-top: 4px;
+          transition: background 0.12s ease, transform 0.12s ease,
+            box-shadow 0.12s ease, border-color 0.12s ease;
+        }
+
+        .btn.primary {
+          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
+          border-color: transparent;
+          color: #111827;
+          font-weight: 600;
+        }
+
+        .btn.primary:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.9);
+        }
+
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: default;
+        }
+
+        .note {
+          margin-top: 6px;
+          border-radius: 10px;
+          padding: 8px 10px;
+          font-size: 12px;
+          border: 1px solid #4b5563;
+          background: #020617;
+        }
+
+        .note.ok {
+          border-color: #16a34a;
+          color: #bbf7d0;
+        }
+
+        .note.bad {
+          border-color: #b91c1c;
+          color: #fecaca;
+        }
+
+        .ft {
+          margin-top: 10px;
+          font-size: 11px;
+          color: var(--muted);
+          display: flex;
+          gap: 10px;
+          justify-content: space-between;
+        }
+
+        .mini {
+          font-size: 11px;
+          color: var(--muted);
+        }
+
+        @media (max-width: 980px) {
+          .shell {
+            flex-direction: column;
+          }
+
+          .sidebar {
+            width: 100%;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+          }
+
+          .nav {
+            flex-direction: row;
+            flex-wrap: wrap;
+          }
+
+          .navItem {
+            border-radius: 12px;
+            padding: 7px 10px;
+          }
+
+          .main {
+            margin-top: 8px;
+          }
+
+          .transportContent {
+            flex-direction: column;
+          }
+        }
+      `}</style>
+    </main>
+  )
+}
+
