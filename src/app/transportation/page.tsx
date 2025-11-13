@@ -5,7 +5,7 @@
    - Left sidebar nav (same style as home)
    - Calendar (one request per day, greyed if booked)
    - Transportation request form
-   - Puppy Mileage Fee Policy + Terms display
+   - Accordion policies (click to expand)
    ============================================ */
 
 import React, { useEffect, useMemo, useState } from 'react'
@@ -212,6 +212,7 @@ const initialForm: TransportFormState = {
    ============================================ */
 
 type StatusMsg = { kind: 'success' | 'error'; text: string } | null
+type InfoSectionKey = 'mileage' | 'terms' | 'health' | 'fees' | 'hypo'
 
 export default function TransportationPage() {
   const pathname = usePathname()
@@ -226,6 +227,7 @@ export default function TransportationPage() {
   const [form, setForm] = useState<TransportFormState>({ ...initialForm })
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState<StatusMsg>(null)
+  const [openSection, setOpenSection] = useState<InfoSectionKey | null>('mileage')
 
   const hasEnv = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY)
 
@@ -266,6 +268,10 @@ export default function TransportationPage() {
       const m = prev.getMonth() + delta
       return new Date(y, m, 1)
     })
+  }
+
+  function toggleSection(section: InfoSectionKey) {
+    setOpenSection((prev) => (prev === section ? null : section))
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -397,132 +403,217 @@ export default function TransportationPage() {
           </section>
 
           <section className="transportContent">
+            {/* LEFT: POLICIES / ACCORDION */}
             <div className="transportLeft">
               <div className="panel">
-                <h2>Puppy Mileage Fee Policy</h2>
-                <p>
-                  We are happy to personally deliver our puppies to ensure safe,
-                  stress-free travel. To make adoption easier for local families, we
-                  include a limited number of free miles before mileage fees begin.
+                <h2>Transportation Policies &amp; Info</h2>
+                <p className="muted">
+                  Click a heading below to reveal the full policy. These sections are what
+                  you&apos;re agreeing to when you submit a transportation request.
                 </p>
-                <h3>Included Free Miles</h3>
-                <ul>
-                  <li>The first 50 miles (one way) from Marion, VA are free.</li>
-                  <li>
-                    After 50 miles, delivery is charged at <strong>$1.25 per mile</strong>{' '}
-                    (one way).
-                  </li>
-                  <li>
-                    Mileage is calculated using the most direct driving route from Marion,
-                    VA (via Google Maps).
-                  </li>
-                  <li>
-                    A minimum delivery fee of <strong>$75</strong> applies for all trips
-                    beyond the free-mile zone.
-                  </li>
-                </ul>
 
-                <h3>Delivery Range</h3>
-                <ul>
-                  <li>Local deliveries are available within a 300-mile radius.</li>
-                  <li>
-                    Longer distances may be arranged at breeder discretion and may require
-                    overnight accommodations or a USDA-licensed transporter.
-                  </li>
-                </ul>
+                <div className="accordion">
+                  {/* Puppy Mileage Fee Policy */}
+                  <div className="accItem">
+                    <button
+                      type="button"
+                      className={`accHeader ${openSection === 'mileage' ? 'open' : ''}`}
+                      onClick={() => toggleSection('mileage')}
+                    >
+                      <span>Puppy Mileage Fee Policy</span>
+                      <span className="chevron">▾</span>
+                    </button>
+                    <div
+                      className={`accBody ${openSection === 'mileage' ? 'open' : ''}`}
+                    >
+                      <p>
+                        We are happy to personally deliver our puppies to ensure safe,
+                        stress-free travel. To make adoption easier for local families, we
+                        include a limited number of free miles before mileage fees begin.
+                      </p>
+                      <h4>Included Free Miles</h4>
+                      <ul>
+                        <li>The first 50 miles (one way) from Marion, VA are free.</li>
+                        <li>
+                          After 50 miles, delivery is charged at{' '}
+                          <strong>$1.25 per mile</strong> (one way).
+                        </li>
+                        <li>
+                          Mileage is calculated using the most direct driving route from
+                          Marion, VA (via Google Maps).
+                        </li>
+                        <li>
+                          A minimum delivery fee of <strong>$75</strong> applies for all
+                          trips beyond the free-mile zone.
+                        </li>
+                      </ul>
+                      <h4>Delivery Range</h4>
+                      <ul>
+                        <li>Local deliveries are available within a 300-mile radius.</li>
+                        <li>
+                          Longer distances may be arranged at breeder discretion and may
+                          require overnight accommodations or a USDA-licensed transporter.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
 
-                <h3>Payment & Buyer Responsibilities</h3>
-                <ul>
-                  <li>All delivery fees must be paid in full before departure.</li>
-                  <li>
-                    Tolls, overnight lodging, and special accommodations are the buyer&apos;s
-                    responsibility.
-                  </li>
-                  <li>
-                    Buyer (or their representative) must be present at the agreed-upon
-                    meeting location, date, and time. If no one appears, additional fees
-                    may apply for rescheduling or boarding.
-                  </li>
-                </ul>
+                  {/* Transportation Terms & Conditions */}
+                  <div className="accItem">
+                    <button
+                      type="button"
+                      className={`accHeader ${openSection === 'terms' ? 'open' : ''}`}
+                      onClick={() => toggleSection('terms')}
+                    >
+                      <span>Transportation Terms &amp; Conditions</span>
+                      <span className="chevron">▾</span>
+                    </button>
+                    <div className={`accBody ${openSection === 'terms' ? 'open' : ''}`}>
+                      <p>
+                        These terms outline how transportation is handled and who is
+                        responsible for each part of the journey.
+                      </p>
+                      <h4>Payment Requirement</h4>
+                      <ul>
+                        <li>
+                          All transportation costs must be paid in full before the puppy
+                          leaves the breeder&apos;s possession.
+                        </li>
+                        <li>
+                          Puppies must be fully paid for before transport arrangements are
+                          finalized.
+                        </li>
+                      </ul>
+                      <h4>Transportation Options</h4>
+                      <ul>
+                        <li>Pick-up in person.</li>
+                        <li>Breeder delivery by ground transport.</li>
+                        <li>Licensed ground transport service.</li>
+                        <li>Flight nanny (in-cabin) service.</li>
+                      </ul>
+                      <h4>Missed Pickup / Delivery</h4>
+                      <ul>
+                        <li>
+                          If the buyer or buyer&apos;s representative fails to appear at
+                          the agreed pickup/delivery time, additional fees may apply for
+                          rescheduling or boarding.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
 
-                <h3>Safety & Care During Delivery</h3>
-                <ul>
-                  <li>Puppies travel in climate-controlled vehicles.</li>
-                  <li>Frequent stops are made for care, feeding, and rest.</li>
-                  <li>
-                    Buyers are advised to have Nutri-Cal or honey on hand at pickup to help
-                    prevent hypoglycemia.
-                  </li>
-                </ul>
-              </div>
+                  {/* Health & Safety Agreement */}
+                  <div className="accItem">
+                    <button
+                      type="button"
+                      className={`accHeader ${openSection === 'health' ? 'open' : ''}`}
+                      onClick={() => toggleSection('health')}
+                    >
+                      <span>Health &amp; Safety Agreement</span>
+                      <span className="chevron">▾</span>
+                    </button>
+                    <div
+                      className={`accBody ${openSection === 'health' ? 'open' : ''}`}
+                    >
+                      <p>
+                        We want every puppy to arrive bright, stable, and healthy. Travel
+                        can be exciting but also tiring for small Chihuahuas, so we ask
+                        buyers to follow these guidelines.
+                      </p>
+                      <ul>
+                        <li>
+                          Buyer understands that all transportation methods carry some
+                          level of stress and risk for the puppy.
+                        </li>
+                        <li>
+                          Buyer will provide a warm, draft-free environment and offer
+                          small frequent meals after arrival.
+                        </li>
+                        <li>
+                          Buyer agrees to schedule a veterinary wellness exam within 72
+                          hours of receiving the puppy.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
 
-              <div className="panel">
-                <h2>Transportation Terms &amp; Conditions</h2>
-                <p>
-                  These terms outline how transportation is handled and who is responsible
-                  for each part of the journey.
-                </p>
-                <h3>Payment Requirement</h3>
-                <ul>
-                  <li>
-                    All transportation costs must be paid in full before the puppy leaves
-                    the breeder&apos;s possession.
-                  </li>
-                  <li>
-                    Puppies must be fully paid for before transport arrangements are
-                    finalized.
-                  </li>
-                </ul>
+                  {/* Fees & Liabilities */}
+                  <div className="accItem">
+                    <button
+                      type="button"
+                      className={`accHeader ${openSection === 'fees' ? 'open' : ''}`}
+                      onClick={() => toggleSection('fees')}
+                    >
+                      <span>Fees &amp; Liabilities</span>
+                      <span className="chevron">▾</span>
+                    </button>
+                    <div className={`accBody ${openSection === 'fees' ? 'open' : ''}`}>
+                      <ul>
+                        <li>
+                          Buyer is responsible for all transportation costs (delivery
+                          fees, mileage fees, tolls, overnight lodging, flight nanny, or
+                          licensed ground transporter).
+                        </li>
+                        <li>
+                          Once the puppy is released to the buyer, transporter, or airline
+                          representative, Southwest Virginia Chihuahua is no longer
+                          responsible for delays, accidents, illness, or loss during
+                          transport.
+                        </li>
+                        <li>
+                          Transportation stress does not extend or alter the terms of the
+                          main Health Guarantee.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
 
-                <h3>Transportation Options</h3>
-                <ul>
-                  <li>Pick-up in person.</li>
-                  <li>Breeder delivery by ground transport.</li>
-                  <li>Licensed ground transport service.</li>
-                  <li>Flight nanny (in-cabin) service.</li>
-                </ul>
-
-                <h3>Risk &amp; Responsibility</h3>
-                <ul>
-                  <li>
-                    Buyer understands that travel may cause some stress to the puppy,
-                    including risk of hypoglycemia, and agrees to follow all care
-                    instructions.
-                  </li>
-                  <li>
-                    Once the puppy is released to the buyer, transporter, or airline
-                    representative, Southwest Virginia Chihuahua is no longer responsible
-                    for delays, accidents, illness, or loss during transport.
-                  </li>
-                </ul>
-
-                <h3>Veterinary Care</h3>
-                <ul>
-                  <li>
-                    Buyer agrees to schedule a wellness exam within 72 hours of receiving
-                    the puppy.
-                  </li>
-                  <li>
-                    Any concerns arising from transport should be addressed promptly with a
-                    licensed veterinarian.
-                  </li>
-                </ul>
-
-                <h3>Missed Pickup or Delivery</h3>
-                <ul>
-                  <li>
-                    If the buyer or buyer&apos;s representative fails to appear at the
-                    agreed pickup/delivery time, additional fees may apply for
-                    rescheduling or boarding.
-                  </li>
-                </ul>
+                  {/* Hypoglycemia Warning Policy */}
+                  <div className="accItem">
+                    <button
+                      type="button"
+                      className={`accHeader ${openSection === 'hypo' ? 'open' : ''}`}
+                      onClick={() => toggleSection('hypo')}
+                    >
+                      <span>Hypoglycemia Warning Policy</span>
+                      <span className="chevron">▾</span>
+                    </button>
+                    <div className={`accBody ${openSection === 'hypo' ? 'open' : ''}`}>
+                      <p>
+                        Chihuahua puppies are especially prone to hypoglycemia (low blood
+                        sugar), especially during travel, excitement, or any change in
+                        routine.
+                      </p>
+                      <ul>
+                        <li>
+                          Buyer agrees to have Nutri-Cal, Karo syrup, or honey available
+                          at pickup and to offer a pea-sized amount upon arrival.
+                        </li>
+                        <li>
+                          Signs of hypoglycemia can include wobbliness, weakness,
+                          glassy-eyed stare, low body temperature, or unresponsiveness.
+                          These require immediate attention.
+                        </li>
+                        <li>
+                          If any of these signs appear, buyer will immediately provide a
+                          sugar source and seek emergency veterinary care.
+                        </li>
+                        <li>
+                          Hypoglycemia is usually preventable with proper care and is not
+                          considered a congenital defect covered by the Health Guarantee.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
+            {/* RIGHT: CALENDAR + FORM */}
             <div className="transportRight">
               <div className="panel">
                 <h2>Request Transportation</h2>
-                <p>
+                <p className="muted">
                   Select an available date below. Only one transportation request is
                   accepted per day, so once a date is booked it will be greyed out for
                   everyone.
@@ -594,7 +685,8 @@ export default function TransportationPage() {
                   <fieldset className="fieldGroup">
                     <legend>Transportation Options</legend>
                     <p className="help">
-                      Choose how you would like to receive your puppy.
+                      Choose how you would like to receive your puppy. Details for each
+                      option are in the Transportation Terms.
                     </p>
                     <label className="radioRow">
                       <input
@@ -1054,44 +1146,91 @@ export default function TransportationPage() {
 
         .panel {
           border-radius: 18px;
-                  .panel {
-          border-radius: 18px;
-          padding: 18px 20px 20px;
           border: 1px solid var(--panelBorder);
           background: radial-gradient(
-              140% 240% at 0 0,
+              140% 160% at 0 0,
               rgba(224, 169, 109, 0.08),
               transparent 50%
             ),
             #020617;
-          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
+          padding: 18px 18px 20px;
+          box-shadow: 0 20px 42px rgba(0, 0, 0, 0.9);
         }
 
         .panel h2 {
-          margin: 0 0 8px;
+          margin: 0 0 6px;
           font-size: 18px;
         }
 
-        .panel h3 {
-          margin: 14px 0 4px;
+        .muted {
+          color: var(--muted);
+          font-size: 13px;
+          margin-bottom: 10px;
+        }
+
+        /* ACCORDION */
+
+        .accordion {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .accItem {
+          border-radius: 12px;
+          border: 1px solid #111827;
+          overflow: hidden;
+          background: rgba(15, 23, 42, 0.9);
+        }
+
+        .accHeader {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 10px 12px;
+          background: transparent;
+          color: var(--ink);
+          border: none;
           font-size: 14px;
+          cursor: pointer;
         }
 
-        .panel p {
-          margin: 0 0 8px;
+        .accHeader .chevron {
+          font-size: 12px;
+          opacity: 0.7;
+          transform: rotate(0deg);
+          transition: transform 0.12s ease;
+        }
+
+        .accHeader.open .chevron {
+          transform: rotate(180deg);
+        }
+
+        .accBody {
+          max-height: 0;
+          overflow: hidden;
+          padding: 0 12px;
           font-size: 13px;
           color: var(--muted);
+          transition: max-height 0.18s ease, padding 0.18s ease;
         }
 
-        .panel ul {
-          margin: 0 0 6px 18px;
+        .accBody.open {
+          max-height: 600px;
+          padding: 0 12px 10px;
+        }
+
+        .accBody h4 {
+          margin: 8px 0 4px;
+          font-size: 13px;
+          color: var(--ink);
+        }
+
+        .accBody ul {
+          margin: 0 0 4px 16px;
           padding: 0;
-          font-size: 13px;
-          color: var(--muted);
-        }
-
-        .panel li + li {
-          margin-top: 2px;
+          list-style: disc;
         }
 
         /* CALENDAR */
@@ -1100,40 +1239,15 @@ export default function TransportationPage() {
           margin-top: 8px;
           border-radius: 14px;
           border: 1px solid #111827;
-          background: radial-gradient(
-              120% 220% at 100% 0,
-              rgba(224, 169, 109, 0.14),
-              transparent 60%
-            ),
-            #020617;
-          padding: 12px 12px 14px;
+          padding: 10px 10px 12px;
+          background: rgba(15, 23, 42, 0.9);
         }
 
         .calendarHeader {
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 8px;
+          justify-content: space-between;
           margin-bottom: 6px;
-        }
-
-        .calNav {
-          width: 28px;
-          height: 28px;
-          border-radius: 999px;
-          border: 1px solid #1f2937;
-          background: #020617;
-          color: var(--ink);
-          cursor: pointer;
-          font-size: 18px;
-          line-height: 1;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .calNav:hover {
-          background: #02091a;
         }
 
         .calMonth {
@@ -1141,43 +1255,53 @@ export default function TransportationPage() {
           font-size: 14px;
         }
 
+        .calNav {
+          border-radius: 999px;
+          border: 1px solid #1f2937;
+          background: #020617;
+          color: var(--ink);
+          width: 22px;
+          height: 22px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          cursor: pointer;
+        }
+
         .calendarWeekdays {
           display: grid;
           grid-template-columns: repeat(7, 1fr);
           font-size: 11px;
-          margin: 4px 0 4px;
           color: var(--muted);
+          margin-bottom: 4px;
         }
 
         .weekday {
           text-align: center;
-          padding: 2px 0;
         }
 
         .calendarGrid {
           display: grid;
           grid-template-columns: repeat(7, 1fr);
-          gap: 4px;
+          gap: 2px;
         }
 
         .dayBtn {
-          border-radius: 10px;
+          border-radius: 8px;
           border: 1px solid #111827;
           background: #020617;
           color: var(--ink);
-          font-size: 12px;
-          padding: 6px 0;
-          cursor: pointer;
-          min-height: 30px;
+          font-size: 11px;
+          height: 28px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background 0.12s ease, border-color 0.12s ease,
-            transform 0.12s ease, color 0.12s ease;
+          cursor: pointer;
         }
 
         .dayBtn.outside {
-          opacity: 0.25;
+          opacity: 0.3;
         }
 
         .dayBtn.booked {
@@ -1190,206 +1314,199 @@ export default function TransportationPage() {
           background: linear-gradient(135deg, var(--brand), var(--brandAlt));
           border-color: transparent;
           color: #111827;
-          transform: translateY(-1px);
-          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.8);
+          font-weight: 600;
         }
 
-        .dayBtn:not(:disabled):hover {
-          background: #020b24;
-        }
-
-        .calendarNote {
+        .calendarNote,
+        .calendarSelected {
           margin: 6px 0 0;
           font-size: 11px;
           color: var(--muted);
         }
 
-        .calendarSelected {
-          margin: 2px 0 0;
-          font-size: 12px;
+        .calendarSelected strong {
+          color: var(--brand);
         }
 
-        /* FORM STYLES */
+        /* FORM */
 
         .transportForm {
-          margin-top: 10px;
+          margin-top: 12px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 10px;
         }
 
-        fieldset.fieldGroup {
-          border-radius: 14px;
+        .fieldGroup {
+          border-radius: 12px;
           border: 1px solid #111827;
-          padding: 10px 12px 12px;
-          margin: 0;
+          padding: 10px 10px 12px;
+          background: rgba(15, 23, 42, 0.9);
         }
 
-        fieldset.fieldGroup legend {
+        .fieldGroup legend {
           padding: 0 4px;
           font-size: 13px;
           font-weight: 600;
         }
 
-        .fieldLabel {
-          display: block;
+        .help {
+          margin: 4px 0 6px;
           font-size: 12px;
-          margin-bottom: 2px;
           color: var(--muted);
         }
 
-        .fieldRow {
+        .radioRow {
           display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 6px;
+          font-size: 13px;
+          margin-bottom: 4px;
         }
 
-        .fieldRow > label {
-          flex: 1;
-          min-width: 0;
+        .radioRow input {
+          margin-top: 2px;
+        }
+
+        .fieldLabel {
+          display: block;
+          font-size: 12px;
+          color: var(--muted);
+          margin-bottom: 2px;
         }
 
         .textInput,
         .textArea {
           width: 100%;
-          border-radius: 10px;
+          border-radius: 8px;
           border: 1px solid #1f2937;
-          padding: 8px 10px;
           background: #020617;
           color: var(--ink);
+          padding: 6px 8px;
           font-size: 13px;
-          resize: vertical;
         }
 
         .textInput:focus,
         .textArea:focus {
           outline: none;
           border-color: var(--brand);
-          box-shadow: 0 0 0 1px rgba(224, 169, 109, 0.7);
+          box-shadow: 0 0 0 1px rgba(224, 169, 109, 0.5);
         }
 
-        .radioRow,
+        .textArea {
+          resize: vertical;
+          min-height: 70px;
+        }
+
+        .fieldRow {
+          display: flex;
+          gap: 8px;
+          margin-top: 4px;
+          flex-wrap: wrap;
+        }
+
+        .fieldRow label {
+          flex: 1;
+        }
+
+        .tinyList {
+          margin: 0 0 4px 16px;
+          padding: 0;
+          list-style: disc;
+          font-size: 12px;
+          color: var(--muted);
+        }
+
         .checkRow {
           display: flex;
           align-items: flex-start;
           gap: 6px;
+          font-size: 12px;
           margin-top: 4px;
-          font-size: 13px;
         }
 
-        .radioRow input,
         .checkRow input {
           margin-top: 2px;
         }
 
-        .help {
-          margin: 0 0 4px;
-          font-size: 12px;
-          color: var(--muted);
-        }
-
-        .tinyList {
-          margin: 0 0 4px 18px;
-          padding: 0;
-          font-size: 12px;
-          color: var(--muted);
-        }
-
-        .tinyList li + li {
-          margin-top: 2px;
-        }
-
         .btn {
-          appearance: none;
           border-radius: 999px;
-          padding: 9px 14px;
-          border: 1px solid #1f2937;
-          background: #020617;
-          color: var(--ink);
-          font-size: 13px;
+          padding: 8px 14px;
+          font-size: 14px;
+          border: none;
           cursor: pointer;
-          align-self: flex-start;
-          margin-top: 4px;
-          transition: background 0.12s ease, transform 0.12s ease,
-            box-shadow 0.12s ease, border-color 0.12s ease;
         }
 
         .btn.primary {
           background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          border-color: transparent;
           color: #111827;
           font-weight: 600;
+          align-self: flex-start;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
         }
 
-        .btn.primary:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.9);
-        }
-
-        .btn:disabled {
+        .btn.primary:disabled {
           opacity: 0.6;
           cursor: default;
         }
 
         .note {
-          margin-top: 6px;
-          border-radius: 10px;
+          margin-top: 8px;
           padding: 8px 10px;
+          border-radius: 10px;
           font-size: 12px;
-          border: 1px solid #4b5563;
-          background: #020617;
         }
-
         .note.ok {
-          border-color: #16a34a;
+          background: rgba(34, 197, 94, 0.15);
+          border: 1px solid rgba(34, 197, 94, 0.5);
           color: #bbf7d0;
         }
-
         .note.bad {
-          border-color: #b91c1c;
+          background: rgba(239, 68, 68, 0.15);
+          border: 1px solid rgba(239, 68, 68, 0.5);
           color: #fecaca;
         }
 
         .ft {
-          margin-top: 10px;
+          margin-top: 6px;
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
           font-size: 11px;
           color: var(--muted);
-          display: flex;
-          gap: 10px;
-          justify-content: space-between;
         }
 
         .mini {
-          font-size: 11px;
-          color: var(--muted);
+          opacity: 0.8;
         }
 
-        @media (max-width: 980px) {
+        @media (max-width: 960px) {
           .shell {
             flex-direction: column;
           }
-
           .sidebar {
             width: 100%;
             flex-direction: row;
             align-items: center;
-            justify-content: space-between;
+            gap: 12px;
           }
-
           .nav {
             flex-direction: row;
             flex-wrap: wrap;
           }
-
           .navItem {
-            border-radius: 12px;
-            padding: 7px 10px;
+            flex: none;
           }
+        }
 
-          .main {
-            margin-top: 8px;
+        @media (max-width: 720px) {
+          .shell {
+            padding: 14px 10px 20px;
           }
-
+          .sidebar {
+            flex-direction: column;
+            align-items: flex-start;
+          }
           .transportContent {
             flex-direction: column;
           }
@@ -1398,4 +1515,3 @@ export default function TransportationPage() {
     </main>
   )
 }
-
