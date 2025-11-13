@@ -432,6 +432,7 @@ function DevSelfTests(){
 
       // Test 2: Dynamic import works (no crash in sandbox)
       try {
+         // @ts-ignore
         const mod: any = await import(/* webpackIgnore: true */ 'https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
         out.push({ name: 'dynamic import supabase-js', status: mod?.createClient ? 'pass' : 'fail' })
       } catch (e: any) {
