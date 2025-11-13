@@ -38,6 +38,9 @@ function getSupabaseEnv() {
 async function getBrowserClient(): Promise<AnyClient> {
   if (__sb) return __sb
   // Test 0: Tabs shape
+   const out: any[] = [];
+        try {
+            const T = tabs as unknown as any[]
       try {
         const T = tabs as unknown as any[]
         out.push({ name: 'tabs length == 7', status: T?.length === 7 ? 'pass' : 'fail', detail: `len=${T?.length}` })
