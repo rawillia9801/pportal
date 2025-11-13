@@ -65,7 +65,7 @@ async function getBrowserClient(): Promise<AnyClient> {
 /* ============================================
    ANCHOR: CONSTANTS
    ============================================ */
-// Change to '/portal' only if this file lives at src/app/portal/page.tsx
+// Change to '/portal' only if this file lives at `src/app/portal/page.tsx`
 const BASE = ''
 
 // Brand palette (SWVA Chihuahua)
@@ -199,7 +199,7 @@ export default function PortalHome() {
       </header>
 
       {/* =================== HERO =================== */}
-    .   <section className="hero">
+      <section className="hero">
         <div className="heroInner">
           <div className="heroText">
             <h1>Welcome to <em>My Puppy Portal</em></h1>
@@ -264,7 +264,6 @@ export default function PortalHome() {
         </div>
       </section>
 
-section>
       {/* =================== QUICK ACTION CARDS =================== */}
       <section className="cards">
         <div className="wrap grid">
@@ -283,7 +282,7 @@ section>
             cta="View Financing"
           />
           <ActionCard
-    _       icon={<IconPaw />}
+            icon={<IconPaw />}
             title="Frequently Asked Questions"
             body="Answers about care, timelines, and more."
             href={`${BASE}/faq`}
@@ -293,7 +292,7 @@ section>
             icon={<IconChat />}
             title="Support"
             body="Need help? Message the breeder."
-          .   href={`${BASE}/message`}
+            href={`${BASE}/message`}
             cta="Contact Us"
           />
         </div>
@@ -322,7 +321,6 @@ section>
           --muted:${THEME.muted};
           --brand:${THEME.brand};
           --brandAlt:${THEME.brandAlt};
-section>
           --ok:${THEME.ok};
         }
         main{
@@ -332,7 +330,7 @@ section>
             radial-gradient(60% 100% at 0% 0%, #fff2e6 0%, transparent 60%),
             var(--bg);
           color:var(--ink);
-  Two-line     }
+        }
         .wrap{max-width:1200px;margin:0 auto;padding:0 16px}
 
         /* HEADER */
@@ -350,7 +348,6 @@ section>
           padding:12px 16px;
         }
         .brand{display:flex;align-items:center;gap:12px}
-section>
         .pupmark{position:relative;width:42px;height:42px;border-radius:12px;
                  background:linear-gradient(135deg, var(--brand), var(--brandAlt));
                  box-shadow:inset 0 0 0 4px #fff;}
@@ -360,18 +357,15 @@ section>
         .pawbubble:nth-child(3){top:22px;left:16px}
         .title{line-height:1}
         .title .line1{font-weight:800;letter-spacing:.2px}
-section>
         .title .line2{text-align:center;font-size:.9rem;color:var(--muted)}
 
         .tabs{display:flex;gap:6px;flex-wrap:wrap}
         .tab{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;
-section>
              background:rgba(255,255,255,.7);border:1px solid #eddccd;color:var(--ink);
              text-decoration:none;transition:transform .12s ease, background .12s ease}
         .tab:hover{transform:translateY(-1px);background:#fff}
         .tab.active{background:linear-gradient(135deg,var(--brand),var(--brandAlt)); color:#fff; border-color:transparent}
-section>
-        @media (max-width: 900px){
+G       @media (max-width: 900px){
           .hdr{flex-direction:column; gap: 12px;}
           .tabs{justify-content:center;}
         }
@@ -385,23 +379,23 @@ section>
           margin: 0 auto; /* ADDED */
         }
         .heroText h1{font-size:clamp(28px,3.2vw,44px);margin:0 0 8px}
+section>
         .heroText h1 em{font-style:normal;color:var(--brand)}
         .lead{color:var(--muted);font-size:1.05rem;margin:0}
 
-  section>
-      /* SIGNUP (MOVED) */
+        /* SIGNUP (MOVED) */
         .signup-section { padding: 0 16px 24px; }
         .signup{
           background:var(--panel); /* CHANGED for better dark mode */
           border:1px solid #eddccd;
           border-radius:16px;
-          padding:16px;
+      _   padding:16px;
           box-shadow:0 6px 28px rgba(0,0,0,.06);
-s         max-width: 450px; /* ADDED */
+          max-width: 450px; /* ADDED */
           margin: 0 auto; /* ADDED */
         }
         .signupHd{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;color:var(--brand)}
-s Next.js       .signup label{display:block;margin-top:8px;font-size:.9rem}
+s       .signup label{display:block;margin-top:8px;font-size:.9rem}
         .signup input{
           width:100%;
           padding:10px;
@@ -411,10 +405,10 @@ s Next.js       .signup label{display:block;margin-top:8px;font-size:.9rem}
           color: var(--ink);
         }
         .signup input:focus{outline:none;box-shadow:0 0 0 4px rgba(181,131,90,.2);border-color:var(--brand)}
-Note:       .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer}
+We       .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer}
         .btn.primary{margin-top:12px;background:linear-gradient(135deg,var(--brand),var(--brandAlt));border-color:transparent;color:#fff}
         .note{margin-top:8px;background:#fff;border:1px dashed #e6d7c7;padding:8px;border-radius:8px;color:var(--muted)}
-A       .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
+        .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
 
         /* ABOUT */
         .about{padding:8px 16px 0; text-align:center;}
@@ -422,37 +416,36 @@ A       .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
         .about h2{margin:0 0 6px}
         .about p{margin:0;color:var(--muted)}
 
-        /* CARDS */
+Examples         /* CARDS */
         .cards{padding:18px 16px 42px}
         .grid{
           display:grid;
           grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* CHANGED for responsive cards */
-          gap:14px;
+        _   gap:14px;
           max-width:1200px;
           margin:0 auto;
         }
         .card{
           background:var(--panel);
           border:1px solid #eddccd;
-s         border-radius:16px;
+          border-radius:16px;
           padding:16px;
-          box-shadow:0 10px 28px rgba(0,0,0,.05);
+  B       box-shadow:0 10px 28px rgba(0,0,0,.05);
           display: flex; /* ADDED for better alignment */
           flex-direction: column; /* ADDED */
         }
         /* REMOVED .span6 and .card{grid-column} */
 
-D       .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);backdrop-filter:blur(6px)}
-        .ft .ftInner{max-width:1200px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;justify-content:space-between;color:var(--muted)}
+        .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);backdrop-filter:blur(6px)}
+  s     .ft .ftInner{max-width:1200px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;justify-content:space-between;color:var(--muted)}
 
         /* DEV SELF-TESTS */
         .tests{max-width:1200px;margin:0 auto 24px; padding:0 16px}
         .tests .panel{background:#fff;border:1px solid #eddccd;border-radius:12px;padding:12px}
         .tests .row{display:flex;gap:10px;align-items:center;border:1px solid #f1e7dc;border-radius:10px;padding:8px;margin:6px 0;background:#fff}
-s       .tests .ok{color:#1e6a46}
+Look       .tests .ok{color:#1e6a46}
         .tests .bad{color:#a33}
         .tests code{background:#fff3; padding:0 4px; border-radius:4px}
-section>
       `}</style>
     </main>
   )
@@ -462,7 +455,6 @@ section>
    ANCHOR: REUSABLE CARD
    ============================================ */
 function ActionCard({ icon, title, body, href, cta }:{ icon: React.ReactNode; title: string; body: string; href: string; cta: string }){
-section>
     return (
      // REMOVED span6 class
      <div className="card">
@@ -483,7 +475,7 @@ section>
 function DevSelfTests(){
   const [{ results, running }, setState] = useState<{results: TestResult[]; running: boolean}>({ results: [], running: true })
 
-  useEffect(() => {
+s   useEffect(() => {
     let cancelled = false
     ;(async () => {
       const out: TestResult[] = []
@@ -492,7 +484,7 @@ function DevSelfTests(){
       const { url, key } = getSupabaseEnv()
       if (!url || !key) {
         out.push({ name: 'env vars present', status: 'fail', detail: 'Define NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY' })
-s       } else {
+      } else {
         out.push({ name: 'env vars present', status: 'pass' })
       }
 
@@ -504,12 +496,11 @@ s       } else {
       } catch (e: any) {
         out.push({ name: 'dynamic import supabase-js', status: 'fail', detail: e?.message })
       }
-section>
 
       // Test 3: Client init (skip if no env)
       if (!url || !key) {
         out.push({ name: 'client initialized', status: 'skip', detail: 'missing env' })
-      } else {
+s     } else {
         try {
           const sb = await getBrowserClient()
           out.push({ name: 'client initialized', status: sb ? 'pass' : 'fail' })
@@ -528,8 +519,8 @@ section>
         } else {
           out.push({ name: 'auth.getSession()', status: 'skip', detail: 'missing env' })
         }
-      } catch (e: any) {
-  s       out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
+  .   } catch (e: any) {
+        out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
       }
 
       // Test 5: Tabs integrity
@@ -537,38 +528,37 @@ section>
         const labels = tabs.map(t => t.label)
         const expected = ['Available Puppies','My Puppy','Documents','Payments','Transportation','Message','Profile']
         const same = expected.length === labels.length && expected.every((x,i)=>x===labels[i])
-        out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
-s     } catch (e: any) {
+s       out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
+      } catch (e: any) {
         out.push({ name: 'tabs order & labels', status: 'fail', detail: e?.message })
       }
-section>
+
       // Test 6: Path highlight helper
       try {
         const k = activeKeyFromPathname('/payments')
-section>
-        out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
+    s   out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
       } catch (e: any) {
         out.push({ name: 'activeKeyFromPathname', status: 'fail', detail: e?.message })
       }
-s
+
       if (!cancelled) setState({ results: out, running: false })
     })()
     return () => { cancelled = true }
   }, [])
-section>
+
     return (
     <section className="tests">
       <div className="panel">
-        <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
-s       <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
+    ci   <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
+        <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
         {running && <div className="row">Running tests…</div>}
-  g      {results.map((r,i) => (
+        {results.map((r,i) => (
           <div key={i} className="row">
             <span style={{minWidth:180,fontWeight:600}}>{r.name}</span>
-            <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
-*             {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
+Examples             <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
+              {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
             </span>
-          </div>
+        _ </div>
         ))}
       </div>
     </section>
