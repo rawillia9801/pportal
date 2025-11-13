@@ -9,6 +9,7 @@
                  (Price, Credits, Admin Fee Financing, Total Paid, Balance)
    - 2025-11-13: Payments tab with per-year + grand totals
    - 2025-11-13: Sidebar tab buttons enlarged for easier click
+   - 2025-11-13: Breeding Program tab (read-only skeleton)
    ============================================ */
 
 import React, { useEffect, useState } from 'react'
@@ -323,14 +324,17 @@ export default function AdminPage() {
 
         {activeTab === 'payments' && <PaymentsView />}
 
+        {activeTab === 'breeding' && <BreedingProgramView />}
+
         {activeTab !== 'dashboard' &&
           activeTab !== 'buyers' &&
-          activeTab !== 'payments' && (
+          activeTab !== 'payments' &&
+          activeTab !== 'breeding' && (
             <div className="comingSoon">
               <h1>{ADMIN_TABS.find((t) => t.key === activeTab)?.label}</h1>
               <p>
-                This section will be wired after the Buyers and Payments flows
-                are finished.
+                This section will be wired after the Buyers, Payments, and Breeding
+                Program flows are finished.
               </p>
             </div>
           )}
@@ -568,9 +572,7 @@ function BuyersView() {
         const sb = await getBrowserClient()
         const { data, error } = await sb
           .from('puppy_buyers')
-          .select(
-            'id, full_name, email, phone, city, state, created_at'
-          )
+          .select('id, full_name, email, phone, city, state, created_at')
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -684,9 +686,7 @@ function BuyersView() {
           email: newEmail.trim() || null,
           phone: newPhone.trim() || null,
         })
-        .select(
-          'id, full_name, email, phone, city, state, created_at'
-        )
+        .select('id, full_name, email, phone, city, state, created_at')
         .single()
       if (error) throw error
       setBuyers((prev) => [data as BuyerRow, ...prev])
@@ -865,10 +865,7 @@ function BuyersView() {
   }
 
   const totalPaid =
-    detail?.payments?.reduce(
-      (sum, p) => sum + (p.amount ?? 0),
-      0
-    ) ?? 0
+    detail?.payments?.reduce((sum, p) => sum + (p.amount ?? 0), 0) ?? 0
   const basePrice = detail?.buyer.base_price ?? 0
   const credits = detail?.buyer.credits ?? 0
   const adminFee = detail?.buyer.admin_fee_financing ?? 0
@@ -2036,6 +2033,316 @@ function PaymentsView() {
           </div>
         </div>
       )}
+    </>
+  )
+}
+
+/* ============================================
+   BREEDING PROGRAM TAB (NEW)
+   ============================================ */
+
+const sampleDogs = [
+  { name: 'Gus Gus', sex: 'Male', role: 'Stud', registry: 'CKC', status: 'Active' },
+  { name: 'Ember', sex: 'Female', role: 'Dam', registry: 'AKC', status: 'In Program' },
+  { name: 'Tinker Bell', sex: 'Female', role: 'Dam', registry: 'CKC', status: 'Retired' },
+]
+
+const sampleLitters = [
+  {
+    code: 'EMB-2025-01',
+    dam: 'Ember',
+    sire: 'Bubba Roe',
+    pups: 5,
+    status: 'On Ground',
+  },
+  {
+    code: 'GUS-2024-11',
+    dam: 'Love',
+    sire: 'Gus Gus',
+    pups: 3,
+    status: 'All Placed',
+  },
+]
+
+function BreedingProgramView() {
+  const panelStyle = {
+    borderRadius: 16,
+    border: '1px solid #1f2937',
+    background: '#020617',
+    padding: 14,
+    boxShadow: '0 10px 26px rgba(0,0,0,0.6)',
+  }
+
+  return (
+    <>
+      <h1 style={{ marginBottom: 4 }}>Breeding Program</h1>
+      <p style={{ color: '#9ca3af', marginBottom: 18 }}>
+        Central place to track dams, sires, litters, and placements. The data shown
+        below is example-only; later we can wire this directly to Supabase tables
+        for <code>dogs</code>, <code>litters</code>, <code>puppies</code>, and{' '}
+        <code>owners</code>.
+      </p>
+
+      {/* TOP ROW: DOGS + LITTERS */}
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)',
+          gap: 16,
+          marginBottom: 18,
+          alignItems: 'flex-start',
+        }}
+      >
+        {/* My Dogs */}
+        <div style={panelStyle}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              marginBottom: 8,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              My Dogs
+            </div>
+            <button
+              type="button"
+              style={{
+                borderRadius: 999,
+                border: '1px solid #1f2937',
+                padding: '4px 10px',
+                background: '#020617',
+                color: '#e5e7eb',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              + Add Dog (coming soon)
+            </button>
+          </div>
+          <table className="breedTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Sex</th>
+                <th>Role</th>
+                <th>Registry</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sampleDogs.map((dog) => (
+                <tr key={dog.name}>
+                  <td>{dog.name}</td>
+                  <td>{dog.sex}</td>
+                  <td>{dog.role}</td>
+                  <td>{dog.registry}</td>
+                  <td>
+                    <span className="statusBadge">{dog.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p
+            style={{
+              marginTop: 8,
+              fontSize: 12,
+              color: '#9ca3af',
+            }}
+          >
+            Later, each dog row can open a detailed profile: pedigree, health testing,
+            media, notes, and full breeding history.
+          </p>
+        </div>
+
+        {/* Litters */}
+        <div style={panelStyle}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              marginBottom: 8,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              Litters
+            </div>
+            <button
+              type="button"
+              style={{
+                borderRadius: 999,
+                border: '1px solid #1f2937',
+                padding: '4px 10px',
+                background: '#020617',
+                color: '#e5e7eb',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              + Add Litter (coming soon)
+            </button>
+          </div>
+          <table className="breedTable">
+            <thead>
+              <tr>
+                <th>Litter Code</th>
+                <th>Dam</th>
+                <th>Sire</th>
+                <th>Puppies</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sampleLitters.map((litter) => (
+                <tr key={litter.code}>
+                  <td>{litter.code}</td>
+                  <td>{litter.dam}</td>
+                  <td>{litter.sire}</td>
+                  <td>{litter.pups}</td>
+                  <td>
+                    <span className="statusBadge">{litter.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p
+            style={{
+              marginTop: 8,
+              fontSize: 12,
+              color: '#9ca3af',
+            }}
+          >
+            We can later tie each litter directly to puppies in the customer portal,
+            including weights, vaccination dates, and final buyers.
+          </p>
+        </div>
+      </section>
+
+      {/* LOWER ROW: PLACEMENTS + NEXT STEPS */}
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1fr)',
+          gap: 16,
+        }}
+      >
+        <div style={panelStyle}>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              marginBottom: 6,
+            }}
+          >
+            Owners & Placements
+          </div>
+          <p
+            style={{
+              fontSize: 13,
+              color: '#9ca3af',
+              marginBottom: 8,
+            }}
+          >
+            This section will eventually show a placement log: which puppy went where,
+            whether they&apos;re pet-only or breeding, and notes on how they matured.
+          </p>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 18,
+              fontSize: 13,
+              color: '#e5e7eb',
+            }}
+          >
+            <li>Track repeat buyers and referral families.</li>
+            <li>Connect temperament notes to future breeding decisions.</li>
+            <li>
+              Link placements to the financial records you already have in Buyers &
+              Payments.
+            </li>
+          </ul>
+        </div>
+
+        <div style={panelStyle}>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              marginBottom: 6,
+            }}
+          >
+            Next Steps for Wiring This Tab
+          </div>
+          <ol
+            style={{
+              margin: 0,
+              paddingLeft: 18,
+              fontSize: 13,
+              color: '#e5e7eb',
+            }}
+          >
+            <li>Create Supabase tables: <strong>dogs</strong>,{' '}
+              <strong>litters</strong>, <strong>puppies</strong>,{' '}
+              <strong>owners</strong>.
+            </li>
+            <li>
+              Replace the sample arrays with real <code>select</code> queries for each
+              table.
+            </li>
+            <li>
+              Wire the &quot;Add Dog&quot; / &quot;Add Litter&quot; buttons to simple
+              forms that insert into those tables.
+            </li>
+            <li>
+              Link puppies to buyers so this tab and the customer portal stay in sync.
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <style jsx>{`
+        .breedTable {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+        .breedTable th,
+        .breedTable td {
+          border-bottom: 1px solid #111827;
+          padding: 6px 6px;
+          text-align: left;
+        }
+        .breedTable th {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #9ca3af;
+        }
+        .statusBadge {
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 8px;
+          border-radius: 999px;
+          border: 1px solid #1f2937;
+          background: #020617;
+          font-size: 11px;
+          color: #e5e7eb;
+        }
+      `}</style>
     </>
   )
 }
