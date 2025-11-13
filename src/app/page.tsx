@@ -39,7 +39,7 @@ async function getBrowserClient(): Promise<AnyClient> {
   if (__sb) return __sb
   // Test 0: Tabs shape
       try {
-        const T = tabs as any[]
+        const T = tabs as unknown as any[]
         out.push({ name: 'tabs length == 7', status: T?.length === 7 ? 'pass' : 'fail', detail: `len=${T?.length}` })
         out.push({ name: "has '/messages' tab", status: T?.some(t => t.href?.endsWith('/messages')) ? 'pass' : 'fail' })
       } catch (e: any) {
