@@ -14,6 +14,9 @@
                          • Tabs moved from top bar to left sidebar
                          • "Create your account" box centered under hero heading
                          • Bottom action cards centered in a responsive row
+   - 2025-11-12 (Rev G): Supabase import fix for Vercel:
+                         • Use local '@supabase/supabase-js' import (no remote URL)
+                         • Dev tests updated to avoid URL-based import
    ============================================
    NOTE: Place this file at `src/app/page.tsx` for portal.swvachihuahua.com root.
          If you keep it at `src/app/portal/page.tsx`, set BASE = '/portal'.
@@ -22,12 +25,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 /* ============================================
-   ANCHOR: SUPABASE (dynamic import, alias-free)
+   ANCHOR: SUPABASE
    ============================================ */
 
-type AnyClient = any
+type AnyClient = SupabaseClient
 let __sb: AnyClient | null = null
 
 function getSupabaseEnv() {
@@ -46,25 +50,8 @@ async function getBrowserClient(): Promise<AnyClient> {
   if (__sb) return __sb
   const { url, key } = getSupabaseEnv()
   if (!url || !key) throw new Error('Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
-
-  // Primary: esm.sh ; Fallback: jsDelivr
-  let createClient: any
-  try {
-    // @ts-ignore
-    const mod: any = await import(
-      /* webpackIgnore: true */ 'https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022'
-    )
-    createClient = mod.createClient
-  } catch {
-    // @ts-ignore
-    const mod2: any = await import(
-      /* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-    )
-    createClient = (mod2 as any).createClient
-  }
-
   __sb = createClient(url, key)
-  return __sb!
+  return __sb
 }
 
 /* ============================================
@@ -264,7 +251,6 @@ export default function PortalHome() {
                 Already have an account? <Link href={`${BASE}/login`}>Sign in</Link>
               </div>
 
-              {/* Inline env warning if missing */}
               {(!getSupabaseEnv().url || !getSupabaseEnv().key) && (
                 <div className="note" style={{ marginTop: 8 }}>
                   <b>Setup required:</b> Define <code>NEXT_PUBLIC_SUPABASE_URL</code> and{' '}
@@ -737,15 +723,15 @@ function DevSelfTests() {
         out.push({ name: 'env vars present', status: 'pass' })
       }
 
-      // Test 2: Dynamic import works (no crash in sandbox)
+      // Test 2: supabase-js import available
       try {
-        // @ts-ignore
-        const mod: any = await import(
-          /* webpackIgnore: true */ 'https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022'
-        )
-        out.push({ name: 'dynamic import supabase-js', status: mod?.createClient ? 'pass' : 'fail' })
+        out.push({
+          name: 'supabase-js import available',
+          status: typeof createClient === 'function' ? 'pass' : 'fail',
+          detail: typeof createClient === 'function' ? undefined : 'createClient is not a function',
+        })
       } catch (e: any) {
-        out.push({ name: 'dynamic import supabase-js', status: 'fail', detail: e?.message })
+        out.push({ name: 'supabase-js import available', status: 'fail', detail: e?.message })
       }
 
       // Test 3: Client init (skip if no env)
