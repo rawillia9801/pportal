@@ -44,6 +44,8 @@ async function getBrowserClient(): Promise<AnyClient> {
   // Primary: esm.sh ; Fallback: jsDelivr
   let createClient: any
   try {
+     // @ts-ignore
+const mod: any = await import(/* webpackIgnore: true */ 'https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
     const mod: any = await import(/* webpackIgnore: true */ 'https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
     createClient = mod.createClient
   } catch {
