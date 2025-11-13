@@ -6,11 +6,10 @@
    - 2025-11-12: Buyers tab (list + detail panel)
    - 2025-11-12: Supabase wiring for buyers, puppies,
                  payments, transport_requests
-   - 2025-11-12 (Rev B): Fix PuppySummary typing +
-                         explicit mapping from Supabase
-   ============================================
-   ANCHOR: ADMIN_DASHBOARD
-   Suggested route: src/app/admin/page.tsx
+   - 2025-11-12 (Rev C): Force left sidebar layout via grid.
+                         Add manual "Add Puppy" + "Add Payment"
+                         forms for past sales and expand payment
+                         details (method + notes).
    ============================================ */
 
 import React, { useEffect, useState } from 'react'
@@ -38,8 +37,9 @@ function getSupabaseEnv() {
 async function getBrowserClient(): Promise<AnyClient> {
   if (__sb) return __sb
   const { url, key } = getSupabaseEnv()
-  if (!url || !key)
+  if (!url || !key) {
     throw new Error('Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  }
   __sb = createClient(url, key)
   return __sb
 }
@@ -61,7 +61,7 @@ type AdminTabKey =
 type AdminTab = { key: AdminTabKey; label: string }
 
 const ADMIN_TABS: AdminTab[] = [
-  { key: 'puppies', label: 'Puppies' },
+  { key: 'puppies', key: 'puppies', label: 'Puppies' },
   { key: 'upcoming_litters', label: 'Upcoming Litters' },
   { key: 'applications', label: 'Applications' },
   { key: 'payments', label: 'Payments' },
@@ -97,7 +97,7 @@ type PuppySummary = {
   name: string | null
   status: string | null
   price: number | null
-  dam_name?: string | null // optional for now; we’ll fill in later when we join dams
+  dam_name?: string | null
 }
 
 type PaymentSummary = {
@@ -107,6 +107,7 @@ type PaymentSummary = {
   payment_date: string | null
   method: string | null
   puppy_name: string | null
+  notes: string | null
 }
 
 type TransportSummary = {
@@ -176,7 +177,8 @@ export default function AdminDashboard() {
 
           main.adminLayout {
             min-height: 100vh;
-            display: flex;
+            display: grid;
+            grid-template-columns: 240px minmax(0, 1fr);
             background:
               radial-gradient(60% 100% at 100% 0%, #0b1120 0%, transparent 60%),
               radial-gradient(60% 100% at 0% 0%, #020617 0%, transparent 60%),
@@ -186,7 +188,6 @@ export default function AdminDashboard() {
           }
 
           .adminSidebar {
-            width: 240px;
             padding: 18px 14px;
             box-sizing: border-box;
             border-right: 1px solid #1f2937;
@@ -254,7 +255,6 @@ export default function AdminDashboard() {
           }
 
           .adminMain {
-            flex: 1;
             padding: 20px 22px;
             box-sizing: border-box;
             display: flex;
@@ -270,12 +270,11 @@ export default function AdminDashboard() {
             margin-bottom: 8px;
           }
 
-          @media (max-width: 800px) {
+          @media (max-width: 900px) {
             main.adminLayout {
-              flex-direction: column;
+              grid-template-columns: 1fr;
             }
             .adminSidebar {
-              width: 100%;
               flex-direction: row;
               align-items: center;
               justify-content: space-between;
@@ -303,12 +302,28 @@ function BuyersView() {
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Simple “add buyer” form
+  // Add buyer form
   const [newBuyerName, setNewBuyerName] = useState('')
   const [newBuyerEmail, setNewBuyerEmail] = useState('')
   const [newBuyerPhone, setNewBuyerPhone] = useState('')
   const [savingBuyer, setSavingBuyer] = useState(false)
 
+  // Manual puppy form (for past sales)
+  const [newPuppyName, setNewPuppyName] = useState('')
+  const [newPuppyStatus, setNewPuppyStatus] = useState('')
+  const [newPuppyPrice, setNewPuppyPrice] = useState('')
+  const [savingPuppy, setSavingPuppy] = useState(false)
+
+  // Manual payment form (for past sales)
+  const [newPayType, setNewPayType] = useState('')
+  const [newPayAmount, setNewPayAmount] = useState('')
+  const [newPayDate, setNewPayDate] = useState('')
+  const [newPayMethod, setNewPayMethod] = useState('')
+  const [newPayNotes, setNewPayNotes] = useState('')
+  const [newPayPuppyId, setNewPayPuppyId] = useState<string | ''>('')
+  const [savingPayment, setSavingPayment] = useState(false)
+
+  // ---------- Load buyers list ----------
   useEffect(() => {
     ;(async () => {
       setLoadingList(true)
@@ -332,6 +347,7 @@ function BuyersView() {
     })()
   }, [])
 
+  // ---------- Load selected buyer detail ----------
   useEffect(() => {
     if (!selectedId) {
       setDetail(null)
@@ -351,12 +367,12 @@ function BuyersView() {
             .single(),
           sb
             .from('puppies')
-            .select('id, name, status, price, dam_id')
+            .select('id, name, status, price')
             .eq('buyer_id', selectedId)
             .order('created_at', { ascending: false }),
           sb
             .from('puppy_payments')
-            .select('id, type, amount, payment_date, method, puppy_id')
+            .select('id, type, amount, payment_date, method, puppy_id, notes')
             .eq('buyer_id', selectedId)
             .order('payment_date', { ascending: false }),
           sb
@@ -373,18 +389,15 @@ function BuyersView() {
 
         const buyer = buyerRes.data as BuyerDetail['buyer']
 
-        // Map Supabase rows into PuppySummary objects
         const rawPuppies = (puppiesRes.data || []) as any[]
         const puppies: PuppySummary[] = rawPuppies.map((p) => ({
           id: p.id,
           name: p.name,
           status: p.status,
           price: p.price,
-          // dam_name will be filled later when we join with breeding_dogs
           dam_name: null,
         }))
 
-        // Attach puppy names to payments
         const puppyMap = new Map<string, PuppySummary>()
         puppies.forEach((p) => {
           if (p.id) puppyMap.set(p.id, p)
@@ -397,6 +410,7 @@ function BuyersView() {
           payment_date: p.payment_date,
           method: p.method,
           puppy_name: p.puppy_id ? puppyMap.get(p.puppy_id)?.name || null : null,
+          notes: p.notes ?? null,
         }))
 
         const transports = (transRes.data || []) as TransportSummary[]
@@ -415,6 +429,7 @@ function BuyersView() {
     })()
   }, [selectedId])
 
+  // ---------- Add Buyer ----------
   async function handleAddBuyer(e: React.FormEvent) {
     e.preventDefault()
     if (!newBuyerName.trim()) return
@@ -443,6 +458,123 @@ function BuyersView() {
       setError(e?.message || 'Failed to add buyer.')
     } finally {
       setSavingBuyer(false)
+    }
+  }
+
+  // ---------- Add Puppy manually ----------
+  async function handleAddPuppy(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedId) return
+    if (!newPuppyName.trim()) return
+
+    setSavingPuppy(true)
+    setError(null)
+    try {
+      const sb = await getBrowserClient()
+      const priceNum = newPuppyPrice ? Number(newPuppyPrice) : null
+
+      const { data, error } = await sb
+        .from('puppies')
+        .insert({
+          buyer_id: selectedId,
+          name: newPuppyName.trim(),
+          status: newPuppyStatus || null,
+          price: priceNum,
+        })
+        .select('id, name, status, price')
+        .single()
+
+      if (error) throw error
+
+      const inserted: PuppySummary = {
+        id: data.id,
+        name: data.name,
+        status: data.status,
+        price: data.price,
+        dam_name: null,
+      }
+
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              puppies: [inserted, ...prev.puppies],
+            }
+          : prev,
+      )
+
+      setNewPuppyName('')
+      setNewPuppyStatus('')
+      setNewPuppyPrice('')
+    } catch (e: any) {
+      setError(e?.message || 'Failed to add puppy.')
+    } finally {
+      setSavingPuppy(false)
+    }
+  }
+
+  // ---------- Add Payment manually ----------
+  async function handleAddPayment(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedId) return
+    if (!newPayAmount) return
+
+    setSavingPayment(true)
+    setError(null)
+    try {
+      const sb = await getBrowserClient()
+      const amountNum = Number(newPayAmount)
+
+      const { data, error } = await sb
+        .from('puppy_payments')
+        .insert({
+          buyer_id: selectedId,
+          puppy_id: newPayPuppyId || null,
+          type: newPayType || 'payment',
+          amount: amountNum,
+          payment_date: newPayDate || null,
+          method: newPayMethod || null,
+          notes: newPayNotes || null,
+        })
+        .select('id, type, amount, payment_date, method, puppy_id, notes')
+        .single()
+
+      if (error) throw error
+
+      const puppyName =
+        data.puppy_id && detail
+          ? detail.puppies.find((p) => p.id === data.puppy_id)?.name || null
+          : null
+
+      const inserted: PaymentSummary = {
+        id: data.id,
+        type: data.type,
+        amount: data.amount,
+        payment_date: data.payment_date,
+        method: data.method,
+        puppy_name: puppyName,
+        notes: data.notes ?? null,
+      }
+
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              payments: [inserted, ...prev.payments],
+            }
+          : prev,
+      )
+
+      setNewPayType('')
+      setNewPayAmount('')
+      setNewPayDate('')
+      setNewPayMethod('')
+      setNewPayNotes('')
+      setNewPayPuppyId('')
+    } catch (e: any) {
+      setError(e?.message || 'Failed to add payment.')
+    } finally {
+      setSavingPayment(false)
     }
   }
 
@@ -488,7 +620,7 @@ function BuyersView() {
       {error && <div className="errorBanner">{error}</div>}
 
       <section className="buyersMain">
-        {/* LEFT: list of buyers */}
+        {/* LEFT: Buyers list */}
         <div className="buyersListCard">
           <div className="buyersListHeader">
             <h3>All Buyers</h3>
@@ -523,7 +655,7 @@ function BuyersView() {
           </div>
         </div>
 
-        {/* RIGHT: buyer detail */}
+        {/* RIGHT: Buyer detail */}
         <div className="buyerDetailCard">
           {(!detail || loadingDetail) && (
             <div className="detailPlaceholder">
@@ -598,6 +730,39 @@ function BuyersView() {
                     ))}
                   </div>
                 )}
+
+                {/* Manual Add Puppy Form */}
+                <div className="miniForm">
+                  <div className="miniFormTitle">Add Puppy (manual)</div>
+                  <form className="miniFormRow" onSubmit={handleAddPuppy}>
+                    <input
+                      placeholder="Name"
+                      value={newPuppyName}
+                      onChange={(e) => setNewPuppyName(e.target.value)}
+                      required
+                    />
+                    <select
+                      value={newPuppyStatus}
+                      onChange={(e) => setNewPuppyStatus(e.target.value)}
+                    >
+                      <option value="">Status</option>
+                      <option value="available">Available</option>
+                      <option value="reserved">Reserved</option>
+                      <option value="sold">Sold</option>
+                      <option value="kept">Kept</option>
+                    </select>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Price"
+                      value={newPuppyPrice}
+                      onChange={(e) => setNewPuppyPrice(e.target.value)}
+                    />
+                    <button type="submit" disabled={savingPuppy}>
+                      {savingPuppy ? 'Saving…' : 'Save'}
+                    </button>
+                  </form>
+                </div>
               </section>
 
               {/* PAYMENTS */}
@@ -605,12 +770,13 @@ function BuyersView() {
                 <h3>Payments</h3>
                 {detail.payments.length === 0 && <div className="emptyLine">No payments recorded.</div>}
                 {detail.payments.length > 0 && (
-                  <div className="table">
+                  <div className="table payments">
                     <div className="tableHead">
                       <span>Date</span>
                       <span>Type</span>
                       <span>Puppy</span>
                       <span>Amount</span>
+                      <span>Method / Notes</span>
                     </div>
                     {detail.payments.map((p) => (
                       <div key={p.id} className="tableRow">
@@ -618,10 +784,64 @@ function BuyersView() {
                         <span>{p.type || '—'}</span>
                         <span>{p.puppy_name || '—'}</span>
                         <span>{p.amount != null ? `$${p.amount.toFixed(2)}` : '—'}</span>
+                        <span>
+                          {p.method || '—'}
+                          {p.notes ? ` — ${p.notes}` : ''}
+                        </span>
                       </div>
                     ))}
                   </div>
                 )}
+
+                {/* Manual Add Payment Form */}
+                <div className="miniForm">
+                  <div className="miniFormTitle">Add Payment (manual)</div>
+                  <form className="miniFormRow" onSubmit={handleAddPayment}>
+                    <select value={newPayType} onChange={(e) => setNewPayType(e.target.value)}>
+                      <option value="">Type</option>
+                      <option value="deposit">Deposit</option>
+                      <option value="payment">Payment</option>
+                      <option value="refund">Refund</option>
+                    </select>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Amount"
+                      value={newPayAmount}
+                      onChange={(e) => setNewPayAmount(e.target.value)}
+                      required
+                    />
+                    <input
+                      type="date"
+                      value={newPayDate}
+                      onChange={(e) => setNewPayDate(e.target.value)}
+                    />
+                    <select
+                      value={newPayPuppyId}
+                      onChange={(e) => setNewPayPuppyId(e.target.value)}
+                    >
+                      <option value="">Puppy (optional)</option>
+                      {detail.puppies.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name || 'Unnamed'}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      placeholder="Method (cash, PayPal...)"
+                      value={newPayMethod}
+                      onChange={(e) => setNewPayMethod(e.target.value)}
+                    />
+                    <input
+                      placeholder="Notes (optional)"
+                      value={newPayNotes}
+                      onChange={(e) => setNewPayNotes(e.target.value)}
+                    />
+                    <button type="submit" disabled={savingPayment}>
+                      {savingPayment ? 'Saving…' : 'Save'}
+                    </button>
+                  </form>
+                </div>
               </section>
 
               {/* TRANSPORT */}
@@ -649,7 +869,11 @@ function BuyersView() {
                             t.hotel_cost || 0,
                             t.fuel_cost || 0,
                           ].some((v) => v > 0)
-                            ? `$${(((t.tolls || 0) + (t.hotel_cost || 0) + (t.fuel_cost || 0)) as number).toFixed(2)}`
+                            ? `$${(
+                                (t.tolls || 0) +
+                                (t.hotel_cost || 0) +
+                                (t.fuel_cost || 0)
+                              ).toFixed(2)}`
                             : '—'}
                         </span>
                       </div>
@@ -894,9 +1118,61 @@ function BuyersView() {
           background: #02061a;
         }
 
+        .table.payments .tableHead,
+        .table.payments .tableRow {
+          grid-template-columns: 1.1fr 0.9fr 1.1fr 0.8fr 1.6fr;
+        }
+
         .clickableName {
           text-decoration: underline;
           cursor: pointer;
+        }
+
+        .miniForm {
+          margin-top: 10px;
+          padding-top: 8px;
+          border-top: 1px dashed #1f2937;
+        }
+        .miniFormTitle {
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--muted);
+          margin-bottom: 4px;
+        }
+        .miniFormRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+        .miniFormRow input,
+        .miniFormRow select {
+          flex: 1 1 120px;
+          min-width: 0;
+          padding: 6px 8px;
+          border-radius: 8px;
+          border: 1px solid #1f2937;
+          background: #020617;
+          color: #f9fafb;
+          font-size: 0.8rem;
+        }
+        .miniFormRow input::placeholder {
+          color: #6b7280;
+        }
+        .miniFormRow button {
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: none;
+          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
+          color: #111827;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .miniFormRow button:disabled {
+          opacity: 0.7;
+          cursor: default;
         }
 
         @media (max-width: 900px) {
