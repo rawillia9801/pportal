@@ -2,11 +2,8 @@
 
 /* ============================================
    CHANGELOG
-   - 2025-11-13: New layout with left sidebar nav,
-                 centered hero + signup card,
-                 and horizontal quick-action cards.
-   - 2025-11-13: Supabase browser client via
-                 @supabase/supabase-js (no remote ESM).
+   - 2025-11-13: Sidebar layout + centered hero
+                 signup and horizontal quick cards.
    ============================================ */
 
 import React, { useMemo, useState } from 'react'
@@ -14,15 +11,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-/* ============================================
-   ANCHOR: SUPABASE CLIENT (BROWSER)
-   ============================================ */
-
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
 let supabaseBrowser: SupabaseClient | null = null
-
 function getSupabaseClient(): SupabaseClient {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(
@@ -35,15 +27,9 @@ function getSupabaseClient(): SupabaseClient {
   return supabaseBrowser
 }
 
-/* ============================================
-   ANCHOR: THEME + ICONS
-   ============================================ */
-
 const THEME = {
   bg: '#020617',
-  bgAlt: '#020617',
   sidebar: '#020617',
-  panel: '#020617',
   panelBorder: '#111827',
   ink: '#f9fafb',
   muted: '#9ca3af',
@@ -56,20 +42,11 @@ const IconPuppy = (p: React.SVGProps<SVGSVGElement>) => (
     <path d="M20 16c-5 0-9 4-9 9 0 6 3 9 3 12 0 3 2 5 5 5h1c2 5 6 8 12 8s10-3 12-8h1c3 0 5-2 5-5 0-3 3-6 3-12 0-5-4-9-9-9-4 0-7 2-9 5-2-3-5-5-9-5zM26 32a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm12 0a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM24 41c4 3 12 3 16 0 1-1 3 0 2 2-2 4-18 4-20 0-1-2 1-3 2-2z" />
   </svg>
 )
-
 const IconPaw = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    viewBox="0 0 24 24"
-    width={18}
-    height={18}
-    aria-hidden
-    fill="currentColor"
-    {...props}
-  >
+  <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...props}>
     <path d="M12 13c-2.6 0-5 1.9-5 4.2C7 19.4 8.6 21 10.7 21h2.6C15.4 21 17 19.4 17 17.2 17 14.9 14.6 13 12 13zm-5.4-2.1c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm10.8 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.5 9.7c1.3 0 2.3-1.2 2.3-2.7S10.8 4.3 9.5 4.3 7.2 5.5 7.2 7s1 2.7 2.3 2.7zm5 0c1.3 0 2.3-1.2 2.3-2.7s-1-2.7-2.3-2.7-2.3 1.2-2.3 2.7 1 2.7 2.3 2.7z" />
   </svg>
 )
-
 const IconDoc = (p: any) => (
   <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" {...p}>
     <path d="M6 2h7l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1v4h4" />
@@ -96,10 +73,6 @@ const IconUser = (p: any) => (
   </svg>
 )
 
-/* ============================================
-   ANCHOR: NAV TABS
-   ============================================ */
-
 const BASE = ''
 
 const tabs = [
@@ -113,7 +86,6 @@ const tabs = [
 ] as const
 
 type TabKey = (typeof tabs)[number]['key'] | 'home'
-
 function activeKeyFromPathname(pathname?: string | null): TabKey {
   if (!pathname || pathname === '/' || pathname === BASE || pathname === `${BASE}/`) {
     return 'home'
@@ -122,15 +94,7 @@ function activeKeyFromPathname(pathname?: string | null): TabKey {
   return (t?.key as TabKey) ?? 'home'
 }
 
-/* ============================================
-   ANCHOR: SIGNUP STATE
-   ============================================ */
-
 type SignUpState = { name: string; email: string; pass: string; msg: string; busy: boolean }
-
-/* ============================================
-   PAGE COMPONENT
-   ============================================ */
 
 export default function PortalHome() {
   const pathname = usePathname()
@@ -149,7 +113,6 @@ export default function PortalHome() {
     setS((v) => ({ ...v, msg: '', busy: true }))
     try {
       if (!s.email || !s.pass) throw new Error('Please enter email and password')
-
       const supabase = getSupabaseClient()
       const { error } = await supabase.auth.signUp({
         email: s.email,
@@ -165,18 +128,14 @@ export default function PortalHome() {
         busy: false,
       })
     } catch (err: any) {
-      setS((v) => ({
-        ...v,
-        msg: err?.message || 'Sign up failed.',
-        busy: false,
-      }))
+      setS((v) => ({ ...v, msg: err?.message || 'Sign up failed.', busy: false }))
     }
   }
 
   return (
     <main>
       <div className="shell">
-        {/* ============ SIDEBAR ============ */}
+        {/* SIDEBAR */}
         <aside className="sidebar">
           <div className="brand">
             <div className="pupmark" aria-hidden>
@@ -189,7 +148,6 @@ export default function PortalHome() {
               <div className="brandLine2">Virginia&apos;s Premier Chihuahua Breeder</div>
             </div>
           </div>
-
           <nav className="nav">
             {tabs.map(({ key, label, href, Icon }) => (
               <Link
@@ -206,7 +164,7 @@ export default function PortalHome() {
           </nav>
         </aside>
 
-        {/* ============ MAIN CONTENT ============ */}
+        {/* MAIN */}
         <section className="main">
           {/* HERO + SIGNUP */}
           <section className="hero">
@@ -215,8 +173,7 @@ export default function PortalHome() {
               <p>
                 This is your central hub to follow every step of your Chihuahua&apos;s
                 journey. You can track applications, manage payments, celebrate weekly
-                milestones, access key documents, and arrange transportation—all right
-                here.
+                milestones, access key documents, and arrange transportation—all right here.
               </p>
             </div>
 
@@ -265,15 +222,14 @@ export default function PortalHome() {
             </form>
           </section>
 
-          {/* BODY COPY + QUICK CARDS */}
+          {/* COPY + CARDS */}
           <section className="body">
             <div className="copyBlock">
               <h2>Your Puppy Portal</h2>
               <p>
                 Think of the Puppy Portal as your personal, secure hub for everything
-                related to your new Chihuahua! It’s designed especially for our
-                Southwest Virginia Chihuahua families to make your experience seamless and
-                exciting.
+                related to your new Chihuahua! It’s designed especially for our Southwest
+                Virginia Chihuahua families to make your experience seamless and exciting.
               </p>
               <ul>
                 <li>Track your puppy&apos;s weekly weights and milestones</li>
@@ -326,15 +282,10 @@ export default function PortalHome() {
         </section>
       </div>
 
-      {/* ============================================ */}
-      {/* STYLES */}
-      {/* ============================================ */}
       <style jsx>{`
         :root {
           --bg: ${THEME.bg};
-          --bgAlt: ${THEME.bgAlt};
           --sidebar: ${THEME.sidebar};
-          --panel: ${THEME.panel};
           --panelBorder: ${THEME.panelBorder};
           --ink: ${THEME.ink};
           --muted: ${THEME.muted};
@@ -360,8 +311,6 @@ export default function PortalHome() {
           display: flex;
           gap: 20px;
         }
-
-        /* SIDEBAR */
 
         .sidebar {
           width: 230px;
@@ -467,8 +416,6 @@ export default function PortalHome() {
           flex: 1;
         }
 
-        /* MAIN CONTENT */
-
         .main {
           flex: 1;
           display: flex;
@@ -478,17 +425,20 @@ export default function PortalHome() {
 
         .hero {
           border-radius: 24px;
-          padding: 22px 24px 24px;
+          padding: 22px 24px 28px;
           border: 1px solid var(--panelBorder);
           background:
             radial-gradient(120% 220% at 0 0, rgba(224, 169, 109, 0.2), transparent 55%),
             linear-gradient(145deg, #020617, #020617);
           box-shadow: 0 24px 50px rgba(0, 0, 0, 0.85);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 18px;
         }
 
         .heroText {
           max-width: 760px;
-          margin: 0 auto 18px;
           text-align: center;
         }
 
@@ -504,8 +454,8 @@ export default function PortalHome() {
         }
 
         .signup {
+          width: 100%;
           max-width: 420px;
-          margin: 0 auto;
           border-radius: 18px;
           padding: 16px 16px 14px;
           border: 1px solid var(--panelBorder);
@@ -586,8 +536,6 @@ export default function PortalHome() {
           color: var(--muted);
         }
 
-        /* BODY + CARDS */
-
         .body {
           border-radius: 20px;
           padding: 18px 20px 20px;
@@ -631,8 +579,8 @@ export default function PortalHome() {
           display: flex;
           flex-wrap: wrap;
           justify-content: center;
-          gap: 16px;
-          margin-top: 8px;
+          gap: 18px;
+          margin-top: 4px;
         }
 
         .card {
@@ -660,6 +608,7 @@ export default function PortalHome() {
           margin: 0 0 10px;
           font-size: 12px;
           color: var(--muted);
+          text-align: center;
         }
 
         .cardBtn {
@@ -676,8 +625,6 @@ export default function PortalHome() {
           width: 100%;
         }
 
-        /* FOOTER */
-
         .ft {
           display: flex;
           justify-content: space-between;
@@ -693,34 +640,13 @@ export default function PortalHome() {
           }
           .sidebar {
             width: 100%;
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
-          }
-          .nav {
-            flex-direction: row;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-          }
-          .navItem {
-            border-radius: 999px;
           }
         }
 
         @media (max-width: 720px) {
-          .sidebar {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-          .nav {
-            width: 100%;
-          }
           .hero,
           .body {
             padding: 16px 14px 18px;
-          }
-          .cardsRow {
-            gap: 12px;
           }
           .card {
             width: 100%;
@@ -731,10 +657,6 @@ export default function PortalHome() {
     </main>
   )
 }
-
-/* ============================================
-   ANCHOR: REUSABLE CARD COMPONENT
-   ============================================ */
 
 function ActionCard(props: {
   icon: React.ReactNode
