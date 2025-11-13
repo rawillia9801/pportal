@@ -2,20 +2,17 @@
 
 /* ============================================
    CHANGELOG
-   - 2025-11-12: Admin Dashboard shell with left tabs
-   - 2025-11-12: Buyers tab (list + detail panel)
-   - 2025-11-12: Supabase wiring for buyers, puppies,
-                 payments, transport_requests
-   - 2025-11-12 (Rev E): Sidebar locked to left
-                         at all screen sizes (no
-                         responsive top-row tabs).
+   - 2025-11-13: Admin shell with LEFT sidebar
+   - 2025-11-13: New Dashboard tab for /admin landing
+   - 2025-11-13: Buyers view kept + manual puppy/payment
+   - 2025-11-13: Dashboard shows activity counts
    ============================================ */
 
 import React, { useEffect, useState } from 'react'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 /* ============================================
-   ANCHOR: SUPABASE_HELPERS
+   ANCHOR: SUPABASE HELPERS
    ============================================ */
 
 type AnyClient = SupabaseClient<any, 'public', any>
@@ -23,13 +20,23 @@ let __sb: AnyClient | null = null
 
 function getSupabaseEnv() {
   const g: any = (typeof window !== 'undefined' ? window : globalThis) as any
-  const hasProc = typeof process !== 'undefined' && (process as any) && (process as any).env
+  const hasProc =
+    typeof process !== 'undefined' &&
+    (process as any) &&
+    (process as any).env
+
   const url = hasProc
     ? (process as any).env.NEXT_PUBLIC_SUPABASE_URL
-    : (g.NEXT_PUBLIC_SUPABASE_URL || g.__ENV?.NEXT_PUBLIC_SUPABASE_URL || '')
+    : (g.NEXT_PUBLIC_SUPABASE_URL ||
+       g.__ENV?.NEXT_PUBLIC_SUPABASE_URL ||
+       '')
+
   const key = hasProc
     ? (process as any).env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    : (g.NEXT_PUBLIC_SUPABASE_ANON_KEY || g.__ENV?.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
+    : (g.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+       g.__ENV?.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+       '')
+
   return { url: String(url || ''), key: String(key || '') }
 }
 
@@ -37,7 +44,9 @@ async function getBrowserClient(): Promise<AnyClient> {
   if (__sb) return __sb
   const { url, key } = getSupabaseEnv()
   if (!url || !key) {
-    throw new Error('Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    throw new Error(
+      'Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY'
+    )
   }
   __sb = createClient(url, key)
   return __sb
@@ -48,6 +57,7 @@ async function getBrowserClient(): Promise<AnyClient> {
    ============================================ */
 
 type AdminTabKey =
+  | 'dashboard'
   | 'puppies'
   | 'upcoming_litters'
   | 'applications'
@@ -60,6 +70,7 @@ type AdminTabKey =
 type AdminTab = { key: AdminTabKey; label: string }
 
 const ADMIN_TABS: AdminTab[] = [
+  { key: 'dashboard', label: 'Dashboard' },
   { key: 'puppies', label: 'Puppies' },
   { key: 'upcoming_litters', label: 'Upcoming Litters' },
   { key: 'applications', label: 'Applications' },
@@ -78,17 +89,6 @@ type BuyerRow = {
   city: string | null
   state: string | null
   created_at: string
-}
-
-type BuyerDetail = {
-  buyer: BuyerRow & {
-    address_line1?: string | null
-    postal_code?: string | null
-    notes?: string | null
-  }
-  puppies: PuppySummary[]
-  payments: PaymentSummary[]
-  transports: TransportSummary[]
 }
 
 type PuppySummary = {
@@ -120,31 +120,131 @@ type TransportSummary = {
   fuel_cost: number | null
 }
 
+type BuyerDetail = {
+  buyer: BuyerRow & {
+    address_line1?: string | null
+    postal_code?: string | null
+    notes?: string | null
+  }
+  puppies: PuppySummary[]
+  payments: PaymentSummary[]
+  transports: TransportSummary[]
+}
+
+type DashboardCounts = {
+  buyers: number | null
+  applications: number | null
+  payments: number | null
+  messages: number | null
+  transports: number | null
+}
+
 /* ============================================
-   ANCHOR: ROOT COMPONENT
+   ANCHOR: ROOT ADMIN PAGE
    ============================================ */
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<AdminTabKey>('buyers')
+  const [activeTab, setActiveTab] = useState<AdminTabKey>('dashboard')
+
+  // Inline layout styles so the sidebar is ALWAYS on the left
+  const layoutStyle: React.CSSProperties = {
+    minHeight: '100vh',
+    display: 'flex',
+    background:
+      'radial-gradient(60% 100% at 100% 0%, #0b1120 0%, transparent 60%),' +
+      'radial-gradient(60% 100% at 0% 0%, #020617 0%, transparent 60%),' +
+      '#020617',
+    color: '#f9fafb',
+    fontFamily:
+      'system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+  }
+
+  const sidebarStyle: React.CSSProperties = {
+    width: 240,
+    padding: '18px 14px',
+    boxSizing: 'border-box',
+    borderRight: '1px solid #1f2937',
+    background: 'linear-gradient(180deg,#020617,#111827)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 18,
+  }
+
+  const brandRowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  }
+
+  const logoStyle: React.CSSProperties = {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    background: 'linear-gradient(135deg,#e0a96d,#c47a35)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 20,
+  }
+
+  const tabsContainerStyle: React.CSSProperties = {
+    marginTop: 14,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  }
+
+  const tabBaseStyle: React.CSSProperties = {
+    border: '1px solid #1f2937',
+    background: '#020617',
+    color: '#e5e7eb',
+    borderRadius: 10,
+    padding: '9px 10px',
+    textAlign: 'left',
+    fontSize: '.9rem',
+    cursor: 'pointer',
+    transition:
+      'background .12s ease, transform .12s ease, box-shadow .12s ease, border-color .12s ease',
+  }
+
+  const tabActiveStyle: React.CSSProperties = {
+    ...tabBaseStyle,
+    background: 'linear-gradient(135deg,#e0a96d,#c47a35)',
+    color: '#111827',
+    borderColor: 'transparent',
+    fontWeight: 600,
+  }
+
+  const mainStyle: React.CSSProperties = {
+    flex: 1,
+    padding: '20px 22px',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+  }
 
   return (
-    <main className="adminLayout">
-      {/* SIDEBAR */}
-      <aside className="adminSidebar">
-        <div className="adminBrand">
-          <div className="adminLogo">🐶</div>
+    <main style={layoutStyle}>
+      {/* LEFT SIDEBAR */}
+      <aside style={sidebarStyle}>
+        <div style={brandRowStyle}>
+          <div style={logoStyle}>🐶</div>
           <div>
-            <div className="brandLine1">SWVA Chihuahua</div>
-            <div className="brandLine2">Admin Panel</div>
+            <div style={{ fontWeight: 700, fontSize: '.95rem' }}>
+              SWVA Chihuahua
+            </div>
+            <div style={{ fontSize: '.8rem', color: '#e5e7eb' }}>
+              Admin Panel
+            </div>
           </div>
         </div>
 
-        <nav className="adminTabs">
+        <nav style={tabsContainerStyle}>
           {ADMIN_TABS.map((tab) => (
             <button
               key={tab.key}
               type="button"
-              className={`adminTab ${activeTab === tab.key ? 'active' : ''}`}
+              style={activeTab === tab.key ? tabActiveStyle : tabBaseStyle}
               onClick={() => setActiveTab(tab.key)}
             >
               {tab.label}
@@ -153,11 +253,15 @@ export default function AdminDashboard() {
         </nav>
       </aside>
 
-      {/* MAIN PANEL */}
-      <section className="adminMain">
+      {/* MAIN CONTENT */}
+      <section style={mainStyle}>
+        {activeTab === 'dashboard' && (
+          <AdminHomeDashboard onOpenTab={setActiveTab} />
+        )}
+
         {activeTab === 'buyers' && <BuyersView />}
 
-        {activeTab !== 'buyers' && (
+        {activeTab !== 'dashboard' && activeTab !== 'buyers' && (
           <div className="comingSoon">
             <h1>{ADMIN_TABS.find((t) => t.key === activeTab)?.label}</h1>
             <p>We’ll wire this section after Buyers is complete.</p>
@@ -165,105 +269,10 @@ export default function AdminDashboard() {
         )}
 
         <style jsx>{`
-          :root {
-            --bg: #020617;
-            --panel: #020617;
-            --ink: #f9fafb;
-            --muted: #9ca3af;
-            --brand: #e0a96d;
-            --brandAlt: #c47a35;
-          }
-
-          main.adminLayout {
-            min-height: 100vh;
-            display: grid;
-            grid-template-columns: 240px minmax(0, 1fr);
-            background:
-              radial-gradient(60% 100% at 100% 0%, #0b1120 0%, transparent 60%),
-              radial-gradient(60% 100% at 0% 0%, #020617 0%, transparent 60%),
-              var(--bg);
-            color: var(--ink);
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          }
-
-          .adminSidebar {
-            padding: 18px 14px;
-            box-sizing: border-box;
-            border-right: 1px solid #1f2937;
-            background: linear-gradient(180deg, #020617, #111827);
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-          }
-
-          .adminBrand {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-          }
-          .adminLogo {
-            width: 38px;
-            height: 38px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-          }
-          .brandLine1 {
-            font-weight: 700;
-            font-size: 0.95rem;
-          }
-          .brandLine2 {
-            font-size: 0.8rem;
-            color: #e5e7eb;
-          }
-
-          .adminTabs {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-          }
-          .adminTab {
-            border: 1px solid #1f2937;
-            background: #020617;
-            color: #e5e7eb;
-            border-radius: 10px;
-            padding: 9px 10px;
-            text-align: left;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition:
-              background 0.12s ease,
-              transform 0.12s ease,
-              box-shadow 0.12s ease,
-              border-color 0.12s ease;
-          }
-          .adminTab:hover {
-            background: #111827;
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-            border-color: #334155;
-          }
-          .adminTab.active {
-            background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-            color: #111827;
-            border-color: transparent;
-            font-weight: 600;
-          }
-
-          .adminMain {
-            padding: 20px 22px;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-          }
-
           .comingSoon {
             margin: auto;
             text-align: center;
-            color: var(--muted);
+            color: #9ca3af;
           }
           .comingSoon h1 {
             margin-bottom: 8px;
@@ -275,7 +284,272 @@ export default function AdminDashboard() {
 }
 
 /* ============================================
-   ANCHOR: BUYERS_VIEW
+   ANCHOR: DASHBOARD (ADMIN LANDING)
+   ============================================ */
+
+function AdminHomeDashboard({
+  onOpenTab,
+}: {
+  onOpenTab: (tab: AdminTabKey) => void
+}) {
+  const [counts, setCounts] = useState<DashboardCounts>({
+    buyers: null,
+    applications: null,
+    payments: null,
+    messages: null,
+    transports: null,
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    ;(async () => {
+      setLoading(true)
+      setError(null)
+      const next: DashboardCounts = {
+        buyers: null,
+        applications: null,
+        payments: null,
+        messages: null,
+        transports: null,
+      }
+
+      try {
+        const sb = await getBrowserClient()
+
+        // Buyers
+        try {
+          const res = await sb
+            .from('puppy_buyers')
+            .select('id', { count: 'exact', head: true })
+          if (!res.error && typeof res.count === 'number') next.buyers = res.count
+        } catch {}
+
+        // Applications table name is a guess – safe even if it doesn't exist.
+        try {
+          const res = await sb
+            .from('puppy_applications')
+            .select('id', { count: 'exact', head: true })
+          if (!res.error && typeof res.count === 'number')
+            next.applications = res.count
+        } catch {}
+
+        // Payments
+        try {
+          const res = await sb
+            .from('puppy_payments')
+            .select('id', { count: 'exact', head: true })
+          if (!res.error && typeof res.count === 'number')
+            next.payments = res.count
+        } catch {}
+
+        // Messages table name is a guess – adjust when you create it.
+        try {
+          const res = await sb
+            .from('puppy_messages')
+            .select('id', { count: 'exact', head: true })
+          if (!res.error && typeof res.count === 'number')
+            next.messages = res.count
+        } catch {}
+
+        // Transportation requests
+        try {
+          const res = await sb
+            .from('transport_requests')
+            .select('id', { count: 'exact', head: true })
+          if (!res.error && typeof res.count === 'number')
+            next.transports = res.count
+        } catch {}
+
+        setCounts(next)
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load dashboard stats.')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  const cards = [
+    {
+      key: 'applications' as const,
+      label: 'Applications',
+      desc: 'New and pending puppy applications.',
+      count: counts.applications,
+      tab: 'applications' as AdminTabKey,
+    },
+    {
+      key: 'payments' as const,
+      label: 'Payments',
+      desc: 'Deposits, balances, and payment plans.',
+      count: counts.payments,
+      tab: 'payments' as AdminTabKey,
+    },
+    {
+      key: 'messages' as const,
+      label: 'Messages',
+      desc: 'Questions and updates from buyers.',
+      count: counts.messages,
+      tab: 'messages' as AdminTabKey,
+    },
+    {
+      key: 'transport' as const,
+      label: 'Transportation',
+      desc: 'Pickup and delivery requests.',
+      count: counts.transports,
+      tab: 'transport' as AdminTabKey,
+    },
+    {
+      key: 'buyers' as const,
+      label: 'Buyers',
+      desc: 'Families in your program.',
+      count: counts.buyers,
+      tab: 'buyers' as AdminTabKey,
+    },
+  ]
+
+  return (
+    <section className="dashWrap">
+      <header className="dashHeader">
+        <div>
+          <h1>Admin Overview</h1>
+          <p className="muted">
+            Quick snapshot of applications, payments, messages, and travel.
+          </p>
+        </div>
+        {loading && <span className="miniTag">Loading…</span>}
+      </header>
+
+      {error && <div className="dashError">{error}</div>}
+
+      <div className="dashGrid">
+        {cards.map((card) => (
+          <button
+            key={card.key}
+            type="button"
+            className="dashCard"
+            onClick={() => onOpenTab(card.tab)}
+          >
+            <div className="dashCardTop">
+              <span className="dashLabel">{card.label}</span>
+              <span
+                className={
+                  'dashCount ' +
+                  (card.count != null && card.count > 0 ? 'hasActivity' : '')
+                }
+              >
+                {card.count != null ? card.count : '—'}
+              </span>
+            </div>
+            <p className="dashDesc">{card.desc}</p>
+            {card.count != null && card.count > 0 && (
+              <div className="dashActivity">Activity detected</div>
+            )}
+            <div className="dashFooter">Open {card.label}</div>
+          </button>
+        ))}
+      </div>
+
+      <style jsx>{`
+        .dashWrap {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .dashHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .dashHeader h1 {
+          margin: 0 0 4px;
+        }
+        .dashHeader .muted {
+          margin: 0;
+          color: #9ca3af;
+          font-size: 0.95rem;
+        }
+        .miniTag {
+          font-size: 0.8rem;
+          color: #9ca3af;
+        }
+        .dashError {
+          background: rgba(127, 29, 29, 0.9);
+          border: 1px solid #b91c1c;
+          padding: 8px 10px;
+          border-radius: 8px;
+          font-size: 0.9rem;
+        }
+        .dashGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 14px;
+        }
+        .dashCard {
+          border-radius: 14px;
+          border: 1px solid #1f2937;
+          background: radial-gradient(circle at top left, #020617, #020617);
+          padding: 12px 14px 10px;
+          text-align: left;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+          transition:
+            transform 0.12s ease,
+            box-shadow 0.12s ease,
+            border-color 0.12s ease,
+            background 0.12s ease;
+        }
+        .dashCard:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+          border-color: #e0a96d;
+        }
+        .dashCardTop {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          gap: 10px;
+        }
+        .dashLabel {
+          font-weight: 600;
+        }
+        .dashCount {
+          font-weight: 600;
+          font-size: 1.2rem;
+          color: #9ca3af;
+        }
+        .dashCount.hasActivity {
+          color: #f97316;
+        }
+        .dashDesc {
+          margin: 0;
+          font-size: 0.9rem;
+          color: #9ca3af;
+        }
+        .dashActivity {
+          font-size: 0.78rem;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: #f97316;
+        }
+        .dashFooter {
+          margin-top: 6px;
+          font-size: 0.82rem;
+          color: #e0a96d;
+        }
+      `}</style>
+    </section>
+  )
+}
+
+/* ============================================
+   ANCHOR: BUYERS VIEW
+   - Buyers list on left
+   - Detail panel on right
+   - Manual puppy + payment + transport summary
    ============================================ */
 
 function BuyersView() {
@@ -292,13 +566,13 @@ function BuyersView() {
   const [newBuyerPhone, setNewBuyerPhone] = useState('')
   const [savingBuyer, setSavingBuyer] = useState(false)
 
-  // Manual puppy form (for past sales)
+  // Manual puppy form (past sales)
   const [newPuppyName, setNewPuppyName] = useState('')
   const [newPuppyStatus, setNewPuppyStatus] = useState('')
   const [newPuppyPrice, setNewPuppyPrice] = useState('')
   const [savingPuppy, setSavingPuppy] = useState(false)
 
-  // Manual payment form (for past sales)
+  // Manual payment form (past sales)
   const [newPayType, setNewPayType] = useState('')
   const [newPayAmount, setNewPayAmount] = useState('')
   const [newPayDate, setNewPayDate] = useState('')
@@ -307,7 +581,7 @@ function BuyersView() {
   const [newPayPuppyId, setNewPayPuppyId] = useState<string | ''>('')
   const [savingPayment, setSavingPayment] = useState(false)
 
-  // ---------- Load buyers list ----------
+  // Load buyers list
   useEffect(() => {
     ;(async () => {
       setLoadingList(true)
@@ -331,7 +605,7 @@ function BuyersView() {
     })()
   }, [])
 
-  // ---------- Load selected buyer detail ----------
+  // Load selected buyer detail
   useEffect(() => {
     if (!selectedId) {
       setDetail(null)
@@ -346,7 +620,9 @@ function BuyersView() {
         const [buyerRes, puppiesRes, payRes, transRes] = await Promise.all([
           sb
             .from('puppy_buyers')
-            .select('id, full_name, email, phone, address_line1, city, state, postal_code, created_at, notes')
+            .select(
+              'id, full_name, email, phone, address_line1, city, state, postal_code, created_at, notes'
+            )
             .eq('id', selectedId)
             .single(),
           sb
@@ -361,7 +637,9 @@ function BuyersView() {
             .order('payment_date', { ascending: false }),
           sb
             .from('transport_requests')
-            .select('id, trip_date, from_location, to_location, miles, tolls, hotel_cost, fuel_cost')
+            .select(
+              'id, trip_date, from_location, to_location, miles, tolls, hotel_cost, fuel_cost'
+            )
             .eq('buyer_id', selectedId)
             .order('trip_date', { ascending: false }),
         ])
@@ -413,7 +691,7 @@ function BuyersView() {
     })()
   }, [selectedId])
 
-  // ---------- Add Buyer ----------
+  // Add buyer
   async function handleAddBuyer(e: React.FormEvent) {
     e.preventDefault()
     if (!newBuyerName.trim()) return
@@ -445,7 +723,7 @@ function BuyersView() {
     }
   }
 
-  // ---------- Add Puppy manually ----------
+  // Add puppy manually
   async function handleAddPuppy(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedId) return
@@ -484,7 +762,7 @@ function BuyersView() {
               ...prev,
               puppies: [inserted, ...prev.puppies],
             }
-          : prev,
+          : prev
       )
 
       setNewPuppyName('')
@@ -497,7 +775,7 @@ function BuyersView() {
     }
   }
 
-  // ---------- Add Payment manually ----------
+  // Add payment manually
   async function handleAddPayment(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedId) return
@@ -546,7 +824,7 @@ function BuyersView() {
               ...prev,
               payments: [inserted, ...prev.payments],
             }
-          : prev,
+          : prev
       )
 
       setNewPayType('')
@@ -568,15 +846,18 @@ function BuyersView() {
         <div>
           <h1>Buyers</h1>
           <p className="muted">
-            Manage your approved families, their puppies, payment history, and transportation details.
+            Manage your approved families, their puppies, payment history, and
+            transportation details.
           </p>
         </div>
       </header>
 
-      {/* Add Buyer Card */}
+      {/* Add Buyer */}
       <section className="addBuyerCard">
         <h2>Add Buyer</h2>
-        <p className="muted">You can also auto-create buyers later from approved applications.</p>
+        <p className="muted">
+          You can also auto-create buyers later from approved applications.
+        </p>
         <form className="addBuyerForm" onSubmit={handleAddBuyer}>
           <input
             placeholder="Full name"
@@ -604,7 +885,7 @@ function BuyersView() {
       {error && <div className="errorBanner">{error}</div>}
 
       <section className="buyersMain">
-        {/* LEFT: Buyers list */}
+        {/* LEFT LIST */}
         <div className="buyersListCard">
           <div className="buyersListHeader">
             <h3>All Buyers</h3>
@@ -612,7 +893,9 @@ function BuyersView() {
           </div>
           <div className="buyersList">
             {buyers.length === 0 && !loadingList && (
-              <div className="emptyState">No buyers yet. Add your first buyer above.</div>
+              <div className="emptyState">
+                No buyers yet. Add your first buyer above.
+              </div>
             )}
             {buyers.map((b) => (
               <button
@@ -639,11 +922,13 @@ function BuyersView() {
           </div>
         </div>
 
-        {/* RIGHT: Buyer detail */}
+        {/* RIGHT DETAIL */}
         <div className="buyerDetailCard">
           {(!detail || loadingDetail) && (
             <div className="detailPlaceholder">
-              {loadingDetail ? 'Loading buyer details…' : 'Select a buyer from the list.'}
+              {loadingDetail
+                ? 'Loading buyer details…'
+                : 'Select a buyer from the list.'}
             </div>
           )}
 
@@ -653,18 +938,19 @@ function BuyersView() {
                 <div>
                   <h2>{detail.buyer.full_name}</h2>
                   <p className="muted">
-                    {detail.buyer.city && (
+                    {detail.buyer.city ? (
                       <>
                         {detail.buyer.city}
                         {detail.buyer.state ? `, ${detail.buyer.state}` : ''}
                       </>
+                    ) : (
+                      'Buyer details'
                     )}
-                    {!detail.buyer.city && 'Buyer details'}
                   </p>
                 </div>
               </div>
 
-              {/* CONTACT */}
+              {/* Contact */}
               <section className="detailSection">
                 <h3>Contact Information</h3>
                 <div className="detailGrid">
@@ -679,12 +965,18 @@ function BuyersView() {
                   <div>
                     <div className="label">Address</div>
                     <div>
-                      {detail.buyer.address_line1 && <div>{detail.buyer.address_line1}</div>}
-                      {(detail.buyer.city || detail.buyer.state || detail.buyer.postal_code) && (
+                      {detail.buyer.address_line1 && (
+                        <div>{detail.buyer.address_line1}</div>
+                      )}
+                      {(detail.buyer.city ||
+                        detail.buyer.state ||
+                        detail.buyer.postal_code) && (
                         <div>
                           {detail.buyer.city}
                           {detail.buyer.state ? `, ${detail.buyer.state}` : ''}
-                          {detail.buyer.postal_code ? ` ${detail.buyer.postal_code}` : ''}
+                          {detail.buyer.postal_code
+                            ? ` ${detail.buyer.postal_code}`
+                            : ''}
                         </div>
                       )}
                     </div>
@@ -692,10 +984,12 @@ function BuyersView() {
                 </div>
               </section>
 
-              {/* PUPPIES */}
+              {/* Puppies */}
               <section className="detailSection">
                 <h3>Puppies</h3>
-                {detail.puppies.length === 0 && <div className="emptyLine">No puppies assigned yet.</div>}
+                {detail.puppies.length === 0 && (
+                  <div className="emptyLine">No puppies assigned yet.</div>
+                )}
                 {detail.puppies.length > 0 && (
                   <div className="table">
                     <div className="tableHead">
@@ -706,16 +1000,20 @@ function BuyersView() {
                     </div>
                     {detail.puppies.map((p) => (
                       <div key={p.id} className="tableRow">
-                        <span className="clickableName">{p.name || 'Unnamed'}</span>
+                        <span className="clickableName">
+                          {p.name || 'Unnamed'}
+                        </span>
                         <span>{p.status || '—'}</span>
                         <span>{p.dam_name || '—'}</span>
-                        <span>{p.price != null ? `$${p.price.toFixed(2)}` : '—'}</span>
+                        <span>
+                          {p.price != null ? `$${p.price.toFixed(2)}` : '—'}
+                        </span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Manual Add Puppy Form */}
+                {/* Manual puppy form */}
                 <div className="miniForm">
                   <div className="miniFormTitle">Add Puppy (manual)</div>
                   <form className="miniFormRow" onSubmit={handleAddPuppy}>
@@ -749,10 +1047,12 @@ function BuyersView() {
                 </div>
               </section>
 
-              {/* PAYMENTS */}
+              {/* Payments */}
               <section className="detailSection">
                 <h3>Payments</h3>
-                {detail.payments.length === 0 && <div className="emptyLine">No payments recorded.</div>}
+                {detail.payments.length === 0 && (
+                  <div className="emptyLine">No payments recorded.</div>
+                )}
                 {detail.payments.length > 0 && (
                   <div className="table payments">
                     <div className="tableHead">
@@ -764,10 +1064,18 @@ function BuyersView() {
                     </div>
                     {detail.payments.map((p) => (
                       <div key={p.id} className="tableRow">
-                        <span>{p.payment_date ? p.payment_date.slice(0, 10) : '—'}</span>
+                        <span>
+                          {p.payment_date
+                            ? p.payment_date.slice(0, 10)
+                            : '—'}
+                        </span>
                         <span>{p.type || '—'}</span>
                         <span>{p.puppy_name || '—'}</span>
-                        <span>{p.amount != null ? `$${p.amount.toFixed(2)}` : '—'}</span>
+                        <span>
+                          {p.amount != null
+                            ? `$${p.amount.toFixed(2)}`
+                            : '—'}
+                        </span>
                         <span>
                           {p.method || '—'}
                           {p.notes ? ` — ${p.notes}` : ''}
@@ -777,11 +1085,14 @@ function BuyersView() {
                   </div>
                 )}
 
-                {/* Manual Add Payment Form */}
+                {/* Manual payment form */}
                 <div className="miniForm">
                   <div className="miniFormTitle">Add Payment (manual)</div>
                   <form className="miniFormRow" onSubmit={handleAddPayment}>
-                    <select value={newPayType} onChange={(e) => setNewPayType(e.target.value)}>
+                    <select
+                      value={newPayType}
+                      onChange={(e) => setNewPayType(e.target.value)}
+                    >
                       <option value="">Type</option>
                       <option value="deposit">Deposit</option>
                       <option value="payment">Payment</option>
@@ -828,10 +1139,12 @@ function BuyersView() {
                 </div>
               </section>
 
-              {/* TRANSPORT */}
+              {/* Transportation */}
               <section className="detailSection">
                 <h3>Transportation</h3>
-                {detail.transports.length === 0 && <div className="emptyLine">No trips recorded.</div>}
+                {detail.transports.length === 0 && (
+                  <div className="emptyLine">No trips recorded.</div>
+                )}
                 {detail.transports.length > 0 && (
                   <div className="table">
                     <div className="tableHead">
@@ -842,11 +1155,15 @@ function BuyersView() {
                     </div>
                     {detail.transports.map((t) => (
                       <div key={t.id} className="tableRow">
-                        <span>{t.trip_date ? t.trip_date.slice(0, 10) : '—'}</span>
+                        <span>
+                          {t.trip_date ? t.trip_date.slice(0, 10) : '—'}
+                        </span>
                         <span>
                           {t.from_location || '—'} → {t.to_location || '—'}
                         </span>
-                        <span>{t.miles != null ? t.miles.toFixed(1) : '—'}</span>
+                        <span>
+                          {t.miles != null ? t.miles.toFixed(1) : '—'}
+                        </span>
                         <span>
                           {[
                             t.tolls || 0,
@@ -871,23 +1188,29 @@ function BuyersView() {
       </section>
 
       <style jsx>{`
+        :root {
+          --brand: #e0a96d;
+          --brandAlt: #c47a35;
+        }
         .buyersWrapper {
           display: flex;
           flex-direction: column;
           gap: 16px;
           height: 100%;
         }
-
         .buyersHeader h1 {
           margin: 0 0 4px;
         }
         .buyersHeader .muted {
           margin: 0;
-          color: var(--muted);
+          color: #9ca3af;
         }
-
         .addBuyerCard {
-          background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 1));
+          background: radial-gradient(
+            circle at top left,
+            rgba(15, 23, 42, 0.9),
+            rgba(15, 23, 42, 1)
+          );
           border-radius: 14px;
           padding: 14px 16px;
           border: 1px solid #1f2937;
@@ -930,7 +1253,6 @@ function BuyersView() {
           opacity: 0.7;
           cursor: default;
         }
-
         .errorBanner {
           background: rgba(127, 29, 29, 0.9);
           border: 1px solid #b91c1c;
@@ -938,7 +1260,6 @@ function BuyersView() {
           border-radius: 8px;
           font-size: 0.9rem;
         }
-
         .buyersMain {
           display: grid;
           grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
@@ -946,7 +1267,6 @@ function BuyersView() {
           flex: 1;
           min-height: 0;
         }
-
         .buyersListCard,
         .buyerDetailCard {
           background: rgba(15, 23, 42, 0.96);
@@ -955,7 +1275,6 @@ function BuyersView() {
           padding: 12px 12px 10px;
           box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
         }
-
         .buyersListHeader {
           display: flex;
           align-items: center;
@@ -968,9 +1287,8 @@ function BuyersView() {
         }
         .miniTag {
           font-size: 0.8rem;
-          color: var(--muted);
+          color: #9ca3af;
         }
-
         .buyersList {
           max-height: 420px;
           overflow: auto;
@@ -978,7 +1296,6 @@ function BuyersView() {
           flex-direction: column;
           gap: 6px;
         }
-
         .buyerRow {
           width: 100%;
           text-align: left;
@@ -1003,7 +1320,6 @@ function BuyersView() {
           border-color: var(--brand);
           box-shadow: 0 0 0 1px rgba(224, 169, 109, 0.4);
         }
-
         .buyerRowTop {
           display: flex;
           justify-content: space-between;
@@ -1016,7 +1332,7 @@ function BuyersView() {
         }
         .buyerLocation {
           font-size: 0.8rem;
-          color: var(--muted);
+          color: #9ca3af;
         }
         .buyerRowBottom {
           display: flex;
@@ -1030,7 +1346,6 @@ function BuyersView() {
           background: #111827;
           color: #e5e7eb;
         }
-
         .buyerDetailCard {
           display: flex;
           flex-direction: column;
@@ -1039,16 +1354,15 @@ function BuyersView() {
         }
         .detailPlaceholder {
           margin: auto;
-          color: var(--muted);
+          color: #9ca3af;
         }
         .buyerDetailHeader h2 {
           margin: 0 0 2px;
         }
         .buyerDetailHeader .muted {
           margin: 0;
-          color: var(--muted);
+          color: #9ca3af;
         }
-
         .detailSection {
           margin-top: 8px;
         }
@@ -1066,16 +1380,14 @@ function BuyersView() {
           font-size: 0.78rem;
           text-transform: uppercase;
           letter-spacing: 0.04em;
-          color: var(--muted);
+          color: #9ca3af;
           margin-bottom: 2px;
         }
-
         .emptyState,
         .emptyLine {
           font-size: 0.9rem;
-          color: var(--muted);
+          color: #9ca3af;
         }
-
         .table {
           border-radius: 10px;
           border: 1px solid #111827;
@@ -1101,17 +1413,14 @@ function BuyersView() {
         .tableRow:nth-child(even) {
           background: #02061a;
         }
-
         .table.payments .tableHead,
         .table.payments .tableRow {
           grid-template-columns: 1.1fr 0.9fr 1.1fr 0.8fr 1.6fr;
         }
-
         .clickableName {
           text-decoration: underline;
           cursor: pointer;
         }
-
         .miniForm {
           margin-top: 10px;
           padding-top: 8px;
@@ -1121,7 +1430,7 @@ function BuyersView() {
           font-size: 0.8rem;
           text-transform: uppercase;
           letter-spacing: 0.05em;
-          color: var(--muted);
+          color: #9ca3af;
           margin-bottom: 4px;
         }
         .miniFormRow {
@@ -1158,7 +1467,6 @@ function BuyersView() {
           opacity: 0.7;
           cursor: default;
         }
-
         @media (max-width: 900px) {
           .buyersMain {
             grid-template-columns: 1fr;
