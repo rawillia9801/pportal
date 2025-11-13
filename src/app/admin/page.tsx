@@ -6,10 +6,10 @@
    - 2025-11-12: Buyers tab (list + detail panel)
    - 2025-11-12: Supabase wiring for buyers, puppies,
                  payments, transport_requests
-   - 2025-11-12 (Rev C): Force left sidebar layout via grid.
-                         Add manual "Add Puppy" + "Add Payment"
-                         forms for past sales and expand payment
-                         details (method + notes).
+   - 2025-11-12 (Rev D): Fix duplicate key in ADMIN_TABS.
+                         Sidebar locked to left via CSS grid.
+                         Manual Add Puppy + Add Payment for
+                         past sales, richer payment details.
    ============================================ */
 
 import React, { useEffect, useState } from 'react'
@@ -19,7 +19,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
    ANCHOR: SUPABASE_HELPERS
    ============================================ */
 
-type AnyClient = SupabaseClient
+type AnyClient = SupabaseClient<any, 'public', any>
 let __sb: AnyClient | null = null
 
 function getSupabaseEnv() {
@@ -61,7 +61,7 @@ type AdminTabKey =
 type AdminTab = { key: AdminTabKey; label: string }
 
 const ADMIN_TABS: AdminTab[] = [
-  { key: 'puppies', key: 'puppies', label: 'Puppies' },
+  { key: 'puppies', label: 'Puppies' },
   { key: 'upcoming_litters', label: 'Upcoming Litters' },
   { key: 'applications', label: 'Applications' },
   { key: 'payments', label: 'Payments' },
