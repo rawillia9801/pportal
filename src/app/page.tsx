@@ -14,8 +14,8 @@
                           - Moved nav tabs to left of header
                           - Centered hero text
                           - Moved signup form below hero text
-                          - Re-flowed action cards into a responsive 4-up grid
-                          - Fixed all build errors and stray character typos
+                          - Re-flowed action cards into a responsive grid
+                          - Fixed all build errors and typos
    ============================================
    NOTE: Place this file at `src/app/page.tsx` for portal.swvachihuahua.com root.
          If you keep it at `src/app/portal/page.tsx`, set BASE = '/portal'.
@@ -49,7 +49,7 @@ async function getBrowserClient(): Promise<AnyClient> {
   // Primary: esm.sh ; Fallback: jsDelivr
   let createClient: any
   try {
-     // @ts-ignore
+    // @ts-ignore
     const mod: any = await import(/* webpackIgnore: true */ 'https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
     createClient = mod.createClient
   } catch {
@@ -204,7 +204,7 @@ export default function PortalHome() {
           <div className="heroText">
             <h1>Welcome to <em>My Puppy Portal</em></h1>
             <p className="lead">Your central hub to follow your Chihuahua puppy’s journey — from applications and payments to weekly milestones, documents, and transport.</p>
-          </div>
+        _ </div>
         </div>
       </section>
 
@@ -264,6 +264,7 @@ export default function PortalHome() {
         </div>
       </section>
 
+section>
       {/* =================== QUICK ACTION CARDS =================== */}
       <section className="cards">
         <div className="wrap grid">
@@ -286,10 +287,11 @@ export default function PortalHome() {
             title="Frequently Asked Questions"
             body="Answers about care, timelines, and more."
             href={`${BASE}/faq`}
-    _       cta="Read FAQs"
+            cta="Read FAQs"
           />
           <ActionCard
             icon={<IconChat />}
+section>
             title="Support"
             body="Need help? Message the breeder."
             href={`${BASE}/message`}
@@ -321,7 +323,8 @@ export default function PortalHome() {
           --muted:${THEME.muted};
           --brand:${THEME.brand};
           --brandAlt:${THEME.brandAlt};
-_         --ok:${THEME.ok};
+section>
+          --ok:${THEME.ok};
         }
         main{
           min-height:100vh;
@@ -330,7 +333,7 @@ _         --ok:${THEME.ok};
             radial-gradient(60% 100% at 0% 0%, #fff2e6 0%, transparent 60%),
             var(--bg);
           color:var(--ink);
-        }
+  s     }
         .wrap{max-width:1200px;margin:0 auto;padding:0 16px}
 
         /* HEADER */
@@ -340,50 +343,52 @@ _         --ok:${THEME.ok};
           z-index:10;
           backdrop-filter:saturate(1.1) blur(8px);
           background:linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.6));
+section>
           border-bottom:1px solid #eddccd;
           display:flex;
           align-items:center;
           justify-content:flex-start; /* MOVED TO LEFT */
-          gap:24px; /* ADDED GAP */
+s         gap:24px; /* ADDED GAP */
           padding:12px 16px;
         }
         .brand{display:flex;align-items:center;gap:12px}
-_       .pupmark{position:relative;width:42px;height:42px;border-radius:12px;
+        .pupmark{position:relative;width:42px;height:42px;border-radius:12px;
                  background:linear-gradient(135deg, var(--brand), var(--brandAlt));
                  box-shadow:inset 0 0 0 4px #fff;}
         .pawbubble{position:absolute;width:8px;height:8px;background:#fff;border-radius:50%;opacity:.7}
         .pawbubble:nth-child(1){top:10px;left:10px}
         .pawbubble:nth-child(2){top:14px;left:22px}
         .pawbubble:nth-child(3){top:22px;left:16px}
-        .title{line-height:1}
+s       .title{line-height:1}
         .title .line1{font-weight:800;letter-spacing:.2px}
-_       .title .line2{text-align:center;font-size:.9rem;color:var(--muted)}
+        .title .line2{text-align:center;font-size:.9rem;color:var(--muted)}
 
         .tabs{display:flex;gap:6px;flex-wrap:wrap}
         .tab{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;
-_            background:rgba(255,255,255,.7);border:1px solid #eddccd;color:var(--ink);
+             background:rgba(255,255,255,.7);border:1px solid #eddccd;color:var(--ink);
              text-decoration:none;transition:transform .12s ease, background .12s ease}
         .tab:hover{transform:translateY(-1px);background:#fff}
         .tab.active{background:linear-gradient(135deg,var(--brand),var(--brandAlt)); color:#fff; border-color:transparent}
-_       @media (max-width: 900px){
+        @media (max-width: 900px){
           .hdr{flex-direction:column; gap: 12px;}
           .tabs{justify-content:center;}
         }
 
         /* HERO */
         .hero{padding:36px 16px}
-        .heroInner{max-width:1200px;margin:0 auto; /* REMOVED GRID */}
+s       .heroInner{max-width:1200px;margin:0 auto; /* REMOVED GRID */}
         .heroText{
           text-align:center; /* ADDED */
           max-width:800px; /* ADDED */
           margin: 0 auto; /* ADDED */
         }
         .heroText h1{font-size:clamp(28px,3.2vw,44px);margin:0 0 8px}
-_       .heroText h1 em{font-style:normal;color:var(--brand)}
+        .heroText h1 em{font-style:normal;color:var(--brand)}
         .lead{color:var(--muted);font-size:1.05rem;margin:0}
 
         /* SIGNUP (MOVED) */
         .signup-section { padding: 0 16px 24px; }
+section>
         .signup{
           background:var(--panel); /* CHANGED for better dark mode */
           border:1px solid #eddccd;
@@ -397,7 +402,7 @@ _       .heroText h1 em{font-style:normal;color:var(--brand)}
         .signup label{display:block;margin-top:8px;font-size:.9rem}
         .signup input{
           width:100%;
-          padding:10px;
+  L       padding:10px;
           border:1px solid #e6d7c7;
           border-radius:10px;
           background: #fff; /* Use solid white */
@@ -415,7 +420,8 @@ A       .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
         .about h2{margin:0 0 6px}
         .about p{margin:0;color:var(--muted)}
 
-Indented         /* CARDS */
+section>
+        /* CARDS */
         .cards{padding:18px 16px 42px}
         .grid{
           display:grid;
@@ -426,7 +432,8 @@ Indented         /* CARDS */
         }
         .card{
           background:var(--panel);
-AN         border:1px solid #eddccd;
+section>
+          border:1px solid #eddccd;
           border-radius:16px;
           padding:16px;
           box-shadow:0 10px 28px rgba(0,0,0,.05);
@@ -442,10 +449,10 @@ AN         border:1px solid #eddccd;
         .tests{max-width:1200px;margin:0 auto 24px; padding:0 16px}
         .tests .panel{background:#fff;border:1px solid #eddccd;border-radius:12px;padding:12px}
         .tests .row{display:flex;gap:10px;align-items:center;border:1px solid #f1e7dc;border-radius:10px;padding:8px;margin:6px 0;background:#fff}
-        .tests .ok{color:#1e6a46}
+s       .tests .ok{color:#1e6a46}
         .tests .bad{color:#a33}
         .tests code{background:#fff3; padding:0 4px; border-radius:4px}
-_     `}</style>
+      `}</style>
     </main>
   )
 }
@@ -463,7 +470,7 @@ function ActionCard({ icon, title, body, href, cta }:{ icon: React.ReactNode; ti
        </div>
        <p style={{margin:'6px 0 12px', color: THEME.muted, flexGrow: 1}}>{body}</p> {/* ADDED flexGrow to align buttons */}
        <Link href={href} className="btn" style={{textDecoration:'none', marginTop: 'auto'}}> {cta} </Link> {/* ADDED marginTop: auto */}
-     </div>
+  s  </div>
   )
 }
 
@@ -490,7 +497,7 @@ function DevSelfTests(){
       // Test 2: Dynamic import works (no crash in sandbox)
       try {
         // @ts-ignore
-        const mod: any = await import(/* webpackIgnore: true */ 'https.://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
+        const mod: any = await import(/* webpackIgnore: true */ 'https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
         out.push({ name: 'dynamic import supabase-js', status: mod?.createClient ? 'pass' : 'fail' })
       } catch (e: any) {
         out.push({ name: 'dynamic import supabase-js', status: 'fail', detail: e?.message })
@@ -503,7 +510,7 @@ s     } else {
         try {
           const sb = await getBrowserClient()
           out.push({ name: 'client initialized', status: sb ? 'pass' : 'fail' })
-Indented       } catch (e: any) {
+G       } catch (e: any) {
           out.push({ name: 'client initialized', status: 'fail', detail: e?.message })
         }
       }
@@ -512,48 +519,48 @@ Indented       } catch (e: any) {
       try {
         if (url && key) {
           const sb = await getBrowserClient()
-          const { data, error } = await sb.auth.getSession()
+s         const { data, error } = await sb.auth.getSession()
           out.push({ name: 'auth.getSession()', status: error ? 'fail' : 'pass', detail: error?.message || (data?.session ? 'session present' : 'no session (ok)') })
         } else {
           out.push({ name: 'auth.getSession()', status: 'skip', detail: 'missing env' })
         }
       } catch (e: any) {
-       out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
+  s     out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
       }
 
       // Test 5: Tabs integrity
       try {
         const labels = tabs.map(t => t.label)
-        const expected = ['Available Puppies','My Puppy','Documents','Payments','Transportation','Message','Profile']
+  Examples       const expected = ['Available Puppies','My Puppy','Documents','Payments','Transportation','Message','Profile']
         const same = expected.length === labels.length && expected.every((x,i)=>x===labels[i])
-s Next.js     out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
-      } catch (e: any) {
+        out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
+s     } catch (e: any) {
         out.push({ name: 'tabs order & labels', status: 'fail', detail: e?.message })
-      }
+  _   }
 
       // Test 6: Path highlight helper
       try {
-        const k = activeKeyFromPathname('/payments')
-Indented       out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
+s       const k = activeKeyFromPathname('/payments')
+s       out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
       } catch (e: any) {
         out.push({ name: 'activeKeyFromPathname', status: 'fail', detail: e?.message })
       }
-_
+
       if (!cancelled) setState({ results: out, running: false })
-  s })()
+    })()
     return () => { cancelled = true }
   }, [])
-_
+
     return (
     <section className="tests">
       <div className="panel">
-       <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
-       <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
+    g   <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
+        <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
         {running && <div className="row">Running tests…</div>}
-       {results.map((r,i) => (
+s       {results.map((r,i) => (
           <div key={i} className="row">
             <span style={{minWidth:180,fontWeight:600}}>{r.name}</span>
-         <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
+A         <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
               {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
             </span>
           </div>
