@@ -16,6 +16,7 @@
                           - Moved signup form below hero text
                           - Re-flowed action cards into a responsive 4-up grid
                           - Fixed final @ts-ignore build error in DevSelfTests
+                          - (2025-11-12) Fixed typos in style block
    ============================================
    NOTE: Place this file at `src/app/page.tsx` for portal.swvachihuahua.com root.
          If you keep it at `src/app/portal/page.tsx`, set BASE = '/portal'.
@@ -194,7 +195,7 @@ export default function PortalHome() {
             <Link key={key} href={href} className={`tab ${activeKey===key ? 'active' : ''}`}>
               <Icon />
               <span>{label}</span>
-            </Link>
+        _   </Link>
           ))}
         </nav>
       </header>
@@ -232,15 +233,15 @@ export default function PortalHome() {
             autoComplete="email"
             required
           />
-            <label>Password</label>
-            <input
-              type="password"
-              value={s.pass}
-              onChange={e=>setS(v=>({ ...v, pass: e.target.value }))}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              required
-            />
+          <label>Password</label>
+          <input
+            type="password"
+            value={s.pass}
+            onChange={e=>setS(v=>({ ...v, pass: e.target.value }))}
+            placeholder="••••••••"
+            autoComplete="new-password"
+        _   required
+          />
           <button className="btn primary" type="submit" disabled={s.busy}>{s.busy ? 'Creating…' : 'Sign Up'}</button>
           {s.msg && <div className="note">{s.msg}</div>}
           <div className="mini">Already have an account? <Link href={`${BASE}/login`}>Sign in</Link></div>
@@ -249,7 +250,7 @@ export default function PortalHome() {
           {(!getSupabaseEnv().url || !getSupabaseEnv().key) && (
             <div className="note" style={{marginTop:8}}>
               <b>Setup required:</b> Define <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in your environment (or attach to <code>window</code> for local sandboxing).
-            </div>
+              </div>
           )}
         </form>
       </section>
@@ -274,7 +275,7 @@ export default function PortalHome() {
             body="Start or review your application."
             href={`${BASE}/application`}
             cta="Open Application"
-          />
+    D      />
           <ActionCard
             icon={<IconCard />}
             title="Financing Options"
@@ -288,7 +289,7 @@ export default function PortalHome() {
             body="Answers about care, timelines, and more."
             href={`${BASE}/faq`}
             cta="Read FAQs"
-          />
+        _ />
           <ActionCard
             icon={<IconChat />}
             title="Support"
@@ -305,7 +306,7 @@ export default function PortalHome() {
       <footer className="ft">
         <div className="wrap">
           <div className="ftInner">
-            <span className="mini">© {new Date().getFullYear()} Southwest Virginia Chihuahua</span>
+A           <span className="mini">© {new Date().getFullYear()} Southwest Virginia Chihuahua</span>
             <span className="mini">Friendly • Welcoming • High-Tech</span>
           </div>
         </div>
@@ -331,7 +332,7 @@ export default function PortalHome() {
             radial-gradient(60% 100% at 0% 0%, #fff2e6 0%, transparent 60%),
             var(--bg);
           color:var(--ink);
-  m       }
+  s       }
         .wrap{max-width:1200px;margin:0 auto;padding:0 16px}
 
         /* HEADER */
@@ -353,7 +354,7 @@ export default function PortalHome() {
                  background:linear-gradient(135deg, var(--brand), var(--brandAlt));
                  box-shadow:inset 0 0 0 4px #fff;}
         .pawbubble{position:absolute;width:8px;height:8px;background:#fff;border-radius:50%;opacity:.7}
-        .pawbubble:nth-child(1){top:10px;left:10px}
+T       .pawbubble:nth-child(1){top:10px;left:10px}
         .pawbubble:nth-child(2){top:14px;left:22px}
         .pawbubble:nth-child(3){top:22px;left:16px}
         .title{line-height:1}
@@ -383,7 +384,7 @@ export default function PortalHome() {
         .heroText h1 em{font-style:normal;color:var(--brand)}
         .lead{color:var(--muted);font-size:1.05rem;margin:0}
 
-        /* SIGNUP (MOVED) */
+  t     /* SIGNUP (MOVED) */
         .signup-section { padding: 0 16px 24px; }
         .signup{
           background:var(--panel); /* CHANGED for better dark mode */
@@ -391,11 +392,11 @@ export default function PortalHome() {
           border-radius:16px;
           padding:16px;
           box-shadow:0 6px 28px rgba(0,0,0,.06);
-          max-width: 450px; /* ADDED */
+s         max-width: 450px; /* ADDED */
           margin: 0 auto; /* ADDED */
         }
         .signupHd{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;color:var(--brand)}
-        .signup label{display:block;margin-top:8px;font-size:.9rem}
+s       .signup label{display:block;margin-top:8px;font-size:.9rem}
         .signup input{
           width:100%;
           padding:10px;
@@ -408,7 +409,7 @@ export default function PortalHome() {
         .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer}
         .btn.primary{margin-top:12px;background:linear-gradient(135deg,var(--brand),var(--brandAlt));border-color:transparent;color:#fff}
         .note{margin-top:8px;background:#fff;border:1px dashed #e6d7c7;padding:8px;border-radius:8px;color:var(--muted)}
-        .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
+A       .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
 
         /* ABOUT */
         .about{padding:8px 16px 0; text-align:center;}
@@ -428,7 +429,7 @@ export default function PortalHome() {
         .card{
           background:var(--panel);
           border:1px solid #eddccd;
-          border-radius:16px;
+s         border-radius:16px;
           padding:16px;
           box-shadow:0 10px 28px rgba(0,0,0,.05);
           display: flex; /* ADDED for better alignment */
@@ -436,14 +437,14 @@ export default function PortalHome() {
         }
         /* REMOVED .span6 and .card{grid-column} */
 
-        .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);backdrop-filter:blur(6px)}
+D       .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);backdrop-filter:blur(6px)}
         .ft .ftInner{max-width:1200px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;justify-content:space-between;color:var(--muted)}
 
         /* DEV SELF-TESTS */
         .tests{max-width:1200px;margin:0 auto 24px; padding:0 16px}
         .tests .panel{background:#fff;border:1px solid #eddccd;border-radius:12px;padding:12px}
         .tests .row{display:flex;gap:10px;align-items:center;border:1px solid #f1e7dc;border-radius:10px;padding:8px;margin:6px 0;background:#fff}
-A       .tests .ok{color:#1e6a46}
+        .tests .ok{color:#1e6a46}
         .tests .bad{color:#a33}
         .tests code{background:#fff3; padding:0 4px; border-radius:4px}
       `}</style>
@@ -455,7 +456,7 @@ A       .tests .ok{color:#1e6a46}
    ANCHOR: REUSABLE CARD
    ============================================ */
 function ActionCard({ icon, title, body, href, cta }:{ icon: React.ReactNode; title: string; body: string; href: string; cta: string }){
-  return (
+s   return (
     // REMOVED span6 class
     <div className="card">
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
@@ -490,7 +491,7 @@ function DevSelfTests(){
 
       // Test 2: Dynamic import works (no crash in sandbox)
       try {
-        // @ts-ignore <-- ADDED THIS FIX
+        // @ts-ignore
         const mod: any = await import(/* webpackIgnore: true */ 'https://esm.sh/@supabase/supabase-js@2?bundle&target=es2022')
         out.push({ name: 'dynamic import supabase-js', status: mod?.createClient ? 'pass' : 'fail' })
       } catch (e: any) {
@@ -527,7 +528,7 @@ function DevSelfTests(){
         const labels = tabs.map(t => t.label)
         const expected = ['Available Puppies','My Puppy','Documents','Payments','Transportation','Message','Profile']
         const same = expected.length === labels.length && expected.every((x,i)=>x===labels[i])
-        out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
+s       out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
       } catch (e: any) {
         out.push({ name: 'tabs order & labels', status: 'fail', detail: e?.message })
       }
@@ -535,7 +536,7 @@ function DevSelfTests(){
       // Test 6: Path highlight helper
       try {
         const k = activeKeyFromPathname('/payments')
-        out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
+    A   out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
       } catch (e: any) {
         out.push({ name: 'activeKeyFromPathname', status: 'fail', detail: e?.message })
       }
@@ -555,11 +556,11 @@ function DevSelfTests(){
           <div key={i} className="row">
             <span style={{minWidth:180,fontWeight:600}}>{r.name}</span>
             <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
-          _     {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
+              {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
             </span>
           </div>
         ))}
       </div>
     </section>
-  )
+G )
 }
