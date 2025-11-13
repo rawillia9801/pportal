@@ -1,1708 +1,898 @@
-'use client';
+'use client'
 
 /* ============================================
    CHANGELOG
-   - 2025-11-11: Full Admin Dashboard (tabs + admin gate)
-   - 2025-11-11: Fix: newline-safe Recent Activity via NL constant
-   - 2025-11-11: Add Puppy uses Sire/Dam dropdowns from dogs table
-   - 2025-11-11: Buyers tab: Add + Edit + Delete (full CRUD)
-   - 2025-11-11: Applications: Review/Approve drawer with puppy assignment
-   - 2025-11-12: Fix Approve Drawer z-index & scrim order; prevent accidental dismiss
-   - 2025-11-12: Fix onAddPuppy duplicate inserts/extra braces
-   - 2025-11-12: Buyers: click Name to edit; show payments (multi-line) + total
-   - 2025-11-12: Buyers: Multi-Puppy purchases with per-puppy deposit (buyer_puppies)
-   - 2025-11-12: Care/Transport per puppy (vaccinations, deworming, transport costs)
-   - 2025-11-12: New 'Breeding Program' tab with Dam/Sire yearly metrics + sales
+   - 2025-11-12: Admin Dashboard shell with left tabs
+   - 2025-11-12: Buyers tab (list + detail panel)
+   - 2025-11-12: Supabase wiring for buyers, puppies,
+                 payments, transport_requests
+   ============================================
+   ANCHOR: ADMIN_DASHBOARD
+   Suggested route: src/app/admin/page.tsx
    ============================================ */
-import React, { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { getBrowserClient } from '@/lib/supabase/client';
 
-/* ========== Types ========== */
-type Puppy = {
-  id: string;
-  name: string | null;
-  price: number | null;
-  status: 'Available' | 'Reserved' | 'Sold' | null;
-  gender: 'Male' | 'Female' | null;
-  registry: 'AKC' | 'CKC' | 'ACA' | null;
-  dob: string | null;
-  ready_date: string | null;
-  photos: any[] | null;
-  sire_id: string | null;
-  dam_id: string | null;
-  litter_id?: string | null;
-  application_id?: string | null;
-  created_at?: string | null;
-};
-type Dog = { id: string; name: string; sex: 'Male' | 'Female'; active?: boolean | null };
+import React, { useEffect, useState } from 'react'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-type Application = {
-  id: string;
-  user_id?: string | null;
-  buyer_name: string | null;
-  email: string | null;
-  phone: string | null;
-  status: 'submitted' | 'approved' | 'denied' | null;
-  submitted_at: string | null;
-};
-type Buyer = {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  phone: string | null;
-  is_repeat: boolean | null;
-  multiple_puppies?: boolean | null;
-  created_at: string | null;
-};
-type BuyerPuppy = {
-  id: string;
-  buyer_id: string;
-  puppy_id: string;
-  deposit_amount: number | null;
-  deposit_date: string | null; // date
-  created_at?: string | null;
-  puppy?: Puppy;
-};
-type Payment = {
-  id: string;
-  buyer_id: string | null;
-  puppy_id: string | null;
-  amount: number | null;
-  method: string | null;
-  note: string | null;
-  paid_at: string | null;
-};
-type MessageRow = {
-  id: string;
-  buyer_id: string | null;
-  puppy_id: string | null;
-  sender: string | null; // 'admin' | 'buyer'
-  body: string | null;
-  created_at: string | null;
-};
-type DocRow = {
-  id: string;
-  application_id?: string | null;
-  buyer_id?: string | null;
-  puppy_id?: string | null;
-  label?: string | null;
-  file_key: string | null;
-  uploaded_at?: string | null;
-};
-type Transport = {
-  id: string;
-  buyer_id: string | null;
-  puppy_id: string | null;
-  method: string | null; // Pickup | Ground Delivery | Flight Nanny
-  city: string | null;
-  state: string | null;
-  date: string | null; // YYYY-MM-DD
-  miles?: number | null;
-  gas_cost?: number | null;
-  tolls_cost?: number | null;
-  hotel_cost?: number | null;
-  other_cost?: number | null;
-  note: string | null;
-  created_at: string | null;
-};
-type Vaccination = {
-  id: string;
-  puppy_id: string;
-  date: string | null;
-  vaccine: string | null;
-  lot?: string | null;
-  notes?: string | null;
-  created_at?: string | null;
-};
-type Deworming = {
-  id: string;
-  puppy_id: string;
-  date: string | null;
-  product: string | null;
-  dose?: string | null;
-  notes?: string | null;
-  created_at?: string | null;
-};
-type Litter = {
-  id: string;
-  code: string | null;
-  dam_id?: string | null;
-  sire_id?: string | null;
-  whelp_date?: string | null;
-  notes?: string | null;
-};
+/* ============================================
+   ANCHOR: SUPABASE_HELPERS
+   ============================================ */
 
-const ADMIN_EMAIL = 'rawillia9809@gmail.com';
-const NL = String.fromCharCode(10);
+type AnyClient = SupabaseClient
+let __sb: AnyClient | null = null
 
-type TabKey =
-  | 'overview' | 'puppies' | 'litters' | 'applications' | 'buyers'
-  | 'payments' | 'messages' | 'documents' | 'transport' | 'reports' | 'breeding' | 'settings';
+function getSupabaseEnv() {
+  const g: any = (typeof window !== 'undefined' ? window : globalThis) as any
+  const hasProc = typeof process !== 'undefined' && (process as any) && (process as any).env
+  const url = hasProc
+    ? (process as any).env.NEXT_PUBLIC_SUPABASE_URL
+    : (g.NEXT_PUBLIC_SUPABASE_URL || g.__ENV?.NEXT_PUBLIC_SUPABASE_URL || '')
+  const key = hasProc
+    ? (process as any).env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    : (g.NEXT_PUBLIC_SUPABASE_ANON_KEY || g.__ENV?.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
+  return { url: String(url || ''), key: String(key || '') }
+}
 
-/* ========== Page ========== */
-export default function AdminDashboardPage() {
-  const r = useRouter();
-  const supabase = getBrowserClient();
+async function getBrowserClient(): Promise<AnyClient> {
+  if (__sb) return __sb
+  const { url, key } = getSupabaseEnv()
+  if (!url || !key)
+    throw new Error('Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  __sb = createClient(url, key)
+  return __sb
+}
 
-  // Gate
-  const [me, setMe] = useState<string | null>(null);
-  const [blocked, setBlocked] = useState(false);
-  const [loadingGate, setLoadingGate] = useState(true);
+/* ============================================
+   ANCHOR: TYPES
+   ============================================ */
 
-  // Tabs
-  const [tab, setTab] = useState<TabKey>('overview');
+type AdminTabKey =
+  | 'puppies'
+  | 'upcoming_litters'
+  | 'applications'
+  | 'payments'
+  | 'messages'
+  | 'transport'
+  | 'breeding'
+  | 'buyers'
 
-  // Overview
-  const [kpiPuppies, setKpiPuppies] = useState<number | string>('—');
-  const [kpiApps, setKpiApps] = useState<number | string>('—');
-  const [kpiPayments, setKpiPayments] = useState<string>('—');
-  const [recentActivity, setRecentActivity] = useState<string>('Loading…');
+type AdminTab = { key: AdminTabKey; label: string }
 
-  // Puppies
-  const [puppies, setPuppies] = useState<Puppy[]>([]);
-  const [puppyMsg, setPuppyMsg] = useState<string>('');
-  const puppySearchRef = useRef<HTMLInputElement>(null);
+const ADMIN_TABS: AdminTab[] = [
+  { key: 'puppies', label: 'Puppies' },
+  { key: 'upcoming_litters', label: 'Upcoming Litters' },
+  { key: 'applications', label: 'Applications' },
+  { key: 'payments', label: 'Payments' },
+  { key: 'messages', label: 'Messages' },
+  { key: 'transport', label: 'Transportation Request' },
+  { key: 'breeding', label: 'Breeding Program' },
+  { key: 'buyers', label: 'Buyers' },
+]
 
-  // Dogs
-  const [dogs, setDogs] = useState<Dog[]>([]);
-  const maleDogs = dogs.filter(d => d.sex === 'Male');
-  const femaleDogs = dogs.filter(d => d.sex === 'Female');
+type BuyerRow = {
+  id: string
+  full_name: string
+  email: string | null
+  phone: string | null
+  city: string | null
+  state: string | null
+  created_at: string
+}
 
-  // Litters
-  const [litters, setLitters] = useState<Litter[]>([]);
-  const [litterMsg, setLitterMsg] = useState<string>('');
-
-  // Applications
-  const [apps, setApps] = useState<Application[]>([]);
-  const [appFilter, setAppFilter] =
-    useState<'all' | 'submitted' | 'approved' | 'denied'>('all');
-
-  // Buyers
-  const [buyers, setBuyers] = useState<Buyer[]>([]);
-  const [buyerMsg, setBuyerMsg] = useState<string>('');
-  const [editBuyer, setEditBuyer] = useState<Buyer | null>(null);
-
-  // Buyer detail (purchases, payments, care/transport)
-  const [buyerPurchases, setBuyerPurchases] = useState<BuyerPuppy[]>([]);
-  const [buyerPayments, setBuyerPayments] = useState<Payment[]>([]);
-  const buyerPurchaseRowsRef = useRef<Array<{ puppy_id: string; deposit_amount: string; deposit_date: string }>>([]);
-
-  // Payments
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [paymentMsg, setPaymentMsg] = useState<string>('');
-
-  // Messages
-  const [messages, setMessages] = useState<MessageRow[]>([]);
-  const [messageMsg, setMessageMsg] = useState<string>('');
-
-  // Documents
-  const [docs, setDocs] = useState<DocRow[]>([]);
-  const [docMsg, setDocMsg] = useState<string>('');
-
-  // Transport
-  const [transports, setTransports] = useState<Transport[]>([]);
-  const [transportMsg, setTransportMsg] = useState<string>('');
-
-  // Reports
-  const [reportSummary, setReportSummary] = useState<string>('Loading…');
-  const [reportSignals, setReportSignals] = useState<string[]>([]);
-  const [paymentsAscii, setPaymentsAscii] = useState<string>('');
-
-  // Breeding Program
-  const [breedingDamRows, setBreedingDamRows] = useState<Array<{
-    dam_id: string;
-    dam_name: string;
-    year: number;
-    pups: number;
-    male: number;
-    female: number;
-    sales: number;
-  }>>([]);
-  const [breedingTotalsByDam, setBreedingTotalsByDam] = useState<Array<{
-    dam_id: string; dam_name: string; pups: number; sales: number;
-  }>>([]);
-
-  // Approve Drawer
-  const [approveOpen, setApproveOpen] = useState(false);
-  const [activeApp, setActiveApp] = useState<Application | null>(null);
-  const [availablePups, setAvailablePups] = useState<Puppy[]>([]);
-  const [selectedPupId, setSelectedPupId] = useState<string>('');
-  const [appDocUrl, setAppDocUrl] = useState<string>('');
-  const [approving, setApproving] = useState(false);
-  const [approveMsg, setApproveMsg] = useState<string>('');
-
-  /* ========== Helpers ========== */
-  function fmtMoney(n: number | null | undefined) {
-    if (n == null || Number.isNaN(n)) return '-';
-    return `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+type BuyerDetail = {
+  buyer: BuyerRow & {
+    address_line1?: string | null
+    postal_code?: string | null
+    notes?: string | null
   }
-  function titleFor(t: TabKey) {
-    return ({
-      overview: 'Overview', puppies: 'Puppies', litters: 'Litters',
-      applications: 'Applications', buyers: 'Buyers', payments: 'Payments',
-      messages: 'Messages', documents: 'Documents', transport: 'Transportation',
-      reports: 'Reports', breeding: 'Breeding Program', settings: 'Settings'
-    } as const)[t];
-  }
-  function Badge({ status }: { status?: string | null }) {
-    const norm = (status || '').toLowerCase();
-    const cls = norm === 'sold' ? 'danger' : norm === 'reserved' ? 'warn' : 'ok';
-    return <span className={`badge ${cls}`}>{status || '-'}</span>;
-  }
-  function toPublicUrl(key: string): string {
-    try {
-      const { data } = supabase.storage.from('docs').getPublicUrl(key);
-      return data?.publicUrl ?? '';
-    } catch {
-      return '';
-    }
-  }
+  puppies: PuppySummary[]
+  payments: PaymentSummary[]
+  transports: TransportSummary[]
+}
 
-  /* ========== Loaders ========== */
-  async function loadOverview() {
-    try {
-      const { count } = await supabase.from('puppies')
-        .select('*', { count: 'exact', head: true })
-        .neq('status', 'Sold');
-      setKpiPuppies(count ?? '—');
-    } catch { setKpiPuppies('—'); }
+type PuppySummary = {
+  id: string
+  name: string | null
+  status: string | null
+  price: number | null
+  dam_name: string | null
+}
 
-    try {
-      const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-      const { count } = await supabase.from('applications')
-        .select('*', { count: 'exact', head: true })
-        .gte('submitted_at', since)
-        .eq('status', 'approved');
-      setKpiApps(count ?? '—');
-    } catch { setKpiApps('—'); }
+type PaymentSummary = {
+  id: string
+  type: string | null
+  amount: number | null
+  payment_date: string | null
+  method: string | null
+  puppy_name: string | null
+}
 
-    try {
-      const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-      const { data } = await supabase.from('payments')
-        .select('amount,paid_at')
-        .gte('paid_at', since)
-        .order('paid_at', { ascending: false })
-        .limit(10);
+type TransportSummary = {
+  id: string
+  trip_date: string | null
+  from_location: string | null
+  to_location: string | null
+  miles: number | null
+  tolls: number | null
+  hotel_cost: number | null
+  fuel_cost: number | null
+}
 
-      const total = (data || []).reduce((s: number, r: any) => s + (Number(r.amount) || 0), 0);
-      setKpiPayments(fmtMoney(total));
+/* ============================================
+   ANCHOR: ROOT COMPONENT
+   ============================================ */
 
-      const lines = (data || []).map(
-        (r: any) => `Payment ${fmtMoney(r.amount)} on ${new Date(r.paid_at).toLocaleString()}`
-      );
-      setRecentActivity(lines.length ? lines.join(NL) : 'No recent activity.');
-    } catch { setRecentActivity('—'); }
-  }
+export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<AdminTabKey>('buyers')
 
-  async function loadPuppies(query?: string) {
-    let rq = supabase.from('puppies').select('*')
-      .order('created_at', { ascending: false }).limit(200);
-    if (query && query.trim()) {
-      rq = supabase.from('puppies').select('*')
-        .or(`name.ilike.%${query}%,registry.ilike.%${query}%`)
-        .order('created_at', { ascending: false }).limit(200);
-    }
-    const { data } = await rq;
-    setPuppies((data as Puppy[]) || []);
-  }
-  async function loadAvailableOnly() {
-    const { data } = await supabase.from('puppies')
-      .select('id,name,status,gender,registry,price,dob,ready_date,photos,application_id')
-      .eq('status', 'Available')
-      .order('dob', { ascending: true })
-      .limit(200);
-    setAvailablePups((data as Puppy[]) || []);
-  }
-  async function loadDogs() {
-    const { data, error } = await supabase
-      .from('dogs')
-      .select('id,name,sex,active')
-      .eq('active', true)
-      .order('name', { ascending: true });
-    if (!error) setDogs((data as Dog[]) || []);
-  }
-  async function loadLitters() {
-    const { data } = await supabase.from('litters').select('*')
-      .order('whelp_date', { ascending: false }).limit(200);
-    setLitters((data as Litter[]) || []);
-  }
-  async function loadApplications(filter: 'all' | 'submitted' | 'approved' | 'denied') {
-    let rq = supabase.from('applications').select('*')
-      .order('submitted_at', { ascending: false }).limit(200);
-    if (filter !== 'all') rq = rq.eq('status', filter);
-    const { data } = await rq;
-    setApps((data as Application[]) || []);
-  }
-  async function loadBuyers() {
-    const { data } = await supabase.from('buyers').select('*')
-      .order('created_at', { ascending: false }).limit(200);
-    setBuyers((data as Buyer[]) || []);
-  }
-  async function loadPayments() {
-    const { data } = await supabase.from('payments').select('*')
-      .order('paid_at', { ascending: false }).limit(200);
-    setPayments((data as Payment[]) || []);
-  }
-  async function loadMessages() {
-    const { data } = await supabase.from('messages').select('*')
-      .order('created_at', { ascending: false }).limit(100);
-    setMessages((data as MessageRow[]) || []);
-  }
-  async function loadDocuments() {
-    const { data } = await supabase.from('documents').select('*')
-      .order('uploaded_at', { ascending: false }).limit(200);
-    setDocs((data as DocRow[]) || []);
-  }
-  async function loadTransports() {
-    const { data } = await supabase.from('transportations').select('*')
-      .order('created_at', { ascending: false }).limit(200);
-    setTransports((data as Transport[]) || []);
-  }
-  async function refreshReports() {
-    const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-    const { data: pays } = await supabase.from('payments')
-      .select('amount,paid_at').gte('paid_at', since).order('paid_at');
-    const sum = (pays || []).reduce((s: number, r: any) => s + (Number(r.amount) || 0), 0);
-    setReportSummary(`Total payments last 30 days: ${fmtMoney(sum)} (${(pays || []).length} tx)`);
-    const avg = sum / Math.max(1, (pays || []).length);
-    const big = biggestDay(pays || []);
-    setReportSignals([
-      `Avg payment size: ${fmtMoney(avg)}`,
-      `Biggest day: ${fmtMoney(big.total)} on ${new Date(big.day).toLocaleDateString()}`
-    ]);
-    setPaymentsAscii(asciiBarByDay(pays || []));
-  }
-  function biggestDay(rows: any[]) {
-    const map = new Map<string, number>();
-    for (const r of rows) {
-      const d = new Date(r.paid_at); d.setHours(0,0,0,0);
-      const key = d.toISOString();
-      map.set(key, (map.get(key) || 0) + (Number(r.amount) || 0));
-    }
-    let best = { day: new Date().toISOString(), total: 0 };
-    for (const [k, v] of map) if (v > best.total) best = { day: k, total: v };
-    return best;
-  }
-  function asciiBarByDay(rows: any[]) {
-    const map = new Map<string, number>();
-    for (const r of rows) {
-      const d = new Date(r.paid_at);
-      d.setHours(0, 0, 0, 0);
-      const key = d.toISOString().slice(0, 10);
-      map.set(key, (map.get(key) || 0) + (Number(r.amount) || 0));
-    }
-    const days = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-    if (!days.length) return 'No data.';
-    const max = Math.max(...days.map(([, v]) => v));
-    return days
-      .map(([day, val]) => {
-        const len = max ? Math.round((val / max) * 40) : 0;
-        return `${day} | ${'#'.repeat(len)} ${fmtMoney(val)}`;
-      })
-      .join(NL);
-  }
+  return (
+    <main className="adminLayout">
+      {/* SIDEBAR */}
+      <aside className="adminSidebar">
+        <div className="adminBrand">
+          <div className="adminLogo">🐶</div>
+          <div>
+            <div className="brandLine1">SWVA Chihuahua</div>
+            <div className="brandLine2">Admin Panel</div>
+          </div>
+        </div>
 
-  /* ========== Buyers: detail loaders ========== */
-  async function loadBuyerPurchases(buyerId: string) {
-    // Join buyer_puppies -> puppies
-    const { data, error } = await supabase
-      .from('buyer_puppies')
-      .select('id,buyer_id,puppy_id,deposit_amount,deposit_date,created_at,puppy:puppies(id,name,gender,registry,price,dam_id,sire_id,litter_id,dob,status)')
-      .eq('buyer_id', buyerId)
-      .order('created_at', { ascending: false });
-    if (!error) setBuyerPurchases((data as any as BuyerPuppy[]) || []);
-  }
-  async function loadBuyerPayments(buyerId: string) {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('buyer_id', buyerId)
-      .order('paid_at', { ascending: false });
-    if (!error) setBuyerPayments((data as Payment[]) || []);
-  }
+        <nav className="adminTabs">
+          {ADMIN_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`adminTab ${activeTab === tab.key ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
 
-  /* ========== Breeding Program ========== */
-  async function loadBreedingMetrics() {
-    // 1) Dam-year rollups
-    const { data: pups } = await supabase
-      .from('puppies')
-      .select('id, dam_id, gender, dob, price');
+      {/* MAIN PANEL */}
+      <section className="adminMain">
+        {activeTab === 'buyers' && <BuyersView />}
 
-    const byDamYear = new Map<string, { dam_id: string; year: number; pups: number; male: number; female: number; sales: number }>();
-    const damTotals = new Map<string, { dam_id: string; pups: number; sales: number }>();
+        {activeTab !== 'buyers' && (
+          <div className="comingSoon">
+            <h1>{ADMIN_TABS.find((t) => t.key === activeTab)?.label}</h1>
+            <p>We’ll wire this section after Buyers is complete.</p>
+          </div>
+        )}
 
-    // Helper: sum of payments per puppy
-    const { data: pay } = await supabase
-      .from('payments')
-      .select('puppy_id, amount, paid_at');
+        <style jsx>{`
+          :root {
+            --bg: #020617;
+            --panel: #020617;
+            --ink: #f9fafb;
+            --muted: #9ca3af;
+            --brand: #e0a96d;
+            --brandAlt: #c47a35;
+          }
 
-    const payByPuppy = new Map<string, number>();
-    (pay || []).forEach(p => {
-      if (!p.puppy_id) return;
-      const curr = payByPuppy.get(p.puppy_id) || 0;
-      payByPuppy.set(p.puppy_id, curr + (Number(p.amount) || 0));
-    });
+          main.adminLayout {
+            min-height: 100vh;
+            display: flex;
+            background:
+              radial-gradient(60% 100% at 100% 0%, #0b1120 0%, transparent 60%),
+              radial-gradient(60% 100% at 0% 0%, #020617 0%, transparent 60%),
+              var(--bg);
+            color: var(--ink);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          }
 
-    (pups || []).forEach((p: any) => {
-      const damId = p.dam_id as string | null;
-      if (!damId) return;
-      const year = p.dob ? new Date(p.dob).getFullYear() : new Date().getFullYear();
-      const key = `${damId}:${year}`;
-      const g = (p.gender || '').toLowerCase() === 'male' ? 'male' : (p.gender || '').toLowerCase() === 'female' ? 'female' : 'na';
-      const prev = byDamYear.get(key) || { dam_id: damId, year, pups: 0, male: 0, female: 0, sales: 0 };
-      prev.pups += 1;
-      if (g === 'male') prev.male += 1;
-      if (g === 'female') prev.female += 1;
-      const puppySales = payByPuppy.get(p.id) || 0;
-      prev.sales += puppySales;
-      byDamYear.set(key, prev);
+          .adminSidebar {
+            width: 240px;
+            padding: 18px 14px;
+            box-sizing: border-box;
+            border-right: 1px solid #1f2937;
+            background: linear-gradient(180deg, #020617, #111827);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+          }
 
-      const tot = damTotals.get(damId) || { dam_id: damId, pups: 0, sales: 0 };
-      tot.pups += 1;
-      tot.sales += puppySales;
-      damTotals.set(damId, tot);
-    });
+          .adminBrand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+          .adminLogo {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--brand), var(--brandAlt));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+          }
+          .brandLine1 {
+            font-weight: 700;
+            font-size: 0.95rem;
+          }
+          .brandLine2 {
+            font-size: 0.8rem;
+            color: #e5e7eb;
+          }
 
-    // Map dam_id -> name
-    const { data: dams } = await supabase.from('dogs').select('id,name,sex').eq('sex', 'Female');
-    const damName = new Map<string, string>();
-    (dams || []).forEach(d => damName.set(d.id, d.name));
+          .adminTabs {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
+          .adminTab {
+            border: 1px solid #1f2937;
+            background: #020617;
+            color: #e5e7eb;
+            border-radius: 10px;
+            padding: 9px 10px;
+            text-align: left;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition:
+              background 0.12s ease,
+              transform 0.12s ease,
+              box-shadow 0.12s ease,
+              border-color 0.12s ease;
+          }
+          .adminTab:hover {
+            background: #111827;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+            border-color: #334155;
+          }
+          .adminTab.active {
+            background: linear-gradient(135deg, var(--brand), var(--brandAlt));
+            color: #111827;
+            border-color: transparent;
+            font-weight: 600;
+          }
 
-    setBreedingDamRows(
-      Array.from(byDamYear.values())
-        .map(r => ({ ...r, dam_name: damName.get(r.dam_id || '') || '(Unknown Dam)' }))
-        .sort((a, b) => a.dam_name.localeCompare(b.dam_name) || b.year - a.year)
-    );
-    setBreedingTotalsByDam(
-      Array.from(damTotals.values())
-        .map(r => ({ ...r, dam_name: damName.get(r.dam_id || '') || '(Unknown Dam)' }))
-        .sort((a, b) => a.dam_name.localeCompare(b.dam_name))
-    );
-  }
+          .adminMain {
+            flex: 1;
+            padding: 20px 22px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+          }
 
-  /* ========== Approve Drawer Flow ========== */
-  async function findApplicationDocUrl(app: Application): Promise<string> {
-    // Try 1: link by application_id
-    try {
-      const q1 = await supabase
-        .from('documents')
-        .select('file_key')
-        .eq('application_id', app.id)
-        .order('uploaded_at', { ascending: false })
-        .limit(1);
-      const key1 = q1.data?.[0]?.file_key as string | undefined;
-      if (key1) {
-        const url1 = toPublicUrl(key1);
-        if (url1) return url1;
-      }
-    } catch { /* ignored */ }
+          .comingSoon {
+            margin: auto;
+            text-align: center;
+            color: var(--muted);
+          }
+          .comingSoon h1 {
+            margin-bottom: 8px;
+          }
 
-    // Try 2: fallback by buyer/user id w/ label match
-    try {
-      const buyerId = (app as any).user_id || (app as any).buyer_id || null;
-      if (buyerId) {
-        const q2 = await supabase
-          .from('documents')
-          .select('file_key')
-          .eq('buyer_id', buyerId)
-          .ilike('label', '%Application%')
-          .order('uploaded_at', { ascending: false })
-          .limit(1);
-        const key2 = q2.data?.[0]?.file_key as string | undefined;
-        if (key2) {
-          const url2 = toPublicUrl(key2);
-          if (url2) return url2;
-        }
-      }
-    } catch { /* ignored */ }
+          @media (max-width: 800px) {
+            main.adminLayout {
+              flex-direction: column;
+            }
+            .adminSidebar {
+              width: 100%;
+              flex-direction: row;
+              align-items: center;
+              justify-content: space-between;
+            }
+            .adminTabs {
+              flex-direction: row;
+              flex-wrap: wrap;
+            }
+          }
+        `}</style>
+      </section>
+    </main>
+  )
+}
 
-    return '';
-  }
+/* ============================================
+   ANCHOR: BUYERS_VIEW
+   ============================================ */
 
-  async function onOpenApprove(app: Application) {
-    setActiveApp(app);
-    setApproveMsg('');
-    setSelectedPupId('');
-    setAppDocUrl('');
-    setApproveOpen(true);
+function BuyersView() {
+  const [buyers, setBuyers] = useState<BuyerRow[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<BuyerDetail | null>(null)
+  const [loadingList, setLoadingList] = useState(false)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-    await Promise.all([
-      loadAvailableOnly(),
-      (async () => {
-        const url = await findApplicationDocUrl(app);
-        if (url) setAppDocUrl(url);
-      })(),
-    ]);
-  }
-
-  async function approveAndAssign() {
-    if (!activeApp) return;
-    if (!selectedPupId) { setApproveMsg('Select a puppy to assign.'); return; }
-    setApproving(true);
-    setApproveMsg('');
-
-    try {
-      // Reserve + link to application_id if that column exists
-      let pupError: any = null;
-      {
-        const { error } = await supabase
-          .from('puppies')
-          .update({ status: 'Reserved', application_id: (activeApp as any).id })
-          .eq('id', selectedPupId)
-          .eq('status', 'Available');
-        pupError = error;
-      }
-
-      // Fallback: just reserve if linking fails due to missing column
-      if (pupError) {
-        const { error: fallbackErr } = await supabase
-          .from('puppies')
-          .update({ status: 'Reserved' })
-          .eq('id', selectedPupId)
-          .eq('status', 'Available');
-        if (fallbackErr) throw fallbackErr;
-      }
-
-      // Mark application approved
-      const { error: appErr } = await supabase
-        .from('applications')
-        .update({ status: 'approved' })
-        .eq('id', (activeApp as any).id);
-      if (appErr) throw appErr;
-
-      // Refresh lists in parallel
-      await Promise.all([
-        loadApplications(appFilter),
-        loadPuppies(puppySearchRef.current?.value || ''),
-      ]);
-
-      // Reset UI
-      setApproveOpen(false);
-      setActiveApp(null);
-      setSelectedPupId('');
-      setApproveMsg('');
-    } catch (e: any) {
-      setApproveMsg(e?.message || 'Approval failed.');
-    } finally {
-      setApproving(false);
-    }
-  }
-
-  /* ========== Simple handlers for Approve/Deny row actions ========== */
-  async function approveApp(id: string) {
-    const { error } = await supabase
-      .from('applications')
-      .update({ status: 'approved' })
-      .eq('id', id);
-    if (error) alert(error.message);
-    else await loadApplications(appFilter);
-  }
-
-  async function denyApp(id: string) {
-    const { error } = await supabase
-      .from('applications')
-      .update({ status: 'denied' })
-      .eq('id', id);
-    if (error) alert(error.message);
-    else await loadApplications(appFilter);
-  }
-
-  /* ========== Form Handlers ========== */
-  // Puppies
-  /* ANCHOR: onAddPuppy */
-  async function onAddPuppy(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setPuppyMsg('');
-    const fd = new FormData(e.currentTarget);
-    const firstPhoto = (fd.get('photo') as string | null)?.trim();
-    const photos = firstPhoto ? [firstPhoto] : [];
-    const row = {
-      name: (fd.get('name') as string) || null,
-      price: fd.get('price') ? Number(fd.get('price')) : null,
-      status: ((fd.get('status') as string) || 'Available') as Puppy['status'],
-      gender: (fd.get('gender') as Puppy['gender']) || null,
-      registry: (fd.get('registry') as Puppy['registry']) || null,
-      dob: (fd.get('dob') as string) || null,
-      ready_date: (fd.get('ready_date') as string) || null,
-      photos,
-      sire_id: (fd.get('sire_id') as string) || null,
-      dam_id: (fd.get('dam_id') as string) || null,
-    };
-    const { error } = await supabase.from('puppies').insert(row);
-    setPuppyMsg(error ? error.message : 'Saved.');
-    if (!error) {
-      (e.currentTarget as HTMLFormElement).reset();
-      await loadPuppies(puppySearchRef.current?.value || '');
-    }
-  }
-  async function onDeletePuppy(id: string) {
-    if (!confirm('Delete this puppy?')) return;
-    const { error } = await supabase.from('puppies').delete().eq('id', id);
-    if (error) alert(error.message); else loadPuppies(puppySearchRef.current?.value || '');
-  }
-
-  // Payments
-  async function onRecordPayment(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setPaymentMsg('');
-    const fd = new FormData(e.currentTarget);
-    const row = {
-      buyer_id: (fd.get('buyer_id') as string) || null,
-      puppy_id: (fd.get('puppy_id') as string) || null,
-      amount: fd.get('amount') ? Number(fd.get('amount')) : null,
-      method: (fd.get('method') as string) || null,
-      note: (fd.get('note') as string) || null,
-      paid_at: (fd.get('paid_at') as string) || null
-    };
-    const { error } = await supabase.from('payments').insert(row);
-    setPaymentMsg(error ? error.message : 'Saved.');
-    if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadPayments(); await refreshReports(); }
-  }
-
-  // Messages
-  async function onSendMessage(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setMessageMsg('');
-    const fd = new FormData(e.currentTarget);
-    const row = {
-      buyer_id: (fd.get('buyer_id') as string) || null,
-      puppy_id: (fd.get('puppy_id') as string) || null,
-      body: (fd.get('body') as string) || null,
-      sender: 'admin'
-    };
-    const { error } = await supabase.from('messages').insert(row);
-    setMessageMsg(error ? error.message : 'Sent.');
-    if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadMessages(); }
-  }
-
-  // Documents
-  async function onUploadDoc(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setDocMsg('');
-    const fd = new FormData(e.currentTarget);
-    const file = fd.get('file') as File | null;
-    if (!file || !file.name) { setDocMsg('Choose a file'); return; }
-    const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-    const key = `docs/${Date.now()}_${safeName}`;
-    const up = await supabase.storage.from('docs').upload(key, file);
-    if (up.error) { setDocMsg(up.error.message); return; }
-    const row = {
-      buyer_id: (fd.get('buyer_id') as string) || null,
-      puppy_id: (fd.get('puppy_id') as string) || null,
-      label: (fd.get('label') as string) || null,
-      file_key: key,
-      uploaded_at: new Date().toISOString()
-    };
-    const { error } = await supabase.from('documents').insert(row);
-    setDocMsg(error ? error.message : 'Uploaded.');
-    if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadDocuments(); }
-  }
-
-  // Transport (global tab form – includes cost fields)
-  async function onSaveTransport(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setTransportMsg('');
-    const fd = new FormData(e.currentTarget);
-    const row = {
-      buyer_id: (fd.get('buyer_id') as string) || null,
-      puppy_id: (fd.get('puppy_id') as string) || null,
-      method: (fd.get('method') as string) || null,
-      city: (fd.get('city') as string) || null,
-      state: (fd.get('state') as string) || null,
-      date: (fd.get('date') as string) || null,
-      miles: fd.get('miles') ? Number(fd.get('miles')) : null,
-      gas_cost: fd.get('gas_cost') ? Number(fd.get('gas_cost')) : null,
-      tolls_cost: fd.get('tolls_cost') ? Number(fd.get('tolls_cost')) : null,
-      hotel_cost: fd.get('hotel_cost') ? Number(fd.get('hotel_cost')) : null,
-      other_cost: fd.get('other_cost') ? Number(fd.get('other_cost')) : null,
-      note: (fd.get('note') as string) || null
-    };
-    const { error } = await supabase.from('transportations').insert(row);
-    setTransportMsg(error ? error.message : 'Saved.');
-    if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadTransports(); }
-  }
-
-  // Buyers CRUD
-  async function onAddBuyer(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setBuyerMsg('');
-    const fd = new FormData(e.currentTarget);
-    const row = {
-      full_name: (fd.get('full_name') as string) || null,
-      email: (fd.get('email') as string) || null,
-      phone: (fd.get('phone') as string) || null,
-      is_repeat: (fd.get('is_repeat') as string) === 'on',
-      multiple_puppies: (fd.get('multiple_puppies') as string) === 'on'
-    };
-    const { error } = await supabase.from('buyers').insert(row);
-    setBuyerMsg(error ? error.message : 'Buyer added.');
-    if (!error) { (e.currentTarget as HTMLFormElement).reset(); await loadBuyers(); }
-  }
-  async function onUpdateBuyer(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setBuyerMsg('');
-    if (!editBuyer?.id) { setBuyerMsg('No buyer selected.'); return; }
-    const fd = new FormData(e.currentTarget);
-    const row = {
-      full_name: (fd.get('full_name') as string) || null,
-      email: (fd.get('email') as string) || null,
-      phone: (fd.get('phone') as string) || null,
-      is_repeat: (fd.get('is_repeat') as string) === 'on',
-      multiple_puppies: (fd.get('multiple_puppies') as string) === 'on'
-    };
-    const { error } = await supabase.from('buyers').update(row).eq('id', editBuyer.id);
-    setBuyerMsg(error ? error.message : 'Buyer updated.');
-    if (!error) { await loadBuyers(); }
-  }
-  async function onDeleteBuyer(id: string) {
-    if (!confirm('Delete this buyer?')) return;
-    const { error } = await supabase.from('buyers').delete().eq('id', id);
-    if (error) alert(error.message);
-    else {
-      if (editBuyer?.id === id) setEditBuyer(null);
-      await loadBuyers();
-    }
-  }
-
-  // Buyer purchases (join rows)
-  async function addBuyerPurchaseRow() {
-    buyerPurchaseRowsRef.current.push({ puppy_id: '', deposit_amount: '', deposit_date: '' });
-    // force re-render
-    setBuyerPurchases([...buyerPurchases]);
-  }
-  function removeBuyerPurchaseRow(idx: number) {
-    buyerPurchaseRowsRef.current.splice(idx, 1);
-    setBuyerPurchases([...buyerPurchases]);
-  }
-  async function saveBuyerPurchaseRows(buyerId: string) {
-    for (const row of buyerPurchaseRowsRef.current) {
-      if (!row.puppy_id) continue;
-      const payload = {
-        buyer_id: buyerId,
-        puppy_id: row.puppy_id,
-        deposit_amount: row.deposit_amount ? Number(row.deposit_amount) : null,
-        deposit_date: row.deposit_date || null
-      };
-      const { error } = await supabase.from('buyer_puppies').insert(payload);
-      if (error) { setBuyerMsg(error.message); return; }
-    }
-    buyerPurchaseRowsRef.current = [];
-    await loadBuyerPurchases(buyerId);
-    setBuyerMsg('Purchases saved.');
-  }
-  async function deleteBuyerPurchase(id: string, buyerId: string) {
-    if (!confirm('Remove this puppy from buyer?')) return;
-    const { error } = await supabase.from('buyer_puppies').delete().eq('id', id);
-    if (error) { alert(error.message); return; }
-    await loadBuyerPurchases(buyerId);
-  }
-
-  // Care: Vaccination & Deworming tied to a puppy
-  async function addVaccination(puppy_id: string, fd: FormData) {
-    const row = {
-      puppy_id,
-      date: (fd.get('v_date') as string) || null,
-      vaccine: (fd.get('v_vaccine') as string) || null,
-      lot: (fd.get('v_lot') as string) || null,
-      notes: (fd.get('v_notes') as string) || null
-    };
-    const { error } = await supabase.from('puppy_vaccinations').insert(row);
-    if (error) throw error;
-  }
-  async function addDeworming(puppy_id: string, fd: FormData) {
-    const row = {
-      puppy_id,
-      date: (fd.get('d_date') as string) || null,
-      product: (fd.get('d_product') as string) || null,
-      dose: (fd.get('d_dose') as string) || null,
-      notes: (fd.get('d_notes') as string) || null
-    };
-    const { error } = await supabase.from('puppy_dewormings').insert(row);
-    if (error) throw error;
-  }
-  async function addTransportForPuppy(buyer_id: string, puppy_id: string, fd: FormData) {
-    const row = {
-      buyer_id,
-      puppy_id,
-      method: (fd.get('t_method') as string) || null,
-      city: (fd.get('t_city') as string) || null,
-      state: (fd.get('t_state') as string) || null,
-      date: (fd.get('t_date') as string) || null,
-      miles: fd.get('t_miles') ? Number(fd.get('t_miles')) : null,
-      gas_cost: fd.get('t_gas') ? Number(fd.get('t_gas')) : null,
-      tolls_cost: fd.get('t_tolls') ? Number(fd.get('t_tolls')) : null,
-      hotel_cost: fd.get('t_hotel') ? Number(fd.get('t_hotel')) : null,
-      other_cost: fd.get('t_other') ? Number(fd.get('t_other')) : null,
-      note: (fd.get('t_note') as string) || null
-    };
-    const { error } = await supabase.from('transportations').insert(row);
-    if (error) throw error;
-  }
-
-  /* ========== Effects ========== */
-  useEffect(() => {
-    const saved = (localStorage.getItem('admin_active_tab') || '') as TabKey;
-    if (saved) setTab(saved);
-  }, []);
-  useEffect(() => { localStorage.setItem('admin_active_tab', tab); }, [tab]);
+  // Simple “add buyer” form
+  const [newBuyerName, setNewBuyerName] = useState('')
+  const [newBuyerEmail, setNewBuyerEmail] = useState('')
+  const [newBuyerPhone, setNewBuyerPhone] = useState('')
+  const [savingBuyer, setSavingBuyer] = useState(false)
 
   useEffect(() => {
-    (async () => {
+    ;(async () => {
+      setLoadingList(true)
+      setError(null)
       try {
-        const { data } = await supabase.auth.getUser();
-        const email = data.user?.email ?? null;
-        setMe(email);
-        if (!email) { r.replace('/login'); return; }
-        if (email.toLowerCase() !== ADMIN_EMAIL) { setBlocked(true); return; }
+        const sb = await getBrowserClient()
+        const { data, error } = await sb
+          .from('puppy_buyers')
+          .select('id, full_name, email, phone, city, state, created_at')
+          .order('created_at', { ascending: false })
+        if (error) throw error
+        setBuyers(data || [])
+        if (data && data.length > 0) {
+          setSelectedId((prev) => prev || data[0].id)
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load buyers.')
+      } finally {
+        setLoadingList(false)
+      }
+    })()
+  }, [])
 
-        await Promise.all([
-          loadOverview(), loadPuppies(), loadDogs(), loadLitters(), loadApplications('all'),
-          loadBuyers(), loadPayments(), loadMessages(), loadDocuments(),
-          loadTransports(), refreshReports(), loadBreedingMetrics()
-        ]);
-      } finally { setLoadingGate(false); }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => {
+    if (!selectedId) {
+      setDetail(null)
+      return
+    }
+    ;(async () => {
+      setLoadingDetail(true)
+      setError(null)
+      try {
+        const sb = await getBrowserClient()
 
-  /* ========== Render ========== */
-  if (loadingGate) {
-    return (
-      <main style={{ maxWidth: 900, margin: '48px auto', padding: 24 }}>
-        <h1>Admin Dashboard</h1><p>Loading…</p>
-      </main>
-    );
-  }
-  if (blocked) {
-    return (
-      <main style={{ maxWidth: 900, margin: '48px auto', padding: 24 }}>
-        <h1>Admin Dashboard</h1>
-        <p style={{ color: '#a00' }}>Your account does not have access to this page.</p>
-      </main>
-    );
+        const [buyerRes, puppiesRes, payRes, transRes] = await Promise.all([
+          sb
+            .from('puppy_buyers')
+            .select('id, full_name, email, phone, address_line1, city, state, postal_code, created_at, notes')
+            .eq('id', selectedId)
+            .single(),
+          sb
+            .from('puppies')
+            .select('id, name, status, price, dam_id')
+            .eq('buyer_id', selectedId)
+            .order('created_at', { ascending: false }),
+          sb
+            .from('puppy_payments')
+            .select('id, type, amount, payment_date, method, puppy_id')
+            .eq('buyer_id', selectedId)
+            .order('payment_date', { ascending: false }),
+          sb
+            .from('transport_requests')
+            .select('id, trip_date, from_location, to_location, miles, tolls, hotel_cost, fuel_cost')
+            .eq('buyer_id', selectedId)
+            .order('trip_date', { ascending: false }),
+        ])
+
+        if (buyerRes.error) throw buyerRes.error
+        if (puppiesRes.error) throw puppiesRes.error
+        if (payRes.error) throw payRes.error
+        if (transRes.error) throw transRes.error
+
+        const buyer = buyerRes.data as BuyerDetail['buyer']
+        const puppies = (puppiesRes.data || []) as PuppySummary[]
+
+        // We’ll attach puppy names to payments on the client side for now
+        const puppyMap = new Map<string, PuppySummary>()
+        puppies.forEach((p) => {
+          if (p.id) puppyMap.set(p.id, p)
+        })
+
+        const payments: PaymentSummary[] = (payRes.data || []).map((p: any) => ({
+          id: p.id,
+          type: p.type,
+          amount: p.amount,
+          payment_date: p.payment_date,
+          method: p.method,
+          puppy_name: p.puppy_id ? puppyMap.get(p.puppy_id)?.name || null : null,
+        }))
+
+        const transports = (transRes.data || []) as TransportSummary[]
+
+        setDetail({
+          buyer,
+          puppies,
+          payments,
+          transports,
+        })
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load buyer details.')
+      } finally {
+        setLoadingDetail(false)
+      }
+    })()
+  }, [selectedId])
+
+  async function handleAddBuyer(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newBuyerName.trim()) return
+    setSavingBuyer(true)
+    setError(null)
+    try {
+      const sb = await getBrowserClient()
+      const { data, error } = await sb
+        .from('puppy_buyers')
+        .insert({
+          full_name: newBuyerName.trim(),
+          email: newBuyerEmail.trim() || null,
+          phone: newBuyerPhone.trim() || null,
+          source: 'manual',
+        })
+        .select('id, full_name, email, phone, city, state, created_at')
+        .single()
+      if (error) throw error
+      const newRow = data as BuyerRow
+      setBuyers((prev) => [newRow, ...prev])
+      setSelectedId(newRow.id)
+      setNewBuyerName('')
+      setNewBuyerEmail('')
+      setNewBuyerPhone('')
+    } catch (e: any) {
+      setError(e?.message || 'Failed to add buyer.')
+    } finally {
+      setSavingBuyer(false)
+    }
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <div className="wrap">
-        {/* Sidebar */}
-        <aside className="sidebar">
-          <div className="brand">
-            <div className="logo" aria-hidden />
-            <h1>SWVA Chihuahua<br /><span style={{ fontWeight: 400, color: 'var(--muted)' }}>Admin Portal</span></h1>
-            <span className="roleTag">Admin</span>
+    <div className="buyersWrapper">
+      <header className="buyersHeader">
+        <div>
+          <h1>Buyers</h1>
+          <p className="muted">
+            Manage your approved families, their puppies, payment history, and transportation details.
+          </p>
+        </div>
+      </header>
+
+      {/* Add Buyer Card */}
+      <section className="addBuyerCard">
+        <h2>Add Buyer</h2>
+        <p className="muted">You can also auto-create buyers later from approved applications.</p>
+        <form className="addBuyerForm" onSubmit={handleAddBuyer}>
+          <input
+            placeholder="Full name"
+            value={newBuyerName}
+            onChange={(e) => setNewBuyerName(e.target.value)}
+            required
+          />
+          <input
+            placeholder="Email (optional)"
+            type="email"
+            value={newBuyerEmail}
+            onChange={(e) => setNewBuyerEmail(e.target.value)}
+          />
+          <input
+            placeholder="Phone (optional)"
+            value={newBuyerPhone}
+            onChange={(e) => setNewBuyerPhone(e.target.value)}
+          />
+          <button type="submit" disabled={savingBuyer}>
+            {savingBuyer ? 'Saving…' : 'Save Buyer'}
+          </button>
+        </form>
+      </section>
+
+      {error && <div className="errorBanner">{error}</div>}
+
+      <section className="buyersMain">
+        {/* LEFT: list of buyers */}
+        <div className="buyersListCard">
+          <div className="buyersListHeader">
+            <h3>All Buyers</h3>
+            {loadingList && <span className="miniTag">Loading…</span>}
           </div>
-          <nav className="nav">
-            <h4>Manage</h4>
-            {(['overview','puppies','litters','applications','buyers','payments','messages','documents','transport','reports','breeding','settings'] as TabKey[])
-              .map(k => (
-                <button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>
-                  <span className="icon" />{titleFor(k)}
-                </button>
-              ))}
-          </nav>
-          <div className="spacer" />
-          <div className="authBtns">
-            <button className="btn" onClick={async()=>{
-              const { data } = await supabase.auth.getUser();
-              alert(data.user ? JSON.stringify({ id: data.user.id, email: data.user.email }, null, 2) : 'Not signed in');
-            }}>Profile</button>
-            <button className="btn" onClick={async()=>{ await supabase.auth.signOut(); location.href='/login'; }}>Sign Out</button>
-          </div>
-        </aside>
-
-        {/* Main */}
-        <section className="main">
-          <div className="header">
-            <h2>{titleFor(tab)}</h2>
-            <span className="crumbs">Admin / {titleFor(tab)}</span>
-          </div>
-
-          {/* OVERVIEW */}
-          {tab==='overview' && (
-            <div className="grid">
-              <div className="card span4"><div className="stat"><span className="dot" /><div><div className="crumbs">Active Puppies</div><div className="kpi">{String(kpiPuppies)}</div></div></div></div>
-              <div className="card span4"><div className="stat"><span className="dot" style={{background:'var(--ok)'}} /><div><div className="crumbs">Approved Applications (30d)</div><div className="kpi">{String(kpiApps)}</div></div></div></div>
-              <div className="card span4"><div className="stat"><span className="dot" style={{background:'var(--warn)'}} /><div><div className="crumbs">Payments (30d)</div><div className="kpi">{String(kpiPayments)}</div></div></div></div>
-              <div className="card span12">
-                <h3 style={{margin:0,marginBottom:8}}>Recent Activity</h3>
-                <pre style={{whiteSpace:'pre-wrap',margin:0}}>{recentActivity}</pre>
-              </div>
-            </div>
-          )}
-
-          {/* PUPPIES */}
-          {tab==='puppies' && (
-            <div className="grid">
-              <div className="card span6">
-                <h3 style={{margin:0,marginBottom:8}}>Add Puppy</h3>
-                <form onSubmit={onAddPuppy}>
-                  <div className="row">
-                    <div className="col6"><label>Name</label><input name="name" placeholder="Puppy Name" /></div>
-                    <div className="col6"><label>Status</label><select name="status"><option>Available</option><option>Reserved</option><option>Sold</option></select></div>
-                    <div className="col6"><label>DOB</label><input type="date" name="dob" /></div>
-                    <div className="col6"><label>Ready Date</label><input type="date" name="ready_date" /></div>
-                    <div className="col4"><label>Price ($)</label><input name="price" inputMode="decimal" /></div>
-                    <div className="col4"><label>Gender</label><select name="gender"><option value="">—</option><option>Male</option><option>Female</option></select></div>
-                    <div className="col4"><label>Registry</label><select name="registry"><option value="">—</option><option>AKC</option><option>CKC</option><option>ACA</option></select></div>
-                    <div className="col12"><label>Photo URL (first)</label><input name="photo" placeholder="https://…" /></div>
-                    <div className="col6">
-                      <label>Sire</label>
-                      <select name="sire_id" defaultValue="">
-                        <option value="">—</option>
-                        {maleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="col6">
-                      <label>Dam</label>
-                      <select name="dam_id" defaultValue="">
-                        <option value="">—</option>
-                        {femaleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="actions" style={{marginTop:12}}>
-                    <button className="btn primary" type="submit">Save Puppy</button>
-                    <span className="crumbs">{puppyMsg}</span>
-                  </div>
-                </form>
-              </div>
-              <div className="card span6">
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-                  <h3 style={{margin:0}}>Puppy List</h3>
-                  <div className="actions">
-                    <input ref={puppySearchRef} placeholder="Search name/registry…" style={{width:220}} onChange={e=>loadPuppies(e.currentTarget.value)} />
-                    <button className="btn" onClick={()=>loadPuppies(puppySearchRef.current?.value || '')}>Refresh</button>
-                  </div>
-                </div>
-                <div style={{marginTop:8}}>
-                  {puppies.length===0 ? <div className="notice">No puppies found.</div> : (
-                    <table>
-                      <thead><tr><th>Name</th><th>DOB</th><th>Registry</th><th>Gender</th><th>Price</th><th>Status</th><th/></tr></thead>
-                      <tbody>
-                        {puppies.map(p=>(
-                          <tr key={p.id}>
-                            <td>{p.name || ''}</td>
-                            <td>{p.dob ? new Date(p.dob).toLocaleDateString() : '-'}</td>
-                            <td>{p.registry || '-'}</td>
-                            <td>{p.gender || '-'}</td>
-                            <td>{fmtMoney(p.price)}</td>
-                            <td><Badge status={p.status || undefined} /></td>
-                            <td><div className="actions">
-                              <a className="btn" href={`/admin/puppies/${p.id}`}>Edit</a>
-                              <button className="btn" onClick={()=>onDeletePuppy(p.id)}>Delete</button>
-                            </div></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+          <div className="buyersList">
+            {buyers.length === 0 && !loadingList && (
+              <div className="emptyState">No buyers yet. Add your first buyer above.</div>
+            )}
+            {buyers.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                className={`buyerRow ${selectedId === b.id ? 'active' : ''}`}
+                onClick={() => setSelectedId(b.id)}
+              >
+                <div className="buyerRowTop">
+                  <span className="buyerName">{b.full_name}</span>
+                  {b.city && (
+                    <span className="buyerLocation">
+                      {b.city}
+                      {b.state ? `, ${b.state}` : ''}
+                    </span>
                   )}
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* LITTERS */}
-          {tab==='litters' && (
-            <div className="grid">
-              <div className="card span4">
-                <h3 style={{margin:0,marginBottom:8}}>Add Litter</h3>
-                <form onSubmit={async(e)=>{ e.preventDefault(); setLitterMsg(''); const fd=new FormData(e.currentTarget);
-                  const row:any={
-                    code:fd.get('code'),
-                    dam_id: fd.get('dam_id') || null,
-                    sire_id: fd.get('sire_id') || null,
-                    whelp_date:fd.get('whelp_date'),
-                    notes:fd.get('notes')
-                  };
-                  const { error } = await supabase.from('litters').insert(row);
-                  setLitterMsg(error?error.message:'Saved.'); if(!error){ (e.currentTarget as HTMLFormElement).reset(); await loadLitters(); await loadBreedingMetrics(); }
-                }}>
-                  <label>Code</label><input name="code" placeholder="2025-EMB×BUB-01" required />
-                  <label>Dam</label>
-                  <select name="dam_id" defaultValue="">
-                    <option value="">—</option>
-                    {femaleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                  <label>Sire</label>
-                  <select name="sire_id" defaultValue="">
-                    <option value="">—</option>
-                    {maleDogs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                  <label>Whelp Date</label><input type="date" name="whelp_date" />
-                  <label>Notes</label><textarea name="notes" rows={3} />
-                  <div className="actions" style={{marginTop:12}}>
-                    <button className="btn primary" type="submit">Save Litter</button>
-                    <span className="crumbs">{litterMsg}</span>
-                  </div>
-                </form>
-              </div>
-              <div className="card span8">
-                <h3 style={{margin:0,marginBottom:8}}>Litter List</h3>
-                {litters.length===0 ? <div className="notice">No litters found.</div> : (
-                  <table>
-                    <thead><tr><th>Code</th><th>Dam</th><th>Sire</th><th>Whelp Date</th><th>Notes</th></tr></thead>
-                    <tbody>{litters.map((l:any)=>(
-                      <tr key={l.id}>
-                        <td>{l.code || '-'}</td>
-                        <td>{dogs.find(d=>d.id===l.dam_id)?.name || '-'}</td>
-                        <td>{dogs.find(d=>d.id===l.sire_id)?.name || '-'}</td>
-                        <td>{l.whelp_date ? new Date(l.whelp_date).toLocaleDateString() : '-'}</td>
-                        <td>{l.notes || ''}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* APPLICATIONS */}
-          {tab==='applications' && (
-            <div className="card">
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-                <h3 style={{margin:0}}>Applications</h3>
-                <div className="actions">
-                  <select value={appFilter} onChange={async e=>{ const v=e.currentTarget.value as any; setAppFilter(v); await loadApplications(v); }}>
-                    <option value="all">All</option>
-                    <option value="submitted">Submitted</option>
-                    <option value="approved">Approved</option>
-                    <option value="denied">Denied</option>
-                  </select>
-                  <button className="btn" onClick={()=>loadApplications(appFilter)}>Refresh</button>
+                <div className="buyerRowBottom">
+                  {b.email && <span className="chip">{b.email}</span>}
+                  {b.phone && <span className="chip">{b.phone}</span>}
                 </div>
-              </div>
-              <div style={{marginTop:8}}>
-                {apps.length===0 ? <div className="notice">No applications found.</div> : (
-                  <table>
-                    <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Submitted</th><th/></tr></thead>
-                    <tbody>{apps.map(a=>(
-                      <tr key={a.id}>
-                        <td>{a.buyer_name || '-'}</td><td>{a.email || '-'}</td><td>{a.phone || '-'}</td>
-                        <td><Badge status={a.status || 'submitted'} /></td>
-                        <td>{a.submitted_at ? new Date(a.submitted_at).toLocaleString() : '-'}</td>
-                        <td>
-                          <div className="actions">
-                            <button className="btn" onClick={()=>onOpenApprove(a)}>Review / Approve</button>
-                            <button className="btn" onClick={()=>denyApp(a.id)}>Deny</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* BUYERS (ADD + EDIT) */}
-          {tab==='buyers' && (
-            <div className="grid">
-              {/* Add Buyer */}
-              <div className="card span4">
-                <h3 style={{margin:0,marginBottom:8}}>Add Buyer</h3>
-                <form onSubmit={onAddBuyer}>
-                  <label>Full Name</label><input name="full_name" placeholder="First Last" required />
-                  <label>Email</label><input name="email" type="email" placeholder="name@example.com" />
-                  <label>Phone</label><input name="phone" placeholder="(555) 555-5555" />
-                  <label className="chk"><input type="checkbox" name="is_repeat" /> <span>Repeat Buyer</span></label>
-                  <label className="chk"><input type="checkbox" name="multiple_puppies" /> <span>Multiple Puppies</span></label>
-                  <div className="actions" style={{marginTop:12}}>
-                    <button className="btn primary" type="submit">Save Buyer</button>
-                    <span className="crumbs">{buyerMsg}</span>
-                  </div>
-                </form>
-              </div>
-
-              {/* Buyers List */}
-              <div className="card span8">
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-                  <h3 style={{margin:0}}>Buyers</h3>
-                  <div className="actions"><button className="btn" onClick={loadBuyers}>Refresh</button></div>
-                </div>
-                <div style={{marginTop:8}}>
-                  {buyers.length===0 ? <div className="notice">No buyers found.</div> : (
-                    <table>
-                      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Repeat</th><th>Created</th><th/></tr></thead>
-                      <tbody>{buyers.map(b=>(
-                        <tr key={b.id}>
-                          <td>
-                            {/* Click name to edit */}
-                            <button className="linklike" onClick={async()=>{
-                              setEditBuyer(b);
-                              await Promise.all([
-                                loadBuyerPurchases(b.id),
-                                loadBuyerPayments(b.id)
-                              ]);
-                            }}>
-                              {b.full_name || '-'}
-                            </button>
-                          </td>
-                          <td>{b.email || '-'}</td>
-                          <td>{b.phone || '-'}</td>
-                          <td>{b.is_repeat ? 'Yes' : 'No'}</td>
-                          <td>{b.created_at ? new Date(b.created_at).toLocaleDateString() : '-'}</td>
-                          <td>
-                            <div className="actions">
-                              <button className="btn" onClick={async()=>{
-                                setEditBuyer(b);
-                                await Promise.all([loadBuyerPurchases(b.id), loadBuyerPayments(b.id)]);
-                              }}>Edit</button>
-                              <button className="btn" onClick={()=>onDeleteBuyer(b.id)}>Delete</button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-
-              {/* Edit Buyer Drawer/Card */}
-              {editBuyer && (
-                <div className="card span12" style={{borderColor:'var(--brand)'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-                    <h3 style={{margin:0}}>Edit Buyer</h3>
-                    <div className="actions">
-                      <button className="btn" onClick={()=>setEditBuyer(null)}>Close</button>
-                    </div>
-                  </div>
-
-                  {/* Buyer basics */}
-                  <form onSubmit={onUpdateBuyer} style={{marginTop:8,display:'grid',gap:12}}>
-                    <div className="row">
-                      <div className="col6">
-                        <label>Full Name</label>
-                        <input name="full_name" defaultValue={editBuyer.full_name || ''} required />
-                      </div>
-                      <div className="col6">
-                        <label>Email</label>
-                        <input name="email" type="email" defaultValue={editBuyer.email || ''} />
-                      </div>
-                      <div className="col6">
-                        <label>Phone</label>
-                        <input name="phone" defaultValue={editBuyer.phone || ''} />
-                      </div>
-                      <div className="col3" style={{display:'flex',alignItems:'flex-end'}}>
-                        <label className="chk" style={{margin:0}}>
-                          <input type="checkbox" name="is_repeat" defaultChecked={!!editBuyer.is_repeat} /> <span>Repeat</span>
-                        </label>
-                      </div>
-                      <div className="col3" style={{display:'flex',alignItems:'flex-end'}}>
-                        <label className="chk" style={{margin:0}}>
-                          <input type="checkbox" name="multiple_puppies" defaultChecked={!!editBuyer.multiple_puppies} /> <span>Multiple Puppies</span>
-                        </label>
-                      </div>
-                    </div>
-                    <div className="actions">
-                      <button className="btn primary" type="submit">Update</button>
-                      <span className="crumbs">{buyerMsg}</span>
-                    </div>
-                  </form>
-
-                  {/* Purchases (puppies for this buyer) */}
-                  <div className="subsection">
-                    <h4 style={{margin:'8px 0'}}>Puppies Purchased</h4>
-                    {buyerPurchases.length===0 ? <div className="notice">None yet.</div> : (
-                      <table>
-                        <thead><tr><th>Puppy</th><th>Gender</th><th>Registry</th><th>DOB</th><th>Deposit</th><th>Deposit Date</th><th/></tr></thead>
-                        <tbody>{buyerPurchases.map(p=>(
-                          <tr key={p.id}>
-                            <td>{p.puppy?.name || p.puppy_id}</td>
-                            <td>{p.puppy?.gender || '-'}</td>
-                            <td>{p.puppy?.registry || '-'}</td>
-                            <td>{p.puppy?.dob ? new Date(p.puppy.dob).toLocaleDateString() : '-'}</td>
-                            <td>{fmtMoney(p.deposit_amount)}</td>
-                            <td>{p.deposit_date ? new Date(p.deposit_date).toLocaleDateString() : '-'}</td>
-                            <td><button className="btn" onClick={()=>deleteBuyerPurchase(p.id, editBuyer.id)}>Remove</button></td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    )}
-
-                    {/* Add additional puppies for this buyer */}
-                    <div className="notice" style={{marginTop:8}}>
-                      <b>Add Puppy for Buyer</b>
-                      <div className="row" style={{marginTop:8}}>
-                        {/* dynamic rows */}
-                        {buyerPurchaseRowsRef.current.map((row, idx)=>(
-                          <div key={idx} className="col12" style={{border:'1px dashed #e0d8d0', padding:10, borderRadius:8, marginBottom:8}}>
-                            <div className="row">
-                              <div className="col6">
-                                <label>Puppy</label>
-                                <select defaultValue="" onChange={e=>{ row.puppy_id = e.target.value; }}>
-                                  <option value="">— Select Puppy —</option>
-                                  {puppies.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                      {(p.name || 'Unnamed')} • {p.gender || '—'} • {p.registry || '—'} • {fmtMoney(p.price)}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="col3">
-                                <label>Deposit ($)</label>
-                                <input inputMode="decimal" onChange={e=>{ row.deposit_amount = e.target.value; }} placeholder="0.00" />
-                              </div>
-                              <div className="col3">
-                                <label>Deposit Date</label>
-                                <input type="date" onChange={e=>{ row.deposit_date = e.target.value; }} />
-                              </div>
-                            </div>
-                            <div className="actions" style={{marginTop:8}}>
-                              <button className="btn" onClick={()=>removeBuyerPurchaseRow(idx)} type="button">Remove Row</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="actions">
-                        <button className="btn" type="button" onClick={addBuyerPurchaseRow}>+ Add Row</button>
-                        <button className="btn primary" type="button" onClick={()=>saveBuyerPurchaseRows(editBuyer.id)}>Save Rows</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payments list + total */}
-                  <div className="subsection">
-                    <h4 style={{margin:'8px 0'}}>Payments</h4>
-                    {buyerPayments.length===0 ? <div className="notice">No payments recorded.</div> : (
-                      <div className="notice" style={{whiteSpace:'pre-wrap'}}>
-                        {buyerPayments.map(p => `• ${fmtMoney(p.amount)} • ${p.method || '—'} • ${p.note || ''} • ${p.paid_at ? new Date(p.paid_at).toLocaleString() : '—'}`).join(NL)}
-                      </div>
-                    )}
-                    <div className="crumbs" style={{marginTop:6}}>
-                      Total: {fmtMoney(buyerPayments.reduce((s,p)=>s+(Number(p.amount)||0),0))}
-                    </div>
-                  </div>
-
-                  {/* Care & Transport per purchased puppy */}
-                  {buyerPurchases.length > 0 && (
-                    <div className="subsection">
-                      <h4 style={{margin:'8px 0'}}>Care & Transport (per puppy)</h4>
-                      {buyerPurchases.map(bp => (
-                        <div key={bp.id} className="notice" style={{marginBottom:10}}>
-                          <div style={{fontWeight:600, marginBottom:6}}>
-                            {(bp.puppy?.name || bp.puppy_id)} — {bp.puppy?.gender || '—'} {bp.puppy?.registry ? `• ${bp.puppy.registry}` : ''}
-                          </div>
-                          <form onSubmit={async(e)=>{ e.preventDefault(); const fd=new FormData(e.currentTarget); try {
-                            await addVaccination(bp.puppy_id, fd);
-                            (e.currentTarget as HTMLFormElement).reset();
-                            alert('Vaccination saved.');
-                          } catch(err:any){ alert(err.message || 'Save failed'); } }} style={{display:'grid', gap:8, marginBottom:6}}>
-                            <div style={{fontWeight:600}}>Vaccination</div>
-                            <div className="row">
-                              <div className="col3"><label>Date</label><input type="date" name="v_date" /></div>
-                              <div className="col4"><label>Vaccine</label><input name="v_vaccine" placeholder="DHPP / Rabies / etc." /></div>
-                              <div className="col2"><label>Lot #</label><input name="v_lot" /></div>
-                              <div className="col3"><label>Notes</label><input name="v_notes" /></div>
-                            </div>
-                            <div className="actions"><button className="btn" type="submit">Save Vaccination</button></div>
-                          </form>
-
-                          <form onSubmit={async(e)=>{ e.preventDefault(); const fd=new FormData(e.currentTarget); try {
-                            await addDeworming(bp.puppy_id, fd);
-                            (e.currentTarget as HTMLFormElement).reset();
-                            alert('Deworming saved.');
-                          } catch(err:any){ alert(err.message || 'Save failed'); } }} style={{display:'grid', gap:8, marginBottom:6}}>
-                            <div style={{fontWeight:600}}>Deworming</div>
-                            <div className="row">
-                              <div className="col3"><label>Date</label><input type="date" name="d_date" /></div>
-                              <div className="col4"><label>Product</label><input name="d_product" placeholder="Pyrantel / Fenbendazole / etc." /></div>
-                              <div className="col2"><label>Dose</label><input name="d_dose" /></div>
-                              <div className="col3"><label>Notes</label><input name="d_notes" /></div>
-                            </div>
-                            <div className="actions"><button className="btn" type="submit">Save Deworming</button></div>
-                          </form>
-
-                          <form onSubmit={async(e)=>{ e.preventDefault(); const fd=new FormData(e.currentTarget); try {
-                            await addTransportForPuppy(editBuyer.id, bp.puppy_id, fd);
-                            (e.currentTarget as HTMLFormElement).reset();
-                            alert('Transport saved.');
-                          } catch(err:any){ alert(err.message || 'Save failed'); } }} style={{display:'grid', gap:8}}>
-                            <div style={{fontWeight:600}}>Transport</div>
-                            <div className="row">
-                              <div className="col3"><label>Date</label><input type="date" name="t_date" /></div>
-                              <div className="col3"><label>Method</label><select name="t_method"><option>Pickup</option><option>Ground Delivery</option><option>Flight Nanny</option></select></div>
-                              <div className="col3"><label>City</label><input name="t_city" /></div>
-                              <div className="col3"><label>State</label><input name="t_state" /></div>
-                              <div className="col3"><label>Miles</label><input inputMode="numeric" name="t_miles" /></div>
-                              <div className="col3"><label>Gas ($)</label><input inputMode="decimal" name="t_gas" /></div>
-                              <div className="col2"><label>Tolls ($)</label><input inputMode="decimal" name="t_tolls" /></div>
-                              <div className="col2"><label>Hotel ($)</label><input inputMode="decimal" name="t_hotel" /></div>
-                              <div className="col2"><label>Other ($)</label><input inputMode="decimal" name="t_other" /></div>
-                            </div>
-                            <label>Notes</label><input name="t_note" />
-                            <div className="actions"><button className="btn" type="submit">Save Transport</button></div>
-                          </form>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* PAYMENTS */}
-          {tab==='payments' && (
-            <div className="grid">
-              <div className="card span4">
-                <h3 style={{margin:0,marginBottom:8}}>Record Payment</h3>
-                <form onSubmit={onRecordPayment}>
-                  <label>Buyer ID</label><input name="buyer_id" required />
-                  <label>Puppy ID (optional)</label><input name="puppy_id" />
-                  <div className="row">
-                    <div className="col6"><label>Amount ($)</label><input name="amount" inputMode="decimal" required /></div>
-                    <div className="col6"><label>Method</label><select name="method"><option>Zoho</option><option>PayPal</option><option>Stripe</option><option>Cash</option><option>Other</option></select></div>
-                  </div>
-                  <label>Note</label><input name="note" placeholder="Deposit / Balance" />
-                  <label>Date</label><input type="datetime-local" name="paid_at" />
-                  <div className="actions" style={{marginTop:12}}>
-                    <button className="btn primary" type="submit">Save Payment</button>
-                    <span className="crumbs">{paymentMsg}</span>
-                  </div>
-                </form>
-              </div>
-              <div className="card span8">
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-                  <h3 style={{margin:0}}>Payments</h3>
-                  <div className="actions">
-                    <button className="btn" onClick={async()=>{ await loadPayments(); await refreshReports(); }}>Refresh</button>
-                  </div>
-                </div>
-                <div style={{marginTop:8}}>
-                  {payments.length===0 ? <div className="notice">No payments found.</div> : (
-                    <table>
-                      <thead><tr><th>Buyer</th><th>Puppy</th><th>Amount</th><th>Method</th><th>Date</th><th>Note</th></tr></thead>
-                      <tbody>{payments.map(p=>(
-                        <tr key={p.id}>
-                          <td>{p.buyer_id || '-'}</td><td>{p.puppy_id || '-'}</td>
-                          <td>{fmtMoney(p.amount)}</td><td>{p.method || '-'}</td>
-                          <td>{p.paid_at ? new Date(p.paid_at).toLocaleString() : '-'}</td>
-                          <td>{p.note || ''}</td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* MESSAGES */}
-          {tab==='messages' && (
-            <div className="grid">
-              <div className="card span8">
-                <h3 style={{margin:0,marginBottom:8}}>Inbox</h3>
-                {messages.length===0 ? <div className="notice">No messages.</div> : (
-                  <div style={{display:'grid',gap:8}}>
-                    {messages.map(m=>(
-                      <div key={m.id} className="notice">
-                        <b>{m.sender || 'buyer'}</b> • {m.created_at ? new Date(m.created_at).toLocaleString() : '—'}<br/>{m.body || ''}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="card span4">
-                <h3 style={{margin:0,marginBottom:8}}>Reply</h3>
-                <form onSubmit={onSendMessage}>
-                  <label>Buyer ID</label><input name="buyer_id" required />
-                  <label>Puppy ID (optional)</label><input name="puppy_id" />
-                  <label>Message</label><textarea name="body" rows={5} required />
-                  <div className="actions" style={{marginTop:12}}>
-                    <button className="btn primary" type="submit">Send Reply</button>
-                    <span className="crumbs">{messageMsg}</span>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* DOCUMENTS */}
-          {tab==='documents' && (
-            <div className="grid">
-              <div className="card span4">
-                <h3 style={{margin:0,marginBottom:8}}>Upload Document</h3>
-                <form onSubmit={onUploadDoc}>
-                  <label>Buyer ID (optional)</label><input name="buyer_id" />
-                  <label>Puppy ID (optional)</label><input name="puppy_id" />
-                  <label>Label</label><input name="label" placeholder="Bill of Sale / Health Guarantee" required />
-                  <label>File</label><input type="file" name="file" accept=".pdf,.jpg,.png,.doc,.docx" required />
-                  <div className="actions" style={{marginTop:12}}>
-                    <button className="btn primary" type="submit">Upload</button>
-                    <span className="crumbs">{docMsg}</span>
-                  </div>
-                </form>
-              </div>
-              <div className="card span8">
-                <h3 style={{margin:0,marginBottom:8}}>Documents</h3>
-                {docs.length===0 ? <div className="notice">No documents found.</div> : (
-                  <table>
-                    <thead><tr><th>Label</th><th>Buyer</th><th>Puppy</th><th>File</th><th>Uploaded</th></tr></thead>
-                    <tbody>{docs.map(d=>(
-                      <tr key={d.id}>
-                        <td>{d.label || '-'}</td><td>{(d as any).buyer_id || '-'}</td><td>{(d as any).puppy_id || '-'}</td>
-                        <td><OpenDocLink supabase={supabase as any} file_key={d.file_key || ''} /></td>
-                        <td>{d.uploaded_at ? new Date(d.uploaded_at).toLocaleString() : '-'}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TRANSPORT */}
-          {tab==='transport' && (
-            <div className="grid">
-              <div className="card span4">
-                <h3 style={{margin:0,marginBottom:8}}>Schedule Transport</h3>
-                <form onSubmit={onSaveTransport}>
-                  <label>Buyer ID</label><input name="buyer_id" required />
-                  <label>Puppy ID</label><input name="puppy_id" required />
-                  <label>Method</label><select name="method"><option>Pickup</option><option>Ground Delivery</option><option>Flight Nanny</option></select>
-                  <div className="row">
-                    <div className="col6"><label>City</label><input name="city" /></div>
-                    <div className="col6"><label>State</label><input name="state" /></div>
-                  </div>
-                  <label>Date</label><input type="date" name="date" />
-                  <div className="row">
-                    <div className="col3"><label>Miles</label><input name="miles" inputMode="numeric" /></div>
-                    <div className="col3"><label>Gas ($)</label><input name="gas_cost" inputMode="decimal" /></div>
-                    <div className="col3"><label>Tolls ($)</label><input name="tolls_cost" inputMode="decimal" /></div>
-                    <div className="col3"><label>Hotel ($)</label><input name="hotel_cost" inputMode="decimal" /></div>
-                  </div>
-                  <label>Other Cost ($)</label><input name="other_cost" inputMode="decimal" />
-                  <label>Note</label><textarea name="note" rows={3} />
-                  <div className="actions" style={{marginTop:12}}>
-                    <button className="btn primary" type="submit">Save</button>
-                    <span className="crumbs">{transportMsg}</span>
-                  </div>
-                </form>
-              </div>
-              <div className="card span8">
-                <h3 style={{margin:0,marginBottom:8}}>Transport Requests</h3>
-                {transports.length===0 ? <div className="notice">No transport requests found.</div> : (
-                  <table>
-                    <thead><tr><th>Buyer</th><th>Puppy</th><th>Method</th><th>City/State</th><th>Date</th><th>Miles</th><th>Costs</th><th>Note</th></tr></thead>
-                    <tbody>{transports.map(t=>(
-                      <tr key={t.id}>
-                        <td>{t.buyer_id || '-'}</td><td>{t.puppy_id || '-'}</td><td>{t.method || '-'}</td>
-                        <td>{t.city || '-'}, {t.state || '-'}</td>
-                        <td>{t.date ? new Date(t.date).toLocaleDateString() : '-'}</td>
-                        <td>{t.miles ?? '-'}</td>
-                        <td>{['gas','tolls','hotel','other'].map(k=>{
-                          const map:any={gas:t.gas_cost,tolls:t.tolls_cost,hotel:t.hotel_cost,other:t.other_cost};
-                          return `${k}:${map[k] ? fmtMoney(map[k]) : '-'}`;
-                        }).join(' • ')}</td>
-                        <td>{t.note || ''}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* REPORTS */}
-          {tab==='reports' && (
-            <div className="grid">
-              <div className="card span6"><h3 style={{margin:0,marginBottom:8}}>30-Day Summary</h3><div className="notice">{reportSummary}</div></div>
-              <div className="card span6"><h3 style={{margin:0,marginBottom:8}}>Top Signals</h3><ul style={{margin:0,paddingLeft:18}}>{reportSignals.map((s,i)=>(<li key={i}>{s}</li>))}</ul></div>
-              <div className="card span12"><h3 style={{margin:0,marginBottom:8}}>Payments by Day (ASCII)</h3><pre style={{whiteSpace:'pre-wrap',margin:0}}>{paymentsAscii}</pre></div>
-            </div>
-          )}
-
-          {/* BREEDING PROGRAM */}
-          {tab==='breeding' && (
-            <div className="grid">
-              <div className="card span12">
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-                  <h3 style={{margin:0}}>Dam Metrics (by Year)</h3>
-                  <div className="actions"><button className="btn" onClick={loadBreedingMetrics}>Refresh</button></div>
-                </div>
-                {breedingDamRows.length===0 ? <div className="notice">No data.</div> : (
-                  <table>
-                    <thead><tr><th>Dam</th><th>Year</th><th>Puppies</th><th>Male</th><th>Female</th><th>Sales</th></tr></thead>
-                    <tbody>
-                      {breedingDamRows.map((r,i)=>(
-                        <tr key={i}>
-                          <td>{r.dam_name}</td>
-                          <td>{r.year}</td>
-                          <td>{r.pups}</td>
-                          <td>{r.male}</td>
-                          <td>{r.female}</td>
-                          <td>{fmtMoney(r.sales)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-              <div className="card span12">
-                <h3 style={{margin:0,marginBottom:8}}>Totals by Dam (All-Time)</h3>
-                {breedingTotalsByDam.length===0 ? <div className="notice">No data.</div> : (
-                  <table>
-                    <thead><tr><th>Dam</th><th>Total Puppies</th><th>Total Sales</th></tr></thead>
-                    <tbody>
-                      {breedingTotalsByDam.map((r,i)=>(
-                        <tr key={i}>
-                          <td>{r.dam_name}</td>
-                          <td>{r.pups}</td>
-                          <td>{fmtMoney(r.sales)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                <div className="crumbs" style={{marginTop:8}}>
-                  Sales totals are computed from recorded payments joined to each puppy’s dam.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SETTINGS */}
-          {tab==='settings' && (
-            <div className="grid">
-              <div className="card span6">
-                <h3 style={{margin:0,marginBottom:8}}>Admin Access</h3>
-                <div className="notice">Admin access is currently email-gated for {ADMIN_EMAIL}.</div>
-              </div>
-              <div className="card span6"><h3 style={{margin:0,marginBottom:8}}>Profile</h3><div className="notice">Signed in as {me}</div></div>
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* Approve Drawer */}
-      {approveOpen && activeApp && (
-        <div className="drawer" role="dialog" aria-modal="true" aria-labelledby="approve-title">
-          <div className="scrim" aria-hidden />
-          <div className="drawer-panel" onClick={(e)=>e.stopPropagation()}>
-            <div className="drawer-hd">
-              <h2 id="approve-title">Review & Approve</h2>
-              <button className="x" onClick={()=>{ setApproveOpen(false); setActiveApp(null); }}>×</button>
-            </div>
-            <div className="drawer-body">
-              <section className="section">
-                <h3>Application</h3>
-                <div className="kv">
-                  <div><label>Name</label><span>{activeApp.buyer_name || '—'}</span></div>
-                  <div><label>Email</label><span>{activeApp.email || '—'}</span></div>
-                  <div><label>Phone</label><span>{activeApp.phone || '—'}</span></div>
-                  <div><label>Status</label><span>{activeApp.status || '—'}</span></div>
-                  <div><label>Submitted</label><span>{activeApp.submitted_at ? new Date(activeApp.submitted_at).toLocaleString() : '—'}</span></div>
-                </div>
-                {appDocUrl ? (
-                  <div style={{marginTop:8}}>
-                    <a className="btn" href={appDocUrl} target="_blank" rel="noreferrer">Open Application PDF</a>
-                  </div>
-                ) : null}
-              </section>
-
-              <section className="section">
-                <h3>Assign Puppy (sets status to Reserved)</h3>
-                <div className="assign">
-                  <select value={selectedPupId} onChange={e=>setSelectedPupId(e.target.value)}>
-                    <option value="">— Select an Available puppy —</option>
-                    {availablePups.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || 'Unnamed'} • {p.gender || '—'} • {p.registry || '—'} • {fmtMoney(p.price)}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="btn primary" disabled={!selectedPupId || approving} onClick={approveAndAssign}>
-                    {approving ? 'Approving…' : 'Approve & Assign'}
-                  </button>
-                </div>
-                {approveMsg && <div className="notice" style={{marginTop:10}}>{approveMsg}</div>}
-                <p className="crumbs" style={{marginTop:8}}>
-                  This will set the puppy’s status to <b>Reserved</b> and mark the application <b>approved</b>.
-                </p>
-              </section>
-            </div>
+              </button>
+            ))}
           </div>
         </div>
-      )}
 
-      {/* Styles */}
-      <style jsx global>{`
-        :root{
-          --bg:#f7f5f1; --ink:#2e2a24; --muted:#6f6257; --panel:#fff; --panelAlt:#f2ede7;
-          --brand:#b5835a; --ok:#2fa36b; --warn:#d28512; --danger:#c63737; --ring:rgba(181,131,90,.25);
-        }
-        html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
-        .wrap{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
-        .sidebar{background:#fff;border-right:1px solid #e7e0d9;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
-        .brand{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid #eee}
-        .brand .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(145deg,#b5835a,#9a6c49);box-shadow:inset 0 0 0 4px #fff}
-        .brand h1{font-size:1.05rem;margin:0;line-height:1.1}
-        .roleTag{font-size:.72rem;color:#fff;background:var(--brand);padding:2px 6px;border-radius:999px;margin-left:auto}
-        .nav{padding:10px}
-        .nav h4{margin:14px 10px 6px;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-        .nav button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin:4px 0;border:0;background:transparent;border-radius:10px;color:var(--ink);cursor:pointer}
-        .nav button:hover{background:var(--panelAlt)}
-        .nav button.active{background:var(--brand);color:#fff}
-        .nav .icon{width:18px;height:18px;border-radius:4px;background:var(--brand);opacity:.15}
-        .linklike{background:none;border:none;padding:0;color:var(--brand);cursor:pointer;text-decoration:underline}
-        .spacer{flex:1}
-        .authBtns{padding:12px;border-top:1px solid #eee;display:flex;gap:8px}
-        .btn{appearance:none;border:1px solid #e0d8d0;background:#fff;color:var(--ink);padding:8px 10px;border-radius:10px;cursor:pointer;text-decoration:none}
-        .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
-        .main{padding:22px;min-height:100vh}
-        .header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
-        .header h2{margin:0;font-size:1.4rem}
-        .crumbs{color:var(--muted);font-size:.9rem}
-        .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
-        .card{grid-column:span 12;background:var(--panel);border:1px solid #e7e0d9;border-radius:14px;padding:16px}
-        @media (min-width:900px){
-          .span4{grid-column:span 4}.span6{grid-column:span 6}.span8{grid-column:span 8}.span12{grid-column:span 12}
-          .col6{grid-column:span 6}.col4{grid-column:span 4}.col3{grid-column:span 3}.col2{grid-column:span 2}.col12{grid-column:span 12}
-        }
-        .row .col6,.row .col4,.row .col3,.row .col2,.row .col12{grid-column:span 12}
-        table{width:100%;border-collapse:separate;border-spacing:0 8px}
-        thead th{font-size:.85rem;color:var(--muted);text-align:left;padding:8px 10px}
-        tbody td{background:#fff;padding:10px;border-top:1px solid #eee;border-bottom:1px solid #eee}
-        tbody tr td:first-child{border-left:1px solid #eee;border-top-left-radius:8px;border-bottom-left-radius:8px}
-        tbody tr td:last-child{border-right:1px solid #eee;border-top-right-radius:8px;border-bottom-right-radius:8px}
-        label{display:block;font-size:.9rem;margin:10px 0 6px}
-        input,select,textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;background:#fff;outline:0}
-        input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
-        .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
-        .actions{display:flex;gap:8px;flex-wrap:wrap}
-        .chk{display:flex;align-items:center;gap:8px}
-        .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:.8rem}
-        .badge.ok{background:rgba(47,163,107,.12);color:#1f6b47}
-        .badge.warn{background:rgba(210,133,18,.12);color:#6f470e}
-        .badge.danger{background:rgba(198,55,55,.12);color:#7a2222}
-        .notice{padding:10px 12px;border-left:4px solid var(--brand);background:#fff;border:1px solid #eee;border-radius:8px;margin:8px 0}
-        .subsection{margin-top:16px}
-        .stat{display:flex;align-items:center;gap:12px}
-        .dot{width:10px;height:10px;border-radius:50%;background:var(--brand)}
-        .kpi{font-size:1.6rem;font-weight:700}
+        {/* RIGHT: buyer detail */}
+        <div className="buyerDetailCard">
+          {(!detail || loadingDetail) && (
+            <div className="detailPlaceholder">
+              {loadingDetail ? 'Loading buyer details…' : 'Select a buyer from the list.'}
+            </div>
+          )}
 
-        /* Drawer */
-        .drawer{position:fixed;inset:0;display:flex;justify-content:flex-end;z-index:1000}
-        .scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:1;pointer-events:none} /* no outside-click dismissal */
-        .drawer-panel{position:relative;width:min(600px,95vw);height:100%;background:#fff;border-left:1px solid #e8ded2;box-shadow:-8px 0 24px rgba(0,0,0,.08);display:flex;flex-direction:column;z-index:2}
-        .drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #f0e6da}
-        .x{font-size:22px;line-height:1;border:0;background:transparent;cursor:pointer;padding:4px 8px}
-        .drawer-body{padding:12px 14px;overflow:auto}
-        .section{margin-bottom:16px}
-        .section h3{margin:0 0 8px}
-        .kv{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 14px}
-        .kv label{display:block;font-size:.85rem;color:var(--muted)}
-        .kv span{display:block}
-        .assign{display:flex;gap:10px;align-items:center}
-        .assign select{flex:1;min-width:220px;padding:8px 10px;border:1px solid #e3d6c9;border-radius:10px}
+          {detail && !loadingDetail && (
+            <>
+              <div className="buyerDetailHeader">
+                <div>
+                  <h2>{detail.buyer.full_name}</h2>
+                  <p className="muted">
+                    {detail.buyer.city && (
+                      <>
+                        {detail.buyer.city}
+                        {detail.buyer.state ? `, ${detail.buyer.state}` : ''}
+                      </>
+                    )}
+                    {!detail.buyer.city && 'Buyer details'}
+                  </p>
+                </div>
+              </div>
+
+              {/* CONTACT */}
+              <section className="detailSection">
+                <h3>Contact Information</h3>
+                <div className="detailGrid">
+                  <div>
+                    <div className="label">Email</div>
+                    <div>{detail.buyer.email || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="label">Phone</div>
+                    <div>{detail.buyer.phone || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="label">Address</div>
+                    <div>
+                      {detail.buyer.address_line1 && <div>{detail.buyer.address_line1}</div>}
+                      {(detail.buyer.city || detail.buyer.state || detail.buyer.postal_code) && (
+                        <div>
+                          {detail.buyer.city}
+                          {detail.buyer.state ? `, ${detail.buyer.state}` : ''}
+                          {detail.buyer.postal_code ? ` ${detail.buyer.postal_code}` : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* PUPPIES */}
+              <section className="detailSection">
+                <h3>Puppies</h3>
+                {detail.puppies.length === 0 && <div className="emptyLine">No puppies assigned yet.</div>}
+                {detail.puppies.length > 0 && (
+                  <div className="table">
+                    <div className="tableHead">
+                      <span>Puppy</span>
+                      <span>Status</span>
+                      <span>Dam</span>
+                      <span>Price</span>
+                    </div>
+                    {detail.puppies.map((p) => (
+                      <div key={p.id} className="tableRow">
+                        <span className="clickableName">{p.name || 'Unnamed'}</span>
+                        <span>{p.status || '—'}</span>
+                        <span>{p.dam_name || '—'}</span>
+                        <span>{p.price != null ? `$${p.price.toFixed(2)}` : '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* PAYMENTS */}
+              <section className="detailSection">
+                <h3>Payments</h3>
+                {detail.payments.length === 0 && <div className="emptyLine">No payments recorded.</div>}
+                {detail.payments.length > 0 && (
+                  <div className="table">
+                    <div className="tableHead">
+                      <span>Date</span>
+                      <span>Type</span>
+                      <span>Puppy</span>
+                      <span>Amount</span>
+                    </div>
+                    {detail.payments.map((p) => (
+                      <div key={p.id} className="tableRow">
+                        <span>{p.payment_date ? p.payment_date.slice(0, 10) : '—'}</span>
+                        <span>{p.type || '—'}</span>
+                        <span>{p.puppy_name || '—'}</span>
+                        <span>{p.amount != null ? `$${p.amount.toFixed(2)}` : '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* TRANSPORT */}
+              <section className="detailSection">
+                <h3>Transportation</h3>
+                {detail.transports.length === 0 && <div className="emptyLine">No trips recorded.</div>}
+                {detail.transports.length > 0 && (
+                  <div className="table">
+                    <div className="tableHead">
+                      <span>Date</span>
+                      <span>Route</span>
+                      <span>Miles</span>
+                      <span>Costs</span>
+                    </div>
+                    {detail.transports.map((t) => (
+                      <div key={t.id} className="tableRow">
+                        <span>{t.trip_date ? t.trip_date.slice(0, 10) : '—'}</span>
+                        <span>
+                          {t.from_location || '—'} → {t.to_location || '—'}
+                        </span>
+                        <span>{t.miles != null ? t.miles.toFixed(1) : '—'}</span>
+                        <span>
+                          {[
+                            t.tolls || 0,
+                            t.hotel_cost || 0,
+                            t.fuel_cost || 0,
+                          ].some((v) => v > 0)
+                            ? `$${(((t.tolls || 0) + (t.hotel_cost || 0) + (t.fuel_cost || 0)) as number).toFixed(2)}`
+                            : '—'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+        </div>
+      </section>
+
+      <style jsx>{`
+        .buyersWrapper {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          height: 100%;
+        }
+
+        .buyersHeader h1 {
+          margin: 0 0 4px;
+        }
+        .buyersHeader .muted {
+          margin: 0;
+          color: var(--muted);
+        }
+
+        .addBuyerCard {
+          background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 1));
+          border-radius: 14px;
+          padding: 14px 16px;
+          border: 1px solid #1f2937;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+        }
+        .addBuyerCard h2 {
+          margin: 0 0 4px;
+          font-size: 1.05rem;
+        }
+        .addBuyerCard .muted {
+          margin: 0 0 10px;
+          font-size: 0.9rem;
+        }
+        .addBuyerForm {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .addBuyerForm input {
+          flex: 1 1 160px;
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1px solid #1f2937;
+          background: #020617;
+          color: #f9fafb;
+        }
+        .addBuyerForm input::placeholder {
+          color: #6b7280;
+        }
+        .addBuyerForm button {
+          padding: 8px 14px;
+          border-radius: 999px;
+          border: none;
+          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
+          color: #111827;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .addBuyerForm button:disabled {
+          opacity: 0.7;
+          cursor: default;
+        }
+
+        .errorBanner {
+          background: rgba(127, 29, 29, 0.9);
+          border: 1px solid #b91c1c;
+          padding: 8px 10px;
+          border-radius: 8px;
+          font-size: 0.9rem;
+        }
+
+        .buyersMain {
+          display: grid;
+          grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+          gap: 16px;
+          flex: 1;
+          min-height: 0;
+        }
+
+        .buyersListCard,
+        .buyerDetailCard {
+          background: rgba(15, 23, 42, 0.96);
+          border-radius: 14px;
+          border: 1px solid #1f2937;
+          padding: 12px 12px 10px;
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+        }
+
+        .buyersListHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+        .buyersListHeader h3 {
+          margin: 0;
+          font-size: 0.95rem;
+        }
+        .miniTag {
+          font-size: 0.8rem;
+          color: var(--muted);
+        }
+
+        .buyersList {
+          max-height: 420px;
+          overflow: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .buyerRow {
+          width: 100%;
+          text-align: left;
+          border-radius: 10px;
+          border: 1px solid #111827;
+          background: #020617;
+          padding: 8px 9px;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          transition:
+            background 0.12s ease,
+            border-color 0.12s ease,
+            transform 0.12s ease;
+        }
+        .buyerRow:hover {
+          background: #0b1120;
+          transform: translateY(-1px);
+        }
+        .buyerRow.active {
+          border-color: var(--brand);
+          box-shadow: 0 0 0 1px rgba(224, 169, 109, 0.4);
+        }
+
+        .buyerRowTop {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+          align-items: baseline;
+        }
+        .buyerName {
+          font-weight: 600;
+          font-size: 0.95rem;
+        }
+        .buyerLocation {
+          font-size: 0.8rem;
+          color: var(--muted);
+        }
+        .buyerRowBottom {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+        }
+        .chip {
+          font-size: 0.75rem;
+          padding: 2px 6px;
+          border-radius: 999px;
+          background: #111827;
+          color: #e5e7eb;
+        }
+
+        .buyerDetailCard {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          min-height: 0;
+        }
+        .detailPlaceholder {
+          margin: auto;
+          color: var(--muted);
+        }
+        .buyerDetailHeader h2 {
+          margin: 0 0 2px;
+        }
+        .buyerDetailHeader .muted {
+          margin: 0;
+          color: var(--muted);
+        }
+
+        .detailSection {
+          margin-top: 8px;
+        }
+        .detailSection h3 {
+          margin: 0 0 6px;
+          font-size: 0.95rem;
+        }
+        .detailGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+          gap: 8px 16px;
+          font-size: 0.9rem;
+        }
+        .label {
+          font-size: 0.78rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--muted);
+          margin-bottom: 2px;
+        }
+
+        .emptyState,
+        .emptyLine {
+          font-size: 0.9rem;
+          color: var(--muted);
+        }
+
+        .table {
+          border-radius: 10px;
+          border: 1px solid #111827;
+          overflow: hidden;
+          font-size: 0.88rem;
+        }
+        .tableHead,
+        .tableRow {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr 1.2fr 0.8fr;
+          gap: 8px;
+          padding: 6px 10px;
+        }
+        .tableHead {
+          background: #020617;
+          border-bottom: 1px solid #111827;
+          font-weight: 600;
+          font-size: 0.82rem;
+        }
+        .tableRow:nth-child(odd) {
+          background: #020617;
+        }
+        .tableRow:nth-child(even) {
+          background: #02061a;
+        }
+
+        .clickableName {
+          text-decoration: underline;
+          cursor: pointer;
+        }
+
+        @media (max-width: 900px) {
+          .buyersMain {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
-    </main>
-  );
-}
-
-/* ========== Small Pieces ========== */
-function OpenDocLink({ supabase, file_key }: { supabase: any; file_key: string }) {
-  const [url, setUrl] = useState<string>('#');
-  useEffect(() => { (async () => {
-    if (!file_key) return;
-    const { data } = await supabase.storage.from('docs').getPublicUrl(file_key);
-    setUrl(data?.publicUrl || '#');
-  })(); }, [file_key, supabase]);
-  return <a href={url} target="_blank" rel="noreferrer" className="btn">Open</a>;
+    </div>
+  )
 }
