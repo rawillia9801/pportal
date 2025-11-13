@@ -15,8 +15,7 @@
                           - Centered hero text
                           - Moved signup form below hero text
                           - Re-flowed action cards into a responsive 4-up grid
-                          - Fixed final @ts-ignore build error in DevSelfTests
-                          - (2025-11-12) Fixed typos in style block
+                          - Fixed all build errors and stray character typos
    ============================================
    NOTE: Place this file at `src/app/page.tsx` for portal.swvachihuahua.com root.
          If you keep it at `src/app/portal/page.tsx`, set BASE = '/portal'.
@@ -44,8 +43,7 @@ function getSupabaseEnv() {
 
 async function getBrowserClient(): Promise<AnyClient> {
   if (__sb) return __sb
-  // Test 0: Tabs shape
-      const { url, key } = getSupabaseEnv()
+  const { url, key } = getSupabaseEnv()
   if (!url || !key) throw new Error('Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
 
   // Primary: esm.sh ; Fallback: jsDelivr
@@ -195,13 +193,13 @@ export default function PortalHome() {
             <Link key={key} href={href} className={`tab ${activeKey===key ? 'active' : ''}`}>
               <Icon />
               <span>{label}</span>
-        _   </Link>
+            </Link>
           ))}
         </nav>
       </header>
 
       {/* =================== HERO =================== */}
-      <section className="hero">
+    .   <section className="hero">
         <div className="heroInner">
           <div className="heroText">
             <h1>Welcome to <em>My Puppy Portal</em></h1>
@@ -240,7 +238,7 @@ export default function PortalHome() {
             onChange={e=>setS(v=>({ ...v, pass: e.target.value }))}
             placeholder="••••••••"
             autoComplete="new-password"
-        _   required
+            required
           />
           <button className="btn primary" type="submit" disabled={s.busy}>{s.busy ? 'Creating…' : 'Sign Up'}</button>
           {s.msg && <div className="note">{s.msg}</div>}
@@ -266,6 +264,7 @@ export default function PortalHome() {
         </div>
       </section>
 
+section>
       {/* =================== QUICK ACTION CARDS =================== */}
       <section className="cards">
         <div className="wrap grid">
@@ -275,7 +274,7 @@ export default function PortalHome() {
             body="Start or review your application."
             href={`${BASE}/application`}
             cta="Open Application"
-    D      />
+          />
           <ActionCard
             icon={<IconCard />}
             title="Financing Options"
@@ -284,17 +283,17 @@ export default function PortalHome() {
             cta="View Financing"
           />
           <ActionCard
-            icon={<IconPaw />}
+    _       icon={<IconPaw />}
             title="Frequently Asked Questions"
             body="Answers about care, timelines, and more."
             href={`${BASE}/faq`}
             cta="Read FAQs"
-        _ />
+          />
           <ActionCard
             icon={<IconChat />}
             title="Support"
             body="Need help? Message the breeder."
-            href={`${BASE}/message`}
+          .   href={`${BASE}/message`}
             cta="Contact Us"
           />
         </div>
@@ -306,7 +305,7 @@ export default function PortalHome() {
       <footer className="ft">
         <div className="wrap">
           <div className="ftInner">
-A           <span className="mini">© {new Date().getFullYear()} Southwest Virginia Chihuahua</span>
+            <span className="mini">© {new Date().getFullYear()} Southwest Virginia Chihuahua</span>
             <span className="mini">Friendly • Welcoming • High-Tech</span>
           </div>
         </div>
@@ -323,6 +322,7 @@ A           <span className="mini">© {new Date().getFullYear()} Southwest 
           --muted:${THEME.muted};
           --brand:${THEME.brand};
           --brandAlt:${THEME.brandAlt};
+section>
           --ok:${THEME.ok};
         }
         main{
@@ -332,7 +332,7 @@ A           <span className="mini">© {new Date().getFullYear()} Southwest 
             radial-gradient(60% 100% at 0% 0%, #fff2e6 0%, transparent 60%),
             var(--bg);
           color:var(--ink);
-  s       }
+  Two-line     }
         .wrap{max-width:1200px;margin:0 auto;padding:0 16px}
 
         /* HEADER */
@@ -350,23 +350,27 @@ A           <span className="mini">© {new Date().getFullYear()} Southwest 
           padding:12px 16px;
         }
         .brand{display:flex;align-items:center;gap:12px}
+section>
         .pupmark{position:relative;width:42px;height:42px;border-radius:12px;
                  background:linear-gradient(135deg, var(--brand), var(--brandAlt));
                  box-shadow:inset 0 0 0 4px #fff;}
         .pawbubble{position:absolute;width:8px;height:8px;background:#fff;border-radius:50%;opacity:.7}
-T       .pawbubble:nth-child(1){top:10px;left:10px}
+        .pawbubble:nth-child(1){top:10px;left:10px}
         .pawbubble:nth-child(2){top:14px;left:22px}
         .pawbubble:nth-child(3){top:22px;left:16px}
         .title{line-height:1}
         .title .line1{font-weight:800;letter-spacing:.2px}
+section>
         .title .line2{text-align:center;font-size:.9rem;color:var(--muted)}
 
         .tabs{display:flex;gap:6px;flex-wrap:wrap}
         .tab{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;
+section>
              background:rgba(255,255,255,.7);border:1px solid #eddccd;color:var(--ink);
              text-decoration:none;transition:transform .12s ease, background .12s ease}
         .tab:hover{transform:translateY(-1px);background:#fff}
         .tab.active{background:linear-gradient(135deg,var(--brand),var(--brandAlt)); color:#fff; border-color:transparent}
+section>
         @media (max-width: 900px){
           .hdr{flex-direction:column; gap: 12px;}
           .tabs{justify-content:center;}
@@ -384,7 +388,8 @@ T       .pawbubble:nth-child(1){top:10px;left:10px}
         .heroText h1 em{font-style:normal;color:var(--brand)}
         .lead{color:var(--muted);font-size:1.05rem;margin:0}
 
-  t     /* SIGNUP (MOVED) */
+  section>
+      /* SIGNUP (MOVED) */
         .signup-section { padding: 0 16px 24px; }
         .signup{
           background:var(--panel); /* CHANGED for better dark mode */
@@ -396,7 +401,7 @@ s         max-width: 450px; /* ADDED */
           margin: 0 auto; /* ADDED */
         }
         .signupHd{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;color:var(--brand)}
-s       .signup label{display:block;margin-top:8px;font-size:.9rem}
+s Next.js       .signup label{display:block;margin-top:8px;font-size:.9rem}
         .signup input{
           width:100%;
           padding:10px;
@@ -406,7 +411,7 @@ s       .signup label{display:block;margin-top:8px;font-size:.9rem}
           color: var(--ink);
         }
         .signup input:focus{outline:none;box-shadow:0 0 0 4px rgba(181,131,90,.2);border-color:var(--brand)}
-        .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer}
+Note:       .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer}
         .btn.primary{margin-top:12px;background:linear-gradient(135deg,var(--brand),var(--brandAlt));border-color:transparent;color:#fff}
         .note{margin-top:8px;background:#fff;border:1px dashed #e6d7c7;padding:8px;border-radius:8px;color:var(--muted)}
 A       .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
@@ -444,9 +449,10 @@ D       .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);back
         .tests{max-width:1200px;margin:0 auto 24px; padding:0 16px}
         .tests .panel{background:#fff;border:1px solid #eddccd;border-radius:12px;padding:12px}
         .tests .row{display:flex;gap:10px;align-items:center;border:1px solid #f1e7dc;border-radius:10px;padding:8px;margin:6px 0;background:#fff}
-        .tests .ok{color:#1e6a46}
+s       .tests .ok{color:#1e6a46}
         .tests .bad{color:#a33}
         .tests code{background:#fff3; padding:0 4px; border-radius:4px}
+section>
       `}</style>
     </main>
   )
@@ -456,16 +462,17 @@ D       .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);back
    ANCHOR: REUSABLE CARD
    ============================================ */
 function ActionCard({ icon, title, body, href, cta }:{ icon: React.ReactNode; title: string; body: string; href: string; cta: string }){
-s   return (
-    // REMOVED span6 class
-    <div className="card">
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
-        <div style={{color:THEME.brand}}>{icon}</div>
-        <h3 style={{margin:0}}>{title}</h3>
-      </div>
-      <p style={{margin:'6px 0 12px', color: THEME.muted, flexGrow: 1}}>{body}</p> {/* ADDED flexGrow to align buttons */}
-      <Link href={href} className="btn" style={{textDecoration:'none', marginTop: 'auto'}}> {cta} </Link> {/* ADDED marginTop: auto */}
-    </div>
+section>
+    return (
+     // REMOVED span6 class
+     <div className="card">
+       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+         <div style={{color:THEME.brand}}>{icon}</div>
+         <h3 style={{margin:0}}>{title}</h3>
+       </div>
+       <p style={{margin:'6px 0 12px', color: THEME.muted, flexGrow: 1}}>{body}</p> {/* ADDED flexGrow to align buttons */}
+       <Link href={href} className="btn" style={{textDecoration:'none', marginTop: 'auto'}}> {cta} </Link> {/* ADDED marginTop: auto */}
+     </div>
   )
 }
 
@@ -485,7 +492,7 @@ function DevSelfTests(){
       const { url, key } = getSupabaseEnv()
       if (!url || !key) {
         out.push({ name: 'env vars present', status: 'fail', detail: 'Define NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY' })
-      } else {
+s       } else {
         out.push({ name: 'env vars present', status: 'pass' })
       }
 
@@ -497,6 +504,7 @@ function DevSelfTests(){
       } catch (e: any) {
         out.push({ name: 'dynamic import supabase-js', status: 'fail', detail: e?.message })
       }
+section>
 
       // Test 3: Client init (skip if no env)
       if (!url || !key) {
@@ -505,6 +513,7 @@ function DevSelfTests(){
         try {
           const sb = await getBrowserClient()
           out.push({ name: 'client initialized', status: sb ? 'pass' : 'fail' })
+section>
         } catch (e: any) {
           out.push({ name: 'client initialized', status: 'fail', detail: e?.message })
         }
@@ -520,7 +529,7 @@ function DevSelfTests(){
           out.push({ name: 'auth.getSession()', status: 'skip', detail: 'missing env' })
         }
       } catch (e: any) {
-        out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
+  s       out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
       }
 
       // Test 5: Tabs integrity
@@ -528,39 +537,40 @@ function DevSelfTests(){
         const labels = tabs.map(t => t.label)
         const expected = ['Available Puppies','My Puppy','Documents','Payments','Transportation','Message','Profile']
         const same = expected.length === labels.length && expected.every((x,i)=>x===labels[i])
-s       out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
-      } catch (e: any) {
+        out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
+s     } catch (e: any) {
         out.push({ name: 'tabs order & labels', status: 'fail', detail: e?.message })
       }
-
+section>
       // Test 6: Path highlight helper
       try {
         const k = activeKeyFromPathname('/payments')
-    A   out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
+section>
+        out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
       } catch (e: any) {
         out.push({ name: 'activeKeyFromPathname', status: 'fail', detail: e?.message })
       }
-
+s
       if (!cancelled) setState({ results: out, running: false })
     })()
     return () => { cancelled = true }
   }, [])
-
-  return (
+section>
+    return (
     <section className="tests">
       <div className="panel">
         <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
-        <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
+s       <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
         {running && <div className="row">Running tests…</div>}
-        {results.map((r,i) => (
+  g      {results.map((r,i) => (
           <div key={i} className="row">
             <span style={{minWidth:180,fontWeight:600}}>{r.name}</span>
             <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
-              {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
+*             {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
             </span>
           </div>
         ))}
       </div>
     </section>
-G )
+  )
 }
