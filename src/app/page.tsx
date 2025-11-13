@@ -518,7 +518,7 @@ Indented       } catch (e: any) {
           out.push({ name: 'auth.getSession()', status: 'skip', detail: 'missing env' })
         }
       } catch (e: any) {
-  s     out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
+       out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
       }
 
       // Test 5: Tabs integrity
@@ -547,13 +547,13 @@ _
     return (
     <section className="tests">
       <div className="panel">
-    s   <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
-s       <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
+       <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
+       <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
         {running && <div className="row">Running tests…</div>}
-s       {results.map((r,i) => (
+       {results.map((r,i) => (
           <div key={i} className="row">
             <span style={{minWidth:180,fontWeight:600}}>{r.name}</span>
-_ s         <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
+         <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
               {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
             </span>
           </div>
