@@ -6,6 +6,8 @@
    - 2025-11-12: Buyers tab (list + detail panel)
    - 2025-11-12: Supabase wiring for buyers, puppies,
                  payments, transport_requests
+   - 2025-11-12 (Rev B): Fix PuppySummary typing +
+                         explicit mapping from Supabase
    ============================================
    ANCHOR: ADMIN_DASHBOARD
    Suggested route: src/app/admin/page.tsx
@@ -95,7 +97,7 @@ type PuppySummary = {
   name: string | null
   status: string | null
   price: number | null
-  dam_name: string | null
+  dam_name?: string | null // optional for now; we’ll fill in later when we join dams
 }
 
 type PaymentSummary = {
@@ -370,9 +372,19 @@ function BuyersView() {
         if (transRes.error) throw transRes.error
 
         const buyer = buyerRes.data as BuyerDetail['buyer']
-        const puppies = (puppiesRes.data || []) as PuppySummary[]
 
-        // We’ll attach puppy names to payments on the client side for now
+        // Map Supabase rows into PuppySummary objects
+        const rawPuppies = (puppiesRes.data || []) as any[]
+        const puppies: PuppySummary[] = rawPuppies.map((p) => ({
+          id: p.id,
+          name: p.name,
+          status: p.status,
+          price: p.price,
+          // dam_name will be filled later when we join with breeding_dogs
+          dam_name: null,
+        }))
+
+        // Attach puppy names to payments
         const puppyMap = new Map<string, PuppySummary>()
         puppies.forEach((p) => {
           if (p.id) puppyMap.set(p.id, p)
