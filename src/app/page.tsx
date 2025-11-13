@@ -232,7 +232,6 @@ export default function PortalHome() {
             autoComplete="email"
             required
           />
-    .signup input{width:100%;padding:10px;border:1px solid #e6d7c7;border-radius:10px;background:var(--panel) !important; color: var(--ink) !important;}
             <label>Password</label>
             <input
               type="password"
