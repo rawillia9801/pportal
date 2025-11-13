@@ -3,23 +3,26 @@
 /* ============================================
    CHANGELOG
    - 2025-11-13: Admin shell with LEFT sidebar
-   - 2025-11-13: New Dashboard tab for /admin landing
-   - 2025-11-13: Buyers view kept + manual puppy/payment
-   - 2025-11-13: Dashboard shows activity counts
+   - 2025-11-13: Dashboard landing (cards for activity)
+   - 2025-11-13: Buyers tab with manual puppies/payments
+   - 2025-11-13: Buyers tab pricing summary
+                 (Price, Credits, Admin Fee Financing, Total Paid)
+   - 2025-11-13: Payments tab with per-year + grand totals
    ============================================ */
 
 import React, { useEffect, useState } from 'react'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 /* ============================================
-   ANCHOR: SUPABASE HELPERS
+   SUPABASE HELPERS
    ============================================ */
 
 type AnyClient = SupabaseClient<any, 'public', any>
 let __sb: AnyClient | null = null
 
 function getSupabaseEnv() {
-  const g: any = (typeof window !== 'undefined' ? window : globalThis) as any
+  const g: any =
+    typeof window !== 'undefined' ? (window as any) : (globalThis as any)
   const hasProc =
     typeof process !== 'undefined' &&
     (process as any) &&
@@ -27,15 +30,13 @@ function getSupabaseEnv() {
 
   const url = hasProc
     ? (process as any).env.NEXT_PUBLIC_SUPABASE_URL
-    : (g.NEXT_PUBLIC_SUPABASE_URL ||
-       g.__ENV?.NEXT_PUBLIC_SUPABASE_URL ||
-       '')
+    : g.NEXT_PUBLIC_SUPABASE_URL || g.__ENV?.NEXT_PUBLIC_SUPABASE_URL || ''
 
   const key = hasProc
     ? (process as any).env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    : (g.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-       g.__ENV?.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-       '')
+    : g.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      g.__ENV?.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      ''
 
   return { url: String(url || ''), key: String(key || '') }
 }
@@ -53,7 +54,7 @@ async function getBrowserClient(): Promise<AnyClient> {
 }
 
 /* ============================================
-   ANCHOR: TYPES
+   TYPES
    ============================================ */
 
 type AdminTabKey =
@@ -81,6 +82,8 @@ const ADMIN_TABS: AdminTab[] = [
   { key: 'buyers', label: 'Buyers' },
 ]
 
+/* ---- Buyers tab types ---- */
+
 type BuyerRow = {
   id: string
   full_name: string
@@ -89,6 +92,15 @@ type BuyerRow = {
   city: string | null
   state: string | null
   created_at: string
+}
+
+type BuyerDetailBuyer = BuyerRow & {
+  address_line1?: string | null
+  postal_code?: string | null
+  notes?: string | null
+  base_price?: number | null
+  credits?: number | null
+  admin_fee_financing?: number | null
 }
 
 type PuppySummary = {
@@ -121,15 +133,42 @@ type TransportSummary = {
 }
 
 type BuyerDetail = {
-  buyer: BuyerRow & {
-    address_line1?: string | null
-    postal_code?: string | null
-    notes?: string | null
-  }
+  buyer: BuyerDetailBuyer
   puppies: PuppySummary[]
   payments: PaymentSummary[]
   transports: TransportSummary[]
 }
+
+/* ---- Payments tab types ---- */
+
+type PaymentRow = {
+  id: string
+  buyer_id: string | null
+  buyer_name: string | null
+  type: string | null
+  amount: number | null
+  payment_date: string | null
+  method: string | null
+}
+
+type YearSummary = {
+  year: string
+  count: number
+  total: number
+  depositTotal: number
+  paymentTotal: number
+  refundTotal: number
+}
+
+type PaymentStats = {
+  years: YearSummary[]
+  grandTotal: number
+  grandCount: number
+  latestDate: string | null
+  byYear: Record<string, PaymentRow[]>
+}
+
+/* ---- Dashboard counts ---- */
 
 type DashboardCounts = {
   buyers: number | null
@@ -140,19 +179,39 @@ type DashboardCounts = {
 }
 
 /* ============================================
-   ANCHOR: ROOT ADMIN PAGE
+   SMALL HELPERS
    ============================================ */
 
-export default function AdminDashboard() {
+function fmtCurrency(v: number | null | undefined): string {
+  const n =
+    typeof v === 'number' && !Number.isNaN(v) && Number.isFinite(v) ? v : 0
+  return n.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function fmtDate(d: string | null | undefined): string {
+  if (!d) return '—'
+  // assume YYYY-MM-DD or ISO
+  return d.slice(0, 10)
+}
+
+/* ============================================
+   ROOT ADMIN PAGE
+   ============================================ */
+
+export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTabKey>('dashboard')
 
-  // Inline layout styles so the sidebar is ALWAYS on the left
   const layoutStyle: React.CSSProperties = {
     minHeight: '100vh',
     display: 'flex',
     background:
-      'radial-gradient(60% 100% at 100% 0%, #0b1120 0%, transparent 60%),' +
-      'radial-gradient(60% 100% at 0% 0%, #020617 0%, transparent 60%),' +
+      'radial-gradient(60% 100% at 100% 0%, #020617 0%, transparent 60%),' +
+      'radial-gradient(60% 100% at 0% 0%, #111827 0%, transparent 60%),' +
       '#020617',
     color: '#f9fafb',
     fontFamily:
@@ -228,7 +287,7 @@ export default function AdminDashboard() {
       {/* LEFT SIDEBAR */}
       <aside style={sidebarStyle}>
         <div style={brandRowStyle}>
-          <div style={logoStyle}>🐶</div>
+          <div style={logoStyle}>🐾</div>
           <div>
             <div style={{ fontWeight: 700, fontSize: '.95rem' }}>
               SWVA Chihuahua
@@ -261,12 +320,19 @@ export default function AdminDashboard() {
 
         {activeTab === 'buyers' && <BuyersView />}
 
-        {activeTab !== 'dashboard' && activeTab !== 'buyers' && (
-          <div className="comingSoon">
-            <h1>{ADMIN_TABS.find((t) => t.key === activeTab)?.label}</h1>
-            <p>We’ll wire this section after Buyers is complete.</p>
-          </div>
-        )}
+        {activeTab === 'payments' && <PaymentsView />}
+
+        {activeTab !== 'dashboard' &&
+          activeTab !== 'buyers' &&
+          activeTab !== 'payments' && (
+            <div className="comingSoon">
+              <h1>{ADMIN_TABS.find((t) => t.key === activeTab)?.label}</h1>
+              <p>
+                This section will be wired after the Buyers and Payments flows
+                are finished.
+              </p>
+            </div>
+          )}
 
         <style jsx>{`
           .comingSoon {
@@ -284,13 +350,13 @@ export default function AdminDashboard() {
 }
 
 /* ============================================
-   ANCHOR: DASHBOARD (ADMIN LANDING)
+   DASHBOARD TAB
    ============================================ */
 
 function AdminHomeDashboard({
   onOpenTab,
 }: {
-  onOpenTab: (tab: AdminTabKey) => void
+  onOpenTab: (t: AdminTabKey) => void
 }) {
   const [counts, setCounts] = useState<DashboardCounts>({
     buyers: null,
@@ -317,7 +383,6 @@ function AdminHomeDashboard({
       try {
         const sb = await getBrowserClient()
 
-        // Buyers
         try {
           const res = await sb
             .from('puppy_buyers')
@@ -325,7 +390,6 @@ function AdminHomeDashboard({
           if (!res.error && typeof res.count === 'number') next.buyers = res.count
         } catch {}
 
-        // Applications table name is a guess – safe even if it doesn't exist.
         try {
           const res = await sb
             .from('puppy_applications')
@@ -334,7 +398,6 @@ function AdminHomeDashboard({
             next.applications = res.count
         } catch {}
 
-        // Payments
         try {
           const res = await sb
             .from('puppy_payments')
@@ -343,7 +406,6 @@ function AdminHomeDashboard({
             next.payments = res.count
         } catch {}
 
-        // Messages table name is a guess – adjust when you create it.
         try {
           const res = await sb
             .from('puppy_messages')
@@ -352,7 +414,6 @@ function AdminHomeDashboard({
             next.messages = res.count
         } catch {}
 
-        // Transportation requests
         try {
           const res = await sb
             .from('transport_requests')
@@ -363,7 +424,7 @@ function AdminHomeDashboard({
 
         setCounts(next)
       } catch (e: any) {
-        setError(e?.message || 'Failed to load dashboard stats.')
+        setError(e?.message || 'Failed to load admin stats.')
       } finally {
         setLoading(false)
       }
@@ -496,11 +557,8 @@ function AdminHomeDashboard({
           flex-direction: column;
           gap: 6px;
           box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
-          transition:
-            transform 0.12s ease,
-            box-shadow 0.12s ease,
-            border-color 0.12s ease,
-            background 0.12s ease;
+          transition: transform 0.12s ease, box-shadow 0.12s ease,
+            border-color 0.12s ease, background 0.12s ease;
         }
         .dashCard:hover {
           transform: translateY(-2px);
@@ -525,20 +583,18 @@ function AdminHomeDashboard({
           color: #f97316;
         }
         .dashDesc {
-          margin: 0;
-          font-size: 0.9rem;
+          margin: 4px 0 4px;
           color: #9ca3af;
+          font-size: 0.9rem;
         }
         .dashActivity {
-          font-size: 0.78rem;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: #f97316;
+          font-size: 0.8rem;
+          color: #22c55e;
         }
         .dashFooter {
-          margin-top: 6px;
-          font-size: 0.82rem;
-          color: #e0a96d;
+          margin-top: 4px;
+          font-size: 0.85rem;
+          color: #e5e7eb;
         }
       `}</style>
     </section>
@@ -546,18 +602,15 @@ function AdminHomeDashboard({
 }
 
 /* ============================================
-   ANCHOR: BUYERS VIEW
-   - Buyers list on left
-   - Detail panel on right
-   - Manual puppy + payment + transport summary
+   BUYERS TAB (with Price / Credits / Total Paid)
    ============================================ */
 
 function BuyersView() {
   const [buyers, setBuyers] = useState<BuyerRow[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<BuyerDetail | null>(null)
-  const [loadingList, setLoadingList] = useState(false)
-  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Add buyer form
@@ -566,308 +619,324 @@ function BuyersView() {
   const [newBuyerPhone, setNewBuyerPhone] = useState('')
   const [savingBuyer, setSavingBuyer] = useState(false)
 
-  // Manual puppy form (past sales)
+  // Manual puppy form
   const [newPuppyName, setNewPuppyName] = useState('')
-  const [newPuppyStatus, setNewPuppyStatus] = useState('')
+  const [newPuppyStatus, setNewPuppyStatus] = useState('reserved')
   const [newPuppyPrice, setNewPuppyPrice] = useState('')
-  const [savingPuppy, setSavingPuppy] = useState(false)
 
-  // Manual payment form (past sales)
-  const [newPayType, setNewPayType] = useState('')
+  // Manual payment form
+  const [newPayType, setNewPayType] = useState('payment')
   const [newPayAmount, setNewPayAmount] = useState('')
   const [newPayDate, setNewPayDate] = useState('')
+  const [newPayPuppy, setNewPayPuppy] = useState('')
   const [newPayMethod, setNewPayMethod] = useState('')
-  const [newPayNotes, setNewPayNotes] = useState('')
-  const [newPayPuppyId, setNewPayPuppyId] = useState<string | ''>('')
-  const [savingPayment, setSavingPayment] = useState(false)
+
+  // Pricing summary fields
+  const [priceDraft, setPriceDraft] = useState('')
+  const [creditsDraft, setCreditsDraft] = useState('')
+  const [adminFeeDraft, setAdminFeeDraft] = useState('')
+  const [savingPricing, setSavingPricing] = useState(false)
 
   // Load buyers list
   useEffect(() => {
     ;(async () => {
-      setLoadingList(true)
+      setLoading(true)
       setError(null)
       try {
         const sb = await getBrowserClient()
         const { data, error } = await sb
           .from('puppy_buyers')
-          .select('id, full_name, email, phone, city, state, created_at')
-          .order('created_at', { ascending: false })
+          .select(
+            'id, full_name, email, phone, city, state, created_at'
+          )
+          .order('full_name', { ascending: true })
         if (error) throw error
-        setBuyers(data || [])
-        if (data && data.length > 0) {
-          setSelectedId((prev) => prev || data[0].id)
+        const rows = (data || []) as BuyerRow[]
+        setBuyers(rows)
+        if (rows.length && !selectedId) {
+          setSelectedId(rows[0].id)
         }
       } catch (e: any) {
         setError(e?.message || 'Failed to load buyers.')
       } finally {
-        setLoadingList(false)
+        setLoading(false)
       }
     })()
   }, [])
 
-  // Load selected buyer detail
+  // Load detail when selection changes
   useEffect(() => {
     if (!selectedId) {
       setDetail(null)
       return
     }
     ;(async () => {
-      setLoadingDetail(true)
+      setDetailLoading(true)
       setError(null)
       try {
         const sb = await getBrowserClient()
 
-        const [buyerRes, puppiesRes, payRes, transRes] = await Promise.all([
-          sb
-            .from('puppy_buyers')
-            .select(
-              'id, full_name, email, phone, address_line1, city, state, postal_code, created_at, notes'
-            )
-            .eq('id', selectedId)
-            .single(),
-          sb
-            .from('puppies')
+        // buyer
+        const buyerRes = await sb
+          .from('puppy_buyers')
+          .select(
+            'id, full_name, email, phone, address_line1, city, state, postal_code, notes, base_price, credits, admin_fee_financing, created_at'
+          )
+          .eq('id', selectedId)
+          .single()
+
+        if (buyerRes.error) throw buyerRes.error
+
+        const buyer = buyerRes.data as BuyerDetailBuyer
+
+        // puppies (manual)
+        let puppies: PuppySummary[] = []
+        try {
+          const pupRes = await sb
+            .from('puppy_buyer_puppies')
             .select('id, name, status, price')
             .eq('buyer_id', selectedId)
-            .order('created_at', { ascending: false }),
-          sb
+            .order('created_at', { ascending: true })
+          if (!pupRes.error && pupRes.data) {
+            puppies = pupRes.data as PuppySummary[]
+          }
+        } catch {}
+
+        // payments
+        let payments: PaymentSummary[] = []
+        try {
+          const payRes = await sb
             .from('puppy_payments')
-            .select('id, type, amount, payment_date, method, puppy_id, notes')
+            .select(
+              'id, type, amount, payment_date, method, puppy_name, notes'
+            )
             .eq('buyer_id', selectedId)
-            .order('payment_date', { ascending: false }),
-          sb
-            .from('transport_requests')
+            .order('payment_date', { ascending: true })
+          if (!payRes.error && payRes.data) {
+            payments = payRes.data as PaymentSummary[]
+          }
+        } catch {}
+
+        // transports
+        let transports: TransportSummary[] = []
+        try {
+          const tRes = await sb
+            .from('transport_trips')
             .select(
               'id, trip_date, from_location, to_location, miles, tolls, hotel_cost, fuel_cost'
             )
             .eq('buyer_id', selectedId)
-            .order('trip_date', { ascending: false }),
-        ])
+            .order('trip_date', { ascending: true })
+          if (!tRes.error && tRes.data) {
+            transports = tRes.data as TransportSummary[]
+          }
+        } catch {}
 
-        if (buyerRes.error) throw buyerRes.error
-        if (puppiesRes.error) throw puppiesRes.error
-        if (payRes.error) throw payRes.error
-        if (transRes.error) throw transRes.error
-
-        const buyer = buyerRes.data as BuyerDetail['buyer']
-
-        const rawPuppies = (puppiesRes.data || []) as any[]
-        const puppies: PuppySummary[] = rawPuppies.map((p) => ({
-          id: p.id,
-          name: p.name,
-          status: p.status,
-          price: p.price,
-          dam_name: null,
-        }))
-
-        const puppyMap = new Map<string, PuppySummary>()
-        puppies.forEach((p) => {
-          if (p.id) puppyMap.set(p.id, p)
-        })
-
-        const payments: PaymentSummary[] = (payRes.data || []).map((p: any) => ({
-          id: p.id,
-          type: p.type,
-          amount: p.amount,
-          payment_date: p.payment_date,
-          method: p.method,
-          puppy_name: p.puppy_id ? puppyMap.get(p.puppy_id)?.name || null : null,
-          notes: p.notes ?? null,
-        }))
-
-        const transports = (transRes.data || []) as TransportSummary[]
-
-        setDetail({
+        const detailObj: BuyerDetail = {
           buyer,
           puppies,
           payments,
           transports,
-        })
+        }
+        setDetail(detailObj)
+
+        // Seed pricing drafts
+        setPriceDraft(
+          buyer.base_price != null && !Number.isNaN(buyer.base_price)
+            ? String(buyer.base_price)
+            : ''
+        )
+        setCreditsDraft(
+          buyer.credits != null && !Number.isNaN(buyer.credits)
+            ? String(buyer.credits)
+            : ''
+        )
+        setAdminFeeDraft(
+          buyer.admin_fee_financing != null &&
+            !Number.isNaN(buyer.admin_fee_financing)
+            ? String(buyer.admin_fee_financing)
+            : ''
+        )
       } catch (e: any) {
         setError(e?.message || 'Failed to load buyer details.')
       } finally {
-        setLoadingDetail(false)
+        setDetailLoading(false)
       }
     })()
   }, [selectedId])
 
-  // Add buyer
-  async function handleAddBuyer(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleAddBuyer() {
     if (!newBuyerName.trim()) return
     setSavingBuyer(true)
-    setError(null)
     try {
       const sb = await getBrowserClient()
       const { data, error } = await sb
         .from('puppy_buyers')
         .insert({
           full_name: newBuyerName.trim(),
-          email: newBuyerEmail.trim() || null,
-          phone: newBuyerPhone.trim() || null,
-          source: 'manual',
+          email: newBuyerEmail || null,
+          phone: newBuyerPhone || null,
         })
-        .select('id, full_name, email, phone, city, state, created_at')
+        .select(
+          'id, full_name, email, phone, city, state, created_at'
+        )
         .single()
       if (error) throw error
-      const newRow = data as BuyerRow
-      setBuyers((prev) => [newRow, ...prev])
-      setSelectedId(newRow.id)
+      const row = data as BuyerRow
+      setBuyers((prev) =>
+        [...prev, row].sort((a, b) =>
+          a.full_name.localeCompare(b.full_name)
+        )
+      )
+      setSelectedId(row.id)
       setNewBuyerName('')
       setNewBuyerEmail('')
       setNewBuyerPhone('')
     } catch (e: any) {
-      setError(e?.message || 'Failed to add buyer.')
+      alert(e?.message || 'Failed to add buyer.')
     } finally {
       setSavingBuyer(false)
     }
   }
 
-  // Add puppy manually
-  async function handleAddPuppy(e: React.FormEvent) {
-    e.preventDefault()
-    if (!selectedId) return
+  async function handleAddPuppy() {
+    if (!detail || !selectedId) return
     if (!newPuppyName.trim()) return
-
-    setSavingPuppy(true)
-    setError(null)
+    const priceNum = parseFloat(newPuppyPrice || '0') || 0
     try {
       const sb = await getBrowserClient()
-      const priceNum = newPuppyPrice ? Number(newPuppyPrice) : null
-
       const { data, error } = await sb
-        .from('puppies')
+        .from('puppy_buyer_puppies')
         .insert({
           buyer_id: selectedId,
           name: newPuppyName.trim(),
-          status: newPuppyStatus || null,
+          status: newPuppyStatus,
           price: priceNum,
         })
         .select('id, name, status, price')
         .single()
-
       if (error) throw error
-
-      const inserted: PuppySummary = {
-        id: data.id,
-        name: data.name,
-        status: data.status,
-        price: data.price,
-        dam_name: null,
-      }
-
-      setDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              puppies: [inserted, ...prev.puppies],
-            }
-          : prev
-      )
-
+      const pup = data as PuppySummary
+      setDetail({
+        ...detail,
+        puppies: [...detail.puppies, pup],
+      })
       setNewPuppyName('')
-      setNewPuppyStatus('')
       setNewPuppyPrice('')
+      setNewPuppyStatus('reserved')
     } catch (e: any) {
-      setError(e?.message || 'Failed to add puppy.')
-    } finally {
-      setSavingPuppy(false)
+      alert(e?.message || 'Failed to add puppy.')
     }
   }
 
-  // Add payment manually
-  async function handleAddPayment(e: React.FormEvent) {
-    e.preventDefault()
-    if (!selectedId) return
-    if (!newPayAmount) return
-
-    setSavingPayment(true)
-    setError(null)
+  async function handleAddPayment() {
+    if (!detail || !selectedId) return
+    const amountNum = parseFloat(newPayAmount || '0')
+    if (!amountNum || Number.isNaN(amountNum)) return
+    const date = newPayDate || new Date().toISOString().slice(0, 10)
     try {
       const sb = await getBrowserClient()
-      const amountNum = Number(newPayAmount)
-
       const { data, error } = await sb
         .from('puppy_payments')
         .insert({
           buyer_id: selectedId,
-          puppy_id: newPayPuppyId || null,
-          type: newPayType || 'payment',
+          type: newPayType,
           amount: amountNum,
-          payment_date: newPayDate || null,
+          payment_date: date,
+          puppy_name: newPayPuppy || null,
           method: newPayMethod || null,
-          notes: newPayNotes || null,
         })
-        .select('id, type, amount, payment_date, method, puppy_id, notes')
+        .select(
+          'id, type, amount, payment_date, method, puppy_name, notes'
+        )
         .single()
-
       if (error) throw error
-
-      const puppyName =
-        data.puppy_id && detail
-          ? detail.puppies.find((p) => p.id === data.puppy_id)?.name || null
-          : null
-
-      const inserted: PaymentSummary = {
-        id: data.id,
-        type: data.type,
-        amount: data.amount,
-        payment_date: data.payment_date,
-        method: data.method,
-        puppy_name: puppyName,
-        notes: data.notes ?? null,
-      }
-
-      setDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              payments: [inserted, ...prev.payments],
-            }
-          : prev
-      )
-
-      setNewPayType('')
+      const pay = data as PaymentSummary
+      setDetail({
+        ...detail,
+        payments: [...detail.payments, pay],
+      })
       setNewPayAmount('')
       setNewPayDate('')
       setNewPayMethod('')
-      setNewPayNotes('')
-      setNewPayPuppyId('')
+      setNewPayPuppy('')
+      setNewPayType('payment')
     } catch (e: any) {
-      setError(e?.message || 'Failed to add payment.')
-    } finally {
-      setSavingPayment(false)
+      alert(e?.message || 'Failed to add payment.')
     }
   }
 
+  async function handleSavePricing() {
+    if (!detail || !detail.buyer.id) return
+    setSavingPricing(true)
+    try {
+      const base_price = parseFloat(priceDraft || '0') || 0
+      const credits = parseFloat(creditsDraft || '0') || 0
+      const admin_fee_financing =
+        parseFloat(adminFeeDraft || '0') || 0
+
+      const sb = await getBrowserClient()
+      const { error } = await sb
+        .from('puppy_buyers')
+        .update({ base_price, credits, admin_fee_financing })
+        .eq('id', detail.buyer.id)
+      if (error) throw error
+
+      setDetail({
+        ...detail,
+        buyer: {
+          ...detail.buyer,
+          base_price,
+          credits,
+          admin_fee_financing,
+        },
+      })
+    } catch (e: any) {
+      alert(e?.message || 'Failed to save pricing.')
+    } finally {
+      setSavingPricing(false)
+    }
+  }
+
+  const totalPaid = (detail?.payments || []).reduce(
+    (sum, p) => sum + (p.amount || 0),
+    0
+  )
+  const puppiesTotal = (detail?.puppies || []).reduce(
+    (sum, p) => sum + (p.price || 0),
+    0
+  )
+  const basePrice = detail?.buyer.base_price || 0
+  const credits = detail?.buyer.credits || 0
+  const adminFee = detail?.buyer.admin_fee_financing || 0
+  const effectivePrice = basePrice > 0 ? basePrice : puppiesTotal
+  const balance = effectivePrice + adminFee - credits - totalPaid
+
   return (
-    <div className="buyersWrapper">
+    <section className="buyersWrap">
       <header className="buyersHeader">
-        <div>
-          <h1>Buyers</h1>
-          <p className="muted">
-            Manage your approved families, their puppies, payment history, and
-            transportation details.
-          </p>
-        </div>
+        <h1>Buyers</h1>
+        <p className="muted">
+          Manage approved families, their puppies, payment history, and
+          transportation details.
+        </p>
       </header>
 
-      {/* Add Buyer */}
-      <section className="addBuyerCard">
-        <h2>Add Buyer</h2>
-        <p className="muted">
-          You can also auto-create buyers later from approved applications.
-        </p>
-        <form className="addBuyerForm" onSubmit={handleAddBuyer}>
+      {/* Add buyer strip */}
+      <div className="addBuyer">
+        <div className="addBuyerTitle">Add Buyer</div>
+        <div className="addBuyerSubtitle">
+          You can also auto-create buyers later from approved
+          applications.
+        </div>
+        <div className="addBuyerRow">
           <input
             placeholder="Full name"
             value={newBuyerName}
             onChange={(e) => setNewBuyerName(e.target.value)}
-            required
           />
           <input
             placeholder="Email (optional)"
-            type="email"
             value={newBuyerEmail}
             onChange={(e) => setNewBuyerEmail(e.target.value)}
           />
@@ -876,327 +945,322 @@ function BuyersView() {
             value={newBuyerPhone}
             onChange={(e) => setNewBuyerPhone(e.target.value)}
           />
-          <button type="submit" disabled={savingBuyer}>
+          <button
+            type="button"
+            onClick={handleAddBuyer}
+            disabled={savingBuyer || !newBuyerName.trim()}
+          >
             {savingBuyer ? 'Saving…' : 'Save Buyer'}
           </button>
-        </form>
-      </section>
+        </div>
+      </div>
 
-      {error && <div className="errorBanner">{error}</div>}
-
-      <section className="buyersMain">
+      <div className="buyersLayout">
         {/* LEFT LIST */}
-        <div className="buyersListCard">
-          <div className="buyersListHeader">
-            <h3>All Buyers</h3>
-            {loadingList && <span className="miniTag">Loading…</span>}
-          </div>
-          <div className="buyersList">
-            {buyers.length === 0 && !loadingList && (
-              <div className="emptyState">
-                No buyers yet. Add your first buyer above.
-              </div>
-            )}
-            {buyers.map((b) => (
+        <aside className="buyersList">
+          <div className="listTitle">All Buyers</div>
+          {loading && <div className="listEmpty">Loading…</div>}
+          {!loading && !buyers.length && (
+            <div className="listEmpty">No buyers yet.</div>
+          )}
+          {!loading &&
+            buyers.map((b) => (
               <button
                 key={b.id}
                 type="button"
-                className={`buyerRow ${selectedId === b.id ? 'active' : ''}`}
+                className={
+                  'buyerItem ' + (b.id === selectedId ? 'active' : '')
+                }
                 onClick={() => setSelectedId(b.id)}
               >
-                <div className="buyerRowTop">
-                  <span className="buyerName">{b.full_name}</span>
-                  {b.city && (
-                    <span className="buyerLocation">
-                      {b.city}
-                      {b.state ? `, ${b.state}` : ''}
-                    </span>
-                  )}
-                </div>
-                <div className="buyerRowBottom">
-                  {b.email && <span className="chip">{b.email}</span>}
-                  {b.phone && <span className="chip">{b.phone}</span>}
+                <div className="buyerName">{b.full_name}</div>
+                <div className="buyerSub">
+                  {b.city && b.state ? `${b.city}, ${b.state}` : '—'}
                 </div>
               </button>
             ))}
-          </div>
-        </div>
+        </aside>
 
         {/* RIGHT DETAIL */}
-        <div className="buyerDetailCard">
-          {(!detail || loadingDetail) && (
-            <div className="detailPlaceholder">
-              {loadingDetail
-                ? 'Loading buyer details…'
-                : 'Select a buyer from the list.'}
+        <div className="buyersDetail">
+          {error && <div className="detailError">{error}</div>}
+          {detailLoading && !detail && (
+            <div className="detailEmpty">Loading buyer…</div>
+          )}
+          {!detailLoading && !detail && (
+            <div className="detailEmpty">
+              Select a buyer on the left to view details.
             </div>
           )}
-
-          {detail && !loadingDetail && (
+          {detail && (
             <>
-              <div className="buyerDetailHeader">
+              <h2>{detail.buyer.full_name}</h2>
+              <div className="sectionLabel">Buyer details</div>
+
+              {/* CONTACT */}
+              <div className="contactGrid">
                 <div>
-                  <h2>{detail.buyer.full_name}</h2>
-                  <p className="muted">
-                    {detail.buyer.city ? (
-                      <>
-                        {detail.buyer.city}
-                        {detail.buyer.state ? `, ${detail.buyer.state}` : ''}
-                      </>
-                    ) : (
-                      'Buyer details'
-                    )}
-                  </p>
+                  <div className="fieldLabel">Email</div>
+                  <div className="fieldValue">
+                    {detail.buyer.email || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="fieldLabel">Phone</div>
+                  <div className="fieldValue">
+                    {detail.buyer.phone || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="fieldLabel">Address</div>
+                  <div className="fieldValue">
+                    {detail.buyer.address_line1 ||
+                    detail.buyer.city ||
+                    detail.buyer.state
+                      ? [
+                          detail.buyer.address_line1,
+                          detail.buyer.city,
+                          detail.buyer.state,
+                          detail.buyer.postal_code,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')
+                      : '—'}
+                  </div>
                 </div>
               </div>
 
-              {/* Contact */}
-              <section className="detailSection">
-                <h3>Contact Information</h3>
-                <div className="detailGrid">
-                  <div>
-                    <div className="label">Email</div>
-                    <div>{detail.buyer.email || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="label">Phone</div>
-                    <div>{detail.buyer.phone || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="label">Address</div>
-                    <div>
-                      {detail.buyer.address_line1 && (
-                        <div>{detail.buyer.address_line1}</div>
-                      )}
-                      {(detail.buyer.city ||
-                        detail.buyer.state ||
-                        detail.buyer.postal_code) && (
-                        <div>
-                          {detail.buyer.city}
-                          {detail.buyer.state ? `, ${detail.buyer.state}` : ''}
-                          {detail.buyer.postal_code
-                            ? ` ${detail.buyer.postal_code}`
-                            : ''}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* Puppies */}
-              <section className="detailSection">
-                <h3>Puppies</h3>
+              {/* PUPPIES */}
+              <div className="sectionBlock">
+                <div className="sectionLabel">Puppies</div>
                 {detail.puppies.length === 0 && (
-                  <div className="emptyLine">No puppies assigned yet.</div>
+                  <div className="fieldValue">
+                    No puppies assigned yet.
+                  </div>
                 )}
                 {detail.puppies.length > 0 && (
-                  <div className="table">
-                    <div className="tableHead">
-                      <span>Puppy</span>
-                      <span>Status</span>
-                      <span>Dam</span>
-                      <span>Price</span>
-                    </div>
-                    {detail.puppies.map((p) => (
-                      <div key={p.id} className="tableRow">
-                        <span className="clickableName">
-                          {p.name || 'Unnamed'}
-                        </span>
-                        <span>{p.status || '—'}</span>
-                        <span>{p.dam_name || '—'}</span>
-                        <span>
-                          {p.price != null ? `$${p.price.toFixed(2)}` : '—'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <table className="simpleTable">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.puppies.map((p) => (
+                        <tr key={p.id}>
+                          <td>{p.name || '—'}</td>
+                          <td>{p.status || '—'}</td>
+                          <td>{fmtCurrency(p.price || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
 
-                {/* Manual puppy form */}
-                <div className="miniForm">
-                  <div className="miniFormTitle">Add Puppy (manual)</div>
-                  <form className="miniFormRow" onSubmit={handleAddPuppy}>
-                    <input
-                      placeholder="Name"
-                      value={newPuppyName}
-                      onChange={(e) => setNewPuppyName(e.target.value)}
-                      required
-                    />
-                    <select
-                      value={newPuppyStatus}
-                      onChange={(e) => setNewPuppyStatus(e.target.value)}
-                    >
-                      <option value="">Status</option>
-                      <option value="available">Available</option>
-                      <option value="reserved">Reserved</option>
-                      <option value="sold">Sold</option>
-                      <option value="kept">Kept</option>
-                    </select>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Price"
-                      value={newPuppyPrice}
-                      onChange={(e) => setNewPuppyPrice(e.target.value)}
-                    />
-                    <button type="submit" disabled={savingPuppy}>
-                      {savingPuppy ? 'Saving…' : 'Save'}
-                    </button>
-                  </form>
+                <div className="subLabel">Add Puppy (manual)</div>
+                <div className="rowInputs">
+                  <input
+                    placeholder="Name"
+                    value={newPuppyName}
+                    onChange={(e) => setNewPuppyName(e.target.value)}
+                  />
+                  <select
+                    value={newPuppyStatus}
+                    onChange={(e) => setNewPuppyStatus(e.target.value)}
+                  >
+                    <option value="reserved">Reserved</option>
+                    <option value="sold">Sold</option>
+                    <option value="in-care">In care</option>
+                  </select>
+                  <input
+                    placeholder="Price"
+                    value={newPuppyPrice}
+                    onChange={(e) => setNewPuppyPrice(e.target.value)}
+                  />
+                  <button type="button" onClick={handleAddPuppy}>
+                    Save
+                  </button>
                 </div>
-              </section>
+              </div>
 
-              {/* Payments */}
-              <section className="detailSection">
-                <h3>Payments</h3>
+              {/* PAYMENTS + SUMMARY */}
+              <div className="sectionBlock">
+                <div className="sectionLabel">Payments</div>
+
+                {/* SUMMARY ROW */}
+                <div className="paySummary">
+                  <div className="payCol">
+                    <label>Price</label>
+                    <input
+                      value={priceDraft}
+                      onChange={(e) => setPriceDraft(e.target.value)}
+                      placeholder={
+                        puppiesTotal > 0
+                          ? `Default from puppies: ${fmtCurrency(
+                              puppiesTotal
+                            )}`
+                          : '0.00'
+                      }
+                    />
+                  </div>
+                  <div className="payCol">
+                    <label>Credits</label>
+                    <input
+                      value={creditsDraft}
+                      onChange={(e) => setCreditsDraft(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="payCol">
+                    <label>Admin Fee Financing</label>
+                    <input
+                      value={adminFeeDraft}
+                      onChange={(e) => setAdminFeeDraft(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="payCol readonly">
+                    <label>Total Paid</label>
+                    <div className="summaryValue">
+                      {fmtCurrency(totalPaid)}
+                    </div>
+                  </div>
+                </div>
+                <div className="paySummaryFooter">
+                  <button
+                    type="button"
+                    onClick={handleSavePricing}
+                    disabled={savingPricing}
+                  >
+                    {savingPricing ? 'Saving…' : 'Save Pricing'}
+                  </button>
+                  <div className="balanceText">
+                    Balance:{' '}
+                    <span>
+                      {fmtCurrency(
+                        Number.isFinite(balance) ? balance : 0
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {/* PAYMENTS TABLE */}
                 {detail.payments.length === 0 && (
-                  <div className="emptyLine">No payments recorded.</div>
+                  <div className="fieldValue">
+                    No payments recorded.
+                  </div>
                 )}
                 {detail.payments.length > 0 && (
-                  <div className="table payments">
-                    <div className="tableHead">
-                      <span>Date</span>
-                      <span>Type</span>
-                      <span>Puppy</span>
-                      <span>Amount</span>
-                      <span>Method / Notes</span>
-                    </div>
-                    {detail.payments.map((p) => (
-                      <div key={p.id} className="tableRow">
-                        <span>
-                          {p.payment_date
-                            ? p.payment_date.slice(0, 10)
-                            : '—'}
-                        </span>
-                        <span>{p.type || '—'}</span>
-                        <span>{p.puppy_name || '—'}</span>
-                        <span>
-                          {p.amount != null
-                            ? `$${p.amount.toFixed(2)}`
-                            : '—'}
-                        </span>
-                        <span>
-                          {p.method || '—'}
-                          {p.notes ? ` — ${p.notes}` : ''}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <table className="simpleTable">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Puppy</th>
+                        <th>Amount</th>
+                        <th>Method / Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.payments.map((p) => (
+                        <tr key={p.id}>
+                          <td>{fmtDate(p.payment_date)}</td>
+                          <td>{p.type || '—'}</td>
+                          <td>{p.puppy_name || '—'}</td>
+                          <td>{fmtCurrency(p.amount || 0)}</td>
+                          <td>{p.method || p.notes || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
 
-                {/* Manual payment form */}
-                <div className="miniForm">
-                  <div className="miniFormTitle">Add Payment (manual)</div>
-                  <form className="miniFormRow" onSubmit={handleAddPayment}>
-                    <select
-                      value={newPayType}
-                      onChange={(e) => setNewPayType(e.target.value)}
-                    >
-                      <option value="">Type</option>
-                      <option value="deposit">Deposit</option>
-                      <option value="payment">Payment</option>
-                      <option value="refund">Refund</option>
-                    </select>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Amount"
-                      value={newPayAmount}
-                      onChange={(e) => setNewPayAmount(e.target.value)}
-                      required
-                    />
-                    <input
-                      type="date"
-                      value={newPayDate}
-                      onChange={(e) => setNewPayDate(e.target.value)}
-                    />
-                    <select
-                      value={newPayPuppyId}
-                      onChange={(e) => setNewPayPuppyId(e.target.value)}
-                    >
-                      <option value="">Puppy (optional)</option>
-                      {detail.puppies.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name || 'Unnamed'}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      placeholder="Method (cash, PayPal...)"
-                      value={newPayMethod}
-                      onChange={(e) => setNewPayMethod(e.target.value)}
-                    />
-                    <input
-                      placeholder="Notes (optional)"
-                      value={newPayNotes}
-                      onChange={(e) => setNewPayNotes(e.target.value)}
-                    />
-                    <button type="submit" disabled={savingPayment}>
-                      {savingPayment ? 'Saving…' : 'Save'}
-                    </button>
-                  </form>
+                <div className="subLabel">Add Payment (manual)</div>
+                <div className="rowInputs">
+                  <select
+                    value={newPayType}
+                    onChange={(e) => setNewPayType(e.target.value)}
+                  >
+                    <option value="deposit">Deposit</option>
+                    <option value="payment">Payment</option>
+                    <option value="refund">Refund</option>
+                  </select>
+                  <input
+                    placeholder="Amount"
+                    value={newPayAmount}
+                    onChange={(e) => setNewPayAmount(e.target.value)}
+                  />
+                  <input
+                    type="date"
+                    value={newPayDate}
+                    onChange={(e) => setNewPayDate(e.target.value)}
+                  />
+                  <input
+                    placeholder="Puppy (optional)"
+                    value={newPayPuppy}
+                    onChange={(e) => setNewPayPuppy(e.target.value)}
+                  />
+                  <input
+                    placeholder="Method / Notes"
+                    value={newPayMethod}
+                    onChange={(e) => setNewPayMethod(e.target.value)}
+                  />
+                  <button type="button" onClick={handleAddPayment}>
+                    Save
+                  </button>
                 </div>
-              </section>
+              </div>
 
-              {/* Transportation */}
-              <section className="detailSection">
-                <h3>Transportation</h3>
+              {/* TRANSPORT */}
+              <div className="sectionBlock">
+                <div className="sectionLabel">Transportation</div>
                 {detail.transports.length === 0 && (
-                  <div className="emptyLine">No trips recorded.</div>
+                  <div className="fieldValue">
+                    No trips recorded.
+                  </div>
                 )}
                 {detail.transports.length > 0 && (
-                  <div className="table">
-                    <div className="tableHead">
-                      <span>Date</span>
-                      <span>Route</span>
-                      <span>Miles</span>
-                      <span>Costs</span>
-                    </div>
-                    {detail.transports.map((t) => (
-                      <div key={t.id} className="tableRow">
-                        <span>
-                          {t.trip_date ? t.trip_date.slice(0, 10) : '—'}
-                        </span>
-                        <span>
-                          {t.from_location || '—'} → {t.to_location || '—'}
-                        </span>
-                        <span>
-                          {t.miles != null ? t.miles.toFixed(1) : '—'}
-                        </span>
-                        <span>
-                          {[
-                            t.tolls || 0,
-                            t.hotel_cost || 0,
-                            t.fuel_cost || 0,
-                          ].some((v) => v > 0)
-                            ? `$${(
-                                (t.tolls || 0) +
-                                (t.hotel_cost || 0) +
-                                (t.fuel_cost || 0)
-                              ).toFixed(2)}`
-                            : '—'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <table className="simpleTable">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Route</th>
+                        <th>Miles</th>
+                        <th>Tolls</th>
+                        <th>Hotel</th>
+                        <th>Fuel</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.transports.map((t) => (
+                        <tr key={t.id}>
+                          <td>{fmtDate(t.trip_date)}</td>
+                          <td>
+                            {t.from_location || '—'} →{' '}
+                            {t.to_location || '—'}
+                          </td>
+                          <td>{t.miles ?? '—'}</td>
+                          <td>{fmtCurrency(t.tolls || 0)}</td>
+                          <td>{fmtCurrency(t.hotel_cost || 0)}</td>
+                          <td>{fmtCurrency(t.fuel_cost || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
-              </section>
+              </div>
             </>
           )}
         </div>
-      </section>
+      </div>
 
       <style jsx>{`
-        :root {
-          --brand: #e0a96d;
-          --brandAlt: #c47a35;
-        }
-        .buyersWrapper {
+        .buyersWrap {
           display: flex;
           flex-direction: column;
           gap: 16px;
-          height: 100%;
         }
         .buyersHeader h1 {
           margin: 0 0 4px;
@@ -1204,275 +1268,564 @@ function BuyersView() {
         .buyersHeader .muted {
           margin: 0;
           color: #9ca3af;
+          font-size: 0.95rem;
         }
-        .addBuyerCard {
-          background: radial-gradient(
-            circle at top left,
-            rgba(15, 23, 42, 0.9),
-            rgba(15, 23, 42, 1)
-          );
+        .addBuyer {
           border-radius: 14px;
-          padding: 14px 16px;
           border: 1px solid #1f2937;
-          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+          background: radial-gradient(circle at top left, #020617, #020617);
+          padding: 10px 12px 12px;
         }
-        .addBuyerCard h2 {
-          margin: 0 0 4px;
-          font-size: 1.05rem;
+        .addBuyerTitle {
+          font-weight: 600;
+          margin-bottom: 2px;
         }
-        .addBuyerCard .muted {
-          margin: 0 0 10px;
-          font-size: 0.9rem;
+        .addBuyerSubtitle {
+          font-size: 0.85rem;
+          color: #9ca3af;
+          margin-bottom: 6px;
         }
-        .addBuyerForm {
-          display: flex;
-          flex-wrap: wrap;
+        .addBuyerRow {
+          display: grid;
+          grid-template-columns: 1.3fr 1.1fr 1.1fr auto;
           gap: 8px;
         }
-        .addBuyerForm input {
-          flex: 1 1 160px;
-          padding: 8px 10px;
+        .addBuyerRow input {
+          background: #020617;
           border-radius: 8px;
           border: 1px solid #1f2937;
-          background: #020617;
+          padding: 7px 8px;
           color: #f9fafb;
+          font-size: 0.9rem;
         }
-        .addBuyerForm input::placeholder {
-          color: #6b7280;
-        }
-        .addBuyerForm button {
-          padding: 8px 14px;
-          border-radius: 999px;
-          border: none;
-          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
+        .addBuyerRow button {
+          border-radius: 8px;
+          border: 1px solid #e0a96d;
+          background: linear-gradient(135deg, #e0a96d, #c47a35);
           color: #111827;
           font-weight: 600;
+          padding: 7px 10px;
+          font-size: 0.9rem;
           cursor: pointer;
         }
-        .addBuyerForm button:disabled {
-          opacity: 0.7;
-          cursor: default;
+        .buyersLayout {
+          display: grid;
+          grid-template-columns: 260px minmax(0, 1fr);
+          gap: 16px;
         }
-        .errorBanner {
+        .buyersList {
+          border-radius: 14px;
+          border: 1px solid #1f2937;
+          background: #020617;
+          padding: 10px 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .listTitle {
+          font-weight: 600;
+          font-size: 0.95rem;
+          margin-bottom: 4px;
+        }
+        .listEmpty {
+          font-size: 0.9rem;
+          color: #9ca3af;
+          padding: 4px 2px;
+        }
+        .buyerItem {
+          border-radius: 10px;
+          border: 1px solid #1f2937;
+          background: #020617;
+          text-align: left;
+          padding: 6px 8px;
+          cursor: pointer;
+          font-size: 0.9rem;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .buyerItem.active {
+          border-color: #e0a96d;
+          background: radial-gradient(circle at top left, #111827, #020617);
+        }
+        .buyerName {
+          font-weight: 500;
+        }
+        .buyerSub {
+          font-size: 0.8rem;
+          color: #9ca3af;
+        }
+        .buyersDetail {
+          border-radius: 14px;
+          border: 1px solid #1f2937;
+          background: radial-gradient(circle at top left, #020617, #020617);
+          padding: 14px 14px 16px;
+        }
+        .buyersDetail h2 {
+          margin: 0 0 4px;
+        }
+        .detailEmpty {
+          color: #9ca3af;
+          font-size: 0.95rem;
+        }
+        .detailError {
+          background: rgba(127, 29, 29, 0.9);
+          border: 1px solid #b91c1c;
+          padding: 8px 10px;
+          border-radius: 8px;
+          margin-bottom: 8px;
+          font-size: 0.9rem;
+        }
+        .sectionLabel {
+          margin-top: 10px;
+          margin-bottom: 4px;
+          font-weight: 600;
+          font-size: 0.9rem;
+        }
+        .sectionBlock {
+          margin-top: 10px;
+        }
+        .contactGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 8px;
+        }
+        .fieldLabel {
+          font-size: 0.75rem;
+          color: #9ca3af;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          margin-bottom: 2px;
+        }
+        .fieldValue {
+          font-size: 0.9rem;
+        }
+        .simpleTable {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 4px;
+          font-size: 0.9rem;
+        }
+        .simpleTable th,
+        .simpleTable td {
+          border-bottom: 1px solid #1f2937;
+          padding: 4px 4px;
+          text-align: left;
+        }
+        .simpleTable th {
+          font-size: 0.8rem;
+          color: #9ca3af;
+          font-weight: 500;
+        }
+        .subLabel {
+          margin-top: 8px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #9ca3af;
+        }
+        .rowInputs {
+          margin-top: 4px;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          gap: 6px;
+        }
+        .rowInputs input,
+        .rowInputs select {
+          background: #020617;
+          border-radius: 8px;
+          border: 1px solid #1f2937;
+          padding: 6px 8px;
+          color: #f9fafb;
+          font-size: 0.85rem;
+        }
+        .rowInputs button {
+          border-radius: 8px;
+          border: 1px solid #e0a96d;
+          background: linear-gradient(135deg, #e0a96d, #c47a35);
+          color: #111827;
+          font-weight: 600;
+          padding: 6px 8px;
+          font-size: 0.85rem;
+          cursor: pointer;
+        }
+        .paySummary {
+          margin-top: 6px;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 8px;
+        }
+        .payCol label {
+          display: block;
+          font-size: 0.75rem;
+          color: #9ca3af;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          margin-bottom: 2px;
+        }
+        .payCol input {
+          width: 100%;
+          background: #020617;
+          border-radius: 8px;
+          border: 1px solid #1f2937;
+          padding: 6px 8px;
+          color: #f9fafb;
+          font-size: 0.85rem;
+        }
+        .payCol.readonly .summaryValue {
+          border-radius: 8px;
+          border: 1px dashed #1f2937;
+          padding: 7px 8px;
+          font-size: 0.9rem;
+        }
+        .paySummaryFooter {
+          margin-top: 6px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .paySummaryFooter button {
+          border-radius: 8px;
+          border: 1px solid #e0a96d;
+          background: linear-gradient(135deg, #e0a96d, #c47a35);
+          color: #111827;
+          font-weight: 600;
+          padding: 6px 10px;
+          font-size: 0.85rem;
+          cursor: pointer;
+        }
+        .balanceText {
+          font-size: 0.9rem;
+          color: #e5e7eb;
+        }
+        .balanceText span {
+          font-weight: 600;
+        }
+      `}</style>
+    </section>
+  )
+}
+
+/* ============================================
+   PAYMENTS TAB (per-year + grand totals)
+   ============================================ */
+
+function PaymentsView() {
+  const [stats, setStats] = useState<PaymentStats | null>(null)
+  const [activeYear, setActiveYear] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    ;(async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const sb = await getBrowserClient()
+        const { data, error } = await sb
+          .from('puppy_payments')
+          .select('id, buyer_id, type, amount, payment_date, method')
+          .order('payment_date', { ascending: false })
+        if (error) throw error
+
+        const rowsRaw = (data || []) as any[]
+
+        // Get buyer names
+        const buyerIds = Array.from(
+          new Set(
+            rowsRaw
+              .map((r) => r.buyer_id as string | null)
+              .filter(Boolean)
+          )
+        )
+        let buyerNameMap = new Map<string, string>()
+        if (buyerIds.length) {
+          const buyersRes = await sb
+            .from('puppy_buyers')
+            .select('id, full_name')
+            .in('id', buyerIds)
+          if (!buyersRes.error && buyersRes.data) {
+            for (const b of buyersRes.data as any[]) {
+              buyerNameMap.set(b.id as string, b.full_name as string)
+            }
+          }
+        }
+
+        const rows: PaymentRow[] = rowsRaw.map((r) => ({
+          id: String(r.id),
+          buyer_id: r.buyer_id ?? null,
+          buyer_name: r.buyer_id ? buyerNameMap.get(r.buyer_id) || null : null,
+          type: r.type ?? null,
+          amount: typeof r.amount === 'number' ? r.amount : null,
+          payment_date: r.payment_date ?? null,
+          method: r.method ?? null,
+        }))
+
+        const byYear: Record<string, PaymentRow[]> = {}
+        const yearMap: Record<string, YearSummary> = {}
+
+        let grandTotal = 0
+        let grandCount = 0
+        let latestDate: string | null = null
+
+        for (const row of rows) {
+          const year =
+            row.payment_date && row.payment_date.length >= 4
+              ? row.payment_date.slice(0, 4)
+              : 'Unknown'
+          if (!byYear[year]) byYear[year] = []
+          byYear[year].push(row)
+
+          const amount = row.amount || 0
+          grandTotal += amount
+          grandCount += 1
+
+          if (!yearMap[year]) {
+            yearMap[year] = {
+              year,
+              count: 0,
+              total: 0,
+              depositTotal: 0,
+              paymentTotal: 0,
+              refundTotal: 0,
+            }
+          }
+          const ys = yearMap[year]
+          ys.count += 1
+          ys.total += amount
+
+          const kind = (row.type || '').toLowerCase()
+          if (kind === 'deposit') ys.depositTotal += amount
+          else if (kind === 'refund') ys.refundTotal += amount
+          else ys.paymentTotal += amount
+
+          if (row.payment_date) {
+            if (!latestDate || row.payment_date > latestDate) {
+              latestDate = row.payment_date
+            }
+          }
+        }
+
+        const years = Object.values(yearMap).sort((a, b) =>
+          a.year < b.year ? 1 : -1
+        )
+
+        const statObj: PaymentStats = {
+          years,
+          grandTotal,
+          grandCount,
+          latestDate,
+          byYear,
+        }
+        setStats(statObj)
+        if (!activeYear && years.length) {
+          setActiveYear(years[0].year)
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load payments.')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  const activeRows =
+    activeYear && stats ? stats.byYear[activeYear] || [] : []
+
+  return (
+    <section className="payWrap">
+      <header className="payHeader">
+        <div>
+          <h1>Payments</h1>
+          <p className="muted">
+            Breakdown of deposits, payments, and refunds by year, with
+            grand totals for your program.
+          </p>
+        </div>
+      </header>
+
+      {error && <div className="payError">{error}</div>}
+      {loading && <div className="payEmpty">Loading payments…</div>}
+
+      {stats && (
+        <>
+          <div className="paySummaryRow">
+            <div className="summaryCard">
+              <div className="summaryLabel">Grand Total</div>
+              <div className="summaryValue">
+                {fmtCurrency(stats.grandTotal)}
+              </div>
+              <div className="summarySub">
+                {stats.grandCount} payments recorded
+              </div>
+            </div>
+            <div className="summaryCard">
+              <div className="summaryLabel">Latest Payment</div>
+              <div className="summaryValue">
+                {fmtDate(stats.latestDate)}
+              </div>
+              <div className="summarySub">Most recent payment date</div>
+            </div>
+          </div>
+
+          <div className="yearChips">
+            {stats.years.map((y) => (
+              <button
+                key={y.year}
+                type="button"
+                className={
+                  'yearChip ' + (y.year === activeYear ? 'active' : '')
+                }
+                onClick={() => setActiveYear(y.year)}
+              >
+                <div className="chipYear">{y.year}</div>
+                <div className="chipLine">
+                  {y.count} payments · {fmtCurrency(y.total)}
+                </div>
+                <div className="chipBreakdown">
+                  D {fmtCurrency(y.depositTotal)} · P{' '}
+                  {fmtCurrency(y.paymentTotal)} · R{' '}
+                  {fmtCurrency(y.refundTotal)}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="payTableBlock">
+            <h2>
+              {activeYear ? `Payments in ${activeYear}` : 'Payments'}
+            </h2>
+            {!activeRows.length && (
+              <div className="payEmpty">No payments for this year.</div>
+            )}
+            {activeRows.length > 0 && (
+              <table className="simpleTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Buyer</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Method / Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeRows.map((r) => (
+                    <tr key={r.id}>
+                      <td>{fmtDate(r.payment_date)}</td>
+                      <td>{r.buyer_name || '—'}</td>
+                      <td>{r.type || '—'}</td>
+                      <td>{fmtCurrency(r.amount || 0)}</td>
+                      <td>{r.method || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      <style jsx>{`
+        .payWrap {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .payHeader h1 {
+          margin: 0 0 4px;
+        }
+        .payHeader .muted {
+          margin: 0;
+          color: #9ca3af;
+          font-size: 0.95rem;
+        }
+        .payError {
           background: rgba(127, 29, 29, 0.9);
           border: 1px solid #b91c1c;
           padding: 8px 10px;
           border-radius: 8px;
           font-size: 0.9rem;
         }
-        .buyersMain {
-          display: grid;
-          grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
-          gap: 16px;
-          flex: 1;
-          min-height: 0;
-        }
-        .buyersListCard,
-        .buyerDetailCard {
-          background: rgba(15, 23, 42, 0.96);
-          border-radius: 14px;
-          border: 1px solid #1f2937;
-          padding: 12px 12px 10px;
-          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
-        }
-        .buyersListHeader {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 8px;
-        }
-        .buyersListHeader h3 {
-          margin: 0;
-          font-size: 0.95rem;
-        }
-        .miniTag {
-          font-size: 0.8rem;
-          color: #9ca3af;
-        }
-        .buyersList {
-          max-height: 420px;
-          overflow: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .buyerRow {
-          width: 100%;
-          text-align: left;
-          border-radius: 10px;
-          border: 1px solid #111827;
-          background: #020617;
-          padding: 8px 9px;
-          cursor: pointer;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          transition:
-            background 0.12s ease,
-            border-color 0.12s ease,
-            transform 0.12s ease;
-        }
-        .buyerRow:hover {
-          background: #0b1120;
-          transform: translateY(-1px);
-        }
-        .buyerRow.active {
-          border-color: var(--brand);
-          box-shadow: 0 0 0 1px rgba(224, 169, 109, 0.4);
-        }
-        .buyerRowTop {
-          display: flex;
-          justify-content: space-between;
-          gap: 8px;
-          align-items: baseline;
-        }
-        .buyerName {
-          font-weight: 600;
-          font-size: 0.95rem;
-        }
-        .buyerLocation {
-          font-size: 0.8rem;
-          color: #9ca3af;
-        }
-        .buyerRowBottom {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 4px;
-        }
-        .chip {
-          font-size: 0.75rem;
-          padding: 2px 6px;
-          border-radius: 999px;
-          background: #111827;
-          color: #e5e7eb;
-        }
-        .buyerDetailCard {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          min-height: 0;
-        }
-        .detailPlaceholder {
-          margin: auto;
-          color: #9ca3af;
-        }
-        .buyerDetailHeader h2 {
-          margin: 0 0 2px;
-        }
-        .buyerDetailHeader .muted {
-          margin: 0;
-          color: #9ca3af;
-        }
-        .detailSection {
-          margin-top: 8px;
-        }
-        .detailSection h3 {
-          margin: 0 0 6px;
-          font-size: 0.95rem;
-        }
-        .detailGrid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-          gap: 8px 16px;
+        .payEmpty {
           font-size: 0.9rem;
+          color: #9ca3af;
         }
-        .label {
-          font-size: 0.78rem;
+        .paySummaryRow {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 10px;
+        }
+        .summaryCard {
+          border-radius: 12px;
+          border: 1px solid #1f2937;
+          background: radial-gradient(circle at top left, #020617, #020617);
+          padding: 10px 12px;
+        }
+        .summaryLabel {
+          font-size: 0.8rem;
+          color: #9ca3af;
           text-transform: uppercase;
           letter-spacing: 0.04em;
-          color: #9ca3af;
           margin-bottom: 2px;
         }
-        .emptyState,
-        .emptyLine {
-          font-size: 0.9rem;
-          color: #9ca3af;
-        }
-        .table {
-          border-radius: 10px;
-          border: 1px solid #111827;
-          overflow: hidden;
-          font-size: 0.88rem;
-        }
-        .tableHead,
-        .tableRow {
-          display: grid;
-          grid-template-columns: 1.2fr 1fr 1.2fr 0.8fr;
-          gap: 8px;
-          padding: 6px 10px;
-        }
-        .tableHead {
-          background: #020617;
-          border-bottom: 1px solid #111827;
+        .summaryValue {
+          font-size: 1.2rem;
           font-weight: 600;
-          font-size: 0.82rem;
         }
-        .tableRow:nth-child(odd) {
-          background: #020617;
-        }
-        .tableRow:nth-child(even) {
-          background: #02061a;
-        }
-        .table.payments .tableHead,
-        .table.payments .tableRow {
-          grid-template-columns: 1.1fr 0.9fr 1.1fr 0.8fr 1.6fr;
-        }
-        .clickableName {
-          text-decoration: underline;
-          cursor: pointer;
-        }
-        .miniForm {
-          margin-top: 10px;
-          padding-top: 8px;
-          border-top: 1px dashed #1f2937;
-        }
-        .miniFormTitle {
-          font-size: 0.8rem;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
+        .summarySub {
+          margin-top: 2px;
+          font-size: 0.85rem;
           color: #9ca3af;
-          margin-bottom: 4px;
         }
-        .miniFormRow {
+        .yearChips {
           display: flex;
           flex-wrap: wrap;
-          gap: 6px;
+          gap: 8px;
         }
-        .miniFormRow input,
-        .miniFormRow select {
-          flex: 1 1 120px;
-          min-width: 0;
-          padding: 6px 8px;
-          border-radius: 8px;
+        .yearChip {
+          border-radius: 10px;
           border: 1px solid #1f2937;
           background: #020617;
-          color: #f9fafb;
-          font-size: 0.8rem;
-        }
-        .miniFormRow input::placeholder {
-          color: #6b7280;
-        }
-        .miniFormRow button {
-          padding: 6px 10px;
-          border-radius: 999px;
-          border: none;
-          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          color: #111827;
-          font-size: 0.8rem;
-          font-weight: 600;
+          padding: 6px 8px;
+          font-size: 0.85rem;
+          text-align: left;
           cursor: pointer;
-          white-space: nowrap;
         }
-        .miniFormRow button:disabled {
-          opacity: 0.7;
-          cursor: default;
+        .yearChip.active {
+          border-color: #e0a96d;
+          background: radial-gradient(circle at top left, #111827, #020617);
         }
-        @media (max-width: 900px) {
-          .buyersMain {
-            grid-template-columns: 1fr;
-          }
+        .chipYear {
+          font-weight: 600;
+        }
+        .chipLine {
+          font-size: 0.8rem;
+          color: #e5e7eb;
+        }
+        .chipBreakdown {
+          font-size: 0.78rem;
+          color: #9ca3af;
+        }
+        .payTableBlock h2 {
+          margin: 6px 0;
+        }
+        .simpleTable {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 0.9rem;
+        }
+        .simpleTable th,
+        .simpleTable td {
+          border-bottom: 1px solid #1f2937;
+          padding: 4px 4px;
+          text-align: left;
+        }
+        .simpleTable th {
+          font-size: 0.8rem;
+          color: #9ca3af;
+          font-weight: 500;
         }
       `}</style>
-    </div>
+    </section>
   )
 }
