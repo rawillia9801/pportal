@@ -10,13 +10,12 @@
    - 2025-11-12 (Rev E): FIX compile error from malformed arrow near tabs list.
                          Keep tabs as a single constant (no conditional arrow splits).
                          Add tests to assert tabs integrity and path highlighting.
-   - 2025-11-12 (Rev F): Layout update:
-                         • Tabs moved from top bar to left sidebar
-                         • "Create your account" box centered under hero heading
-                         • Bottom action cards centered in a responsive row
-   - 2025-11-12 (Rev G): Supabase import fix for Vercel:
-                         • Use local '@supabase/supabase-js' import (no remote URL)
-                         • Dev tests updated to avoid URL-based import
+   - 2025-11-12 (Rev G): Supabase import fix for Vercel (local '@supabase/supabase-js' import).
+   - 2025-11-12 (Rev H): Visual refresh:
+                         • Dark, professional breeder theme
+                         • Sidebar text made high-contrast and readable
+                         • Signup card now dark glass panel (no flat grey)
+                         • Quick-action cards on darker panels with warm tan accents
    ============================================
    NOTE: Place this file at `src/app/page.tsx` for portal.swvachihuahua.com root.
          If you keep it at `src/app/portal/page.tsx`, set BASE = '/portal'.
@@ -49,7 +48,8 @@ function getSupabaseEnv() {
 async function getBrowserClient(): Promise<AnyClient> {
   if (__sb) return __sb
   const { url, key } = getSupabaseEnv()
-  if (!url || !key) throw new Error('Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  if (!url || !key)
+    throw new Error('Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
   __sb = createClient(url, key)
   return __sb
 }
@@ -60,15 +60,15 @@ async function getBrowserClient(): Promise<AnyClient> {
 // Change to '/portal' only if this file lives at src/app/portal/page.tsx
 const BASE = ''
 
-// Brand palette (SWVA Chihuahua)
+// Brand palette (SWVA Chihuahua – dark, warm, professional)
 const THEME = {
-  bg: '#f7e8d7',
-  panel: '#fff9f2',
-  ink: '#2e2a24',
-  muted: '#6f6257',
-  brand: '#b5835a',
-  brandAlt: '#9a6c49',
-  ok: '#2fa36b',
+  bg: '#020617',        // very dark slate
+  panel: '#020617',     // panel background
+  ink: '#f9fafb',       // main text
+  muted: '#9ca3af',     // secondary text
+  brand: '#e0a96d',     // warm tan
+  brandAlt: '#c47a35',  // deeper accent
+  ok: '#22c55e',        // success
 }
 
 /* ============================================
@@ -76,7 +76,7 @@ const THEME = {
    ============================================ */
 const IconPaw = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden fill="currentColor" {...props}>
-    <path d="M12 13c-2.6 0-5 1.9-5 4.2C7 19.4 8.6 21 10.7 21h2.6C15.4 21 17 19.4 17 17.2 17 14.9 14.6 13 12 13zm-5.4-2.1c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm10.8 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.5 9.7c1.3 0 2.3-1.2 2.3-2.7S10.8 4.3 9.5 4.3 7.2 5.5 7.2 7s1 2.7 2.3 2.7zm5 0c1.3 0 2.3-1.2 2.3-2.7s-1-2.7-2.3-2.7-2.3 1.2-2.3 2.7 1 2.7 2.3 2.7z"/>
+    <path d="M12 13c-2.6 0-5 1.9-5 4.2C7 19.4 8.6 21 10.7 21h2.6C15.4 21 17 19.4 17 17.2 17 14.9 14.6 13 12 13zm-5.4-2.1c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm10.8 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.5 9.7c1.3 0 2.3-1.2 2.3-2.7S10.8 4.3 9.5 4.3 7.2 5.5 7.2 7s1 2.7 2.3 2.7zm5 0c1.3 0 2.3-1.2 2.3-2.7s-1-2.7-2.3-2.7-2.3 1.2-2.3 2.7 1 2.7 2.3 2.7z" />
   </svg>
 )
 const IconDoc = (p: any) => (
@@ -339,8 +339,8 @@ export default function PortalHome() {
           min-height: 100vh;
           display: flex;
           background:
-            radial-gradient(60% 100% at 100% 0%, #fff6ee 0%, transparent 60%),
-            radial-gradient(60% 100% at 0% 0%, #fff2e6 0%, transparent 60%),
+            radial-gradient(60% 100% at 100% 0%, #0b1120 0%, transparent 60%),
+            radial-gradient(60% 100% at 0% 0%, #020617 0%, transparent 60%),
             var(--bg);
           color: var(--ink);
         }
@@ -363,8 +363,8 @@ export default function PortalHome() {
           width: 230px;
           padding: 16px 12px;
           box-sizing: border-box;
-          border-right: 1px solid #eddccd;
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
+          border-right: 1px solid #1f2937;
+          background: linear-gradient(180deg, #020617, #111827);
           backdrop-filter: saturate(1.1) blur(8px);
           position: sticky;
           top: 0;
@@ -373,6 +373,7 @@ export default function PortalHome() {
           display: flex;
           flex-direction: column;
           gap: 16px;
+          color: #e5e7eb;
         }
 
         .brand {
@@ -387,16 +388,16 @@ export default function PortalHome() {
           height: 42px;
           border-radius: 12px;
           background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          box-shadow: inset 0 0 0 4px #fff;
+          box-shadow: 0 0 0 3px #020617;
         }
 
         .pawbubble {
           position: absolute;
           width: 8px;
           height: 8px;
-          background: #fff;
+          background: #f9fafb;
           border-radius: 50%;
-          opacity: 0.7;
+          opacity: 0.85;
         }
         .pawbubble:nth-child(1) {
           top: 10px;
@@ -412,16 +413,17 @@ export default function PortalHome() {
         }
 
         .title {
-          line-height: 1;
+          line-height: 1.15;
         }
         .title .line1 {
           font-weight: 800;
           letter-spacing: 0.2px;
+          color: #f9fafb;
         }
         .title .line2 {
-          text-align: center;
+          text-align: left;
           font-size: 0.9rem;
-          color: var(--muted);
+          color: #cbd5f5;
         }
 
         .tabs {
@@ -437,30 +439,32 @@ export default function PortalHome() {
           gap: 8px;
           padding: 9px 10px;
           border-radius: 12px;
-          background: rgba(255, 255, 255, 0.7);
-          border: 1px solid #eddccd;
-          color: var(--ink);
+          background: rgba(15, 23, 42, 0.95);
+          border: 1px solid #1f2937;
+          color: #e5e7eb;
           text-decoration: none;
           font-size: 0.92rem;
           transition:
             transform 0.12s ease,
             background 0.12s ease,
-            box-shadow 0.12s ease;
+            box-shadow 0.12s ease,
+            border-color 0.12s ease;
         }
         .tab:hover {
           transform: translateY(-1px);
-          background: #fff;
-          box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+          background: #111827;
+          box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+          border-color: #334155;
         }
         .tab.active {
           background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          color: #fff;
+          color: #111827;
           border-color: transparent;
         }
 
         /* HERO */
         .hero {
-          padding: 36px 24px 24px;
+          padding: 48px 24px 24px;
         }
         .heroInner {
           max-width: 900px;
@@ -472,7 +476,7 @@ export default function PortalHome() {
           gap: 24px;
         }
         .heroText h1 {
-          font-size: clamp(28px, 3.2vw, 44px);
+          font-size: clamp(30px, 3.3vw, 46px);
           margin: 0 0 8px;
         }
         .heroText h1 em {
@@ -483,19 +487,21 @@ export default function PortalHome() {
           color: var(--muted);
           font-size: 1.05rem;
           margin: 0;
+          max-width: 720px;
         }
 
         .signup {
-          background: rgba(255, 255, 255, 0.68);
-          border: 1px solid #eddccd;
-          border-radius: 16px;
-          padding: 16px;
-          backdrop-filter: blur(10px);
-          box-shadow: 0 6px 28px rgba(0, 0, 0, 0.06);
+          background: radial-gradient(circle at top left, rgba(148, 163, 184, 0.25), rgba(15, 23, 42, 0.98));
+          border: 1px solid #1f2937;
+          border-radius: 18px;
+          padding: 18px 18px 16px;
+          backdrop-filter: blur(14px);
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
           max-width: 420px;
           width: 100%;
           margin: 0 auto;
           text-align: left;
+          color: var(--ink);
         }
         .signupHd {
           display: flex;
@@ -509,23 +515,28 @@ export default function PortalHome() {
           display: block;
           margin-top: 8px;
           font-size: 0.9rem;
+          color: #e5e7eb;
         }
         .signup input {
           width: 100%;
           padding: 10px;
-          border: 1px solid #e6d7c7;
+          border: 1px solid #1f2937;
           border-radius: 10px;
-          background: #fff;
+          background: #020617;
+          color: var(--ink);
+        }
+        .signup input::placeholder {
+          color: #6b7280;
         }
         .signup input:focus {
           outline: none;
-          box-shadow: 0 0 0 4px rgba(181, 131, 90, 0.2);
+          box-shadow: 0 0 0 2px rgba(224, 169, 109, 0.35);
           border-color: var(--brand);
         }
         .btn {
           appearance: none;
-          border: 1px solid #e6d7c7;
-          background: #fff;
+          border: 1px solid #1f2937;
+          background: #020617;
           color: var(--ink);
           padding: 10px 12px;
           border-radius: 10px;
@@ -535,7 +546,8 @@ export default function PortalHome() {
           margin-top: 12px;
           background: linear-gradient(135deg, var(--brand), var(--brandAlt));
           border-color: transparent;
-          color: #fff;
+          color: #111827;
+          font-weight: 600;
         }
         .btn:disabled {
           opacity: 0.7;
@@ -543,11 +555,12 @@ export default function PortalHome() {
         }
         .note {
           margin-top: 8px;
-          background: #fff;
-          border: 1px dashed #e6d7c7;
+          background: rgba(15, 23, 42, 0.9);
+          border: 1px dashed #334155;
           padding: 8px;
           border-radius: 8px;
           color: var(--muted);
+          font-size: 0.9rem;
         }
         .mini {
           margin-top: 8px;
@@ -572,7 +585,7 @@ export default function PortalHome() {
 
         /* CARDS – centered 4-up row */
         .cards {
-          padding: 18px 16px 42px;
+          padding: 22px 16px 42px;
         }
         .grid {
           max-width: 900px;
@@ -583,20 +596,19 @@ export default function PortalHome() {
           gap: 16px;
         }
         .card {
-          background: var(--panel);
-          border: 1px solid #eddccd;
+          background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 1));
+          border: 1px solid #1f2937;
           border-radius: 16px;
           padding: 16px;
-          box-shadow: 0 10px 28px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6);
           flex: 1 1 220px;
           max-width: 260px;
         }
 
         /* FOOTER */
         .ft {
-          border-top: 1px solid #eddccd;
-          background: rgba(255, 255, 255, 0.6);
-          backdrop-filter: blur(6px);
+          border-top: 1px solid #1f2937;
+          background: #020617;
           margin-top: auto;
         }
         .ft .ftInner {
@@ -616,8 +628,8 @@ export default function PortalHome() {
           padding: 0 16px;
         }
         .tests .panel {
-          background: #fff;
-          border: 1px solid #eddccd;
+          background: #020617;
+          border: 1px solid #1f2937;
           border-radius: 12px;
           padding: 12px;
         }
@@ -625,20 +637,20 @@ export default function PortalHome() {
           display: flex;
           gap: 10px;
           align-items: center;
-          border: 1px solid #f1e7dc;
+          border: 1px solid #111827;
           border-radius: 10px;
           padding: 8px;
           margin: 6px 0;
-          background: #fff;
+          background: #020617;
         }
         .tests .ok {
-          color: #1e6a46;
+          color: ${THEME.ok};
         }
         .tests .bad {
-          color: #a33;
+          color: #f97373;
         }
         .tests code {
-          background: #fff3;
+          background: #111827;
           padding: 0 4px;
           border-radius: 4px;
         }
@@ -690,7 +702,7 @@ function ActionCard({
         <h3 style={{ margin: 0 }}>{title}</h3>
       </div>
       <p style={{ margin: '6px 0 12px', color: THEME.muted }}>{body}</p>
-      <Link href={href} className="btn" style={{ textDecoration: 'none' }}>
+      <Link href={href} className="btn" style={{ textDecoration: 'none', background: THEME.brand, color: '#111827', borderRadius: 999, paddingInline: 16, border: 'none', fontWeight: 600 }}>
         {cta}
       </Link>
     </div>
