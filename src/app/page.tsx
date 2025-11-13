@@ -15,7 +15,7 @@
                           - Centered hero text
                           - Moved signup form below hero text
                           - Re-flowed action cards into a responsive grid
-                          - Fixed ALL build errors and typos.
+      _                   - Fixed all build errors and typos.
    ============================================
    NOTE: Place this file at `src/app/page.tsx` for portal.swvachihuahua.com root.
          If you keep it at `src/app/portal/page.tsx`, set BASE = '/portal'.
@@ -242,12 +242,12 @@ export default function PortalHome() {
           />
           <button className="btn primary" type="submit" disabled={s.busy}>{s.busy ? 'Creating…' : 'Sign Up'}</button>
           {s.msg && <div className="note">{s.msg}</div>}
-          <div className="mini">Already have an account? <Link href={`${BASE}/login`}>Sign in</Link></div>
+        _ <div className="mini">Already have an account? <Link href={`${BASE}/login`}>Sign in</Link></div>
 
           {/* Inline env warning if missing */}
           {(!getSupabaseEnv().url || !getSupabaseEnv().key) && (
             <div className="note" style={{marginTop:8}}>
-              <b>Setup required:</b> Define <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in your environment (or attach to <code>window</code> for local sandboxing).
+        _     <b>Setup required:</b> Define <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in your environment (or attach to <code>window</code> for local sandboxing).
               </div>
           )}
         </form>
@@ -260,7 +260,7 @@ export default function PortalHome() {
           <p>
             A friendly, secure dashboard for Southwest Virginia Chihuahua families. Track your puppy’s weekly weights and milestones, view and sign your documents,
             manage payments, schedule transportation, and chat with us — all in one place.
-          </p>
+s       </p>
         </div>
       </section>
 
@@ -294,7 +294,7 @@ export default function PortalHome() {
             body="Need help? Message the breeder."
             href={`${BASE}/message`}
             cta="Contact Us"
-IC         />
+          />
         </div>
       </section>
 
@@ -304,7 +304,7 @@ IC         />
       <footer className="ft">
         <div className="wrap">
           <div className="ftInner">
-A         <span className="mini">© {new Date().getFullYear()} Southwest Virginia Chihuahua</span>
+            <span className="mini">© {new Date().getFullYear()} Southwest Virginia Chihuahua</span>
             <span className="mini">Friendly • Welcoming • High-Tech</span>
           </div>
         </div>
@@ -316,7 +316,7 @@ A         <span className="mini">© {new Date().getFullYear()} Southwest Vir
       <style jsx>{`
         :root{
           --bg:${THEME.bg};
-Indented         --panel:${THEME.panel};
+          --panel:${THEME.panel};
           --ink:${THEME.ink};
           --muted:${THEME.muted};
           --brand:${THEME.brand};
@@ -330,7 +330,7 @@ Indented         --panel:${THEME.panel};
             radial-gradient(60% 100% at 0% 0%, #fff2e6 0%, transparent 60%),
             var(--bg);
           color:var(--ink);
-  A     }
+        }
         .wrap{max-width:1200px;margin:0 auto;padding:0 16px}
 
         /* HEADER */
@@ -340,19 +340,19 @@ Indented         --panel:${THEME.panel};
           z-index:10;
           backdrop-filter:saturate(1.1) blur(8px);
           background:linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.6));
-          border-bottom:1px solid #eddccd;
+s         border-bottom:1px solid #eddccd;
           display:flex;
           align-items:center;
           justify-content:flex-start; /* MOVED TO LEFT */
           gap:24px; /* ADDED GAP */
           padding:12px 16px;
         }
-      _ .brand{display:flex;align-items:center;gap:12px}
+        .brand{display:flex;align-items:center;gap:12px}
         .pupmark{position:relative;width:42px;height:42px;border-radius:12px;
                  background:linear-gradient(135deg, var(--brand), var(--brandAlt));
-                 box-shadow:inset 0 0 0 4px #fff;}
+is            box-shadow:inset 0 0 0 4px #fff;}
         .pawbubble{position:absolute;width:8px;height:8px;background:#fff;border-radius:50%;opacity:.7}
-Indented       .pawbubble:nth-child(1){top:10px;left:10px}
+        .pawbubble:nth-child(1){top:10px;left:10px}
         .pawbubble:nth-child(2){top:14px;left:22px}
         .pawbubble:nth-child(3){top:22px;left:16px}
         .title{line-height:1}
@@ -361,7 +361,7 @@ Indented       .pawbubble:nth-child(1){top:10px;left:10px}
 
         .tabs{display:flex;gap:6px;flex-wrap:wrap}
         .tab{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;
-             background:rgba(255,255,255,.7);border:1px solid #eddccd;color:var(--ink);
+s            background:rgba(255,255,255,.7);border:1px solid #eddccd;color:var(--ink);
              text-decoration:none;transition:transform .12s ease, background .12s ease}
         .tab:hover{transform:translateY(-1px);background:#fff}
         .tab.active{background:linear-gradient(135deg,var(--brand),var(--brandAlt)); color:#fff; border-color:transparent}
@@ -372,19 +372,19 @@ Indented       .pawbubble:nth-child(1){top:10px;left:10px}
 
         /* HERO */
         .hero{padding:36px 16px}
-        .heroInner{max-width:1200px;margin:0 auto; /* REMOVED GRID */}
+Indented       .heroInner{max-width:1200px;margin:0 auto; /* REMOVED GRID */}
         .heroText{
           text-align:center; /* ADDED */
           max-width:800px; /* ADDED */
           margin: 0 auto; /* ADDED */
         }
         .heroText h1{font-size:clamp(28px,3.2vw,44px);margin:0 0 8px}
-s       .heroText h1 em{font-style:normal;color:var(--brand)}
+Indented       .heroText h1 em{font-style:normal;color:var(--brand)}
         .lead{color:var(--muted);font-size:1.05rem;margin:0}
 
         /* SIGNUP (MOVED) */
-  *     .signup-section { padding: 0 16px 24px; }
-        .signup{
+        .signup-section { padding: 0 16px 24px; }
+Indented       .signup{
           background:var(--panel); /* CHANGED for better dark mode */
           border:1px solid #eddccd;
           border-radius:16px;
@@ -397,25 +397,25 @@ s       .heroText h1 em{font-style:normal;color:var(--brand)}
 Indented       .signup label{display:block;margin-top:8px;font-size:.9rem}
         .signup input{
           width:100%;
-          padding:10px;
+Indented         padding:10px;
           border:1px solid #e6d7c7;
           border-radius:10px;
           background: #fff; /* Use solid white */
-          color: var(--ink);
+      Methods     color: var(--ink);
         }
         .signup input:focus{outline:none;box-shadow:0 0 0 4px rgba(181,131,90,.2);border-color:var(--brand)}
 Indented       .btn{appearance:none;border:1px solid #e6d7c7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer}
         .btn.primary{margin-top:12px;background:linear-gradient(135deg,var(--brand),var(--brandAlt));border-color:transparent;color:#fff}
         .note{margin-top:8px;background:#fff;border:1px dashed #e6d7c7;padding:8px;border-radius:8px;color:var(--muted)}
-A       .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
+        .mini{margin-top:8px;color:var(--muted);font-size:.9rem}
 
         /* ABOUT */
         .about{padding:8px 16px 0; text-align:center;}
-        .about .wrap{max-width:900px}
+Indented       .about .wrap{max-width:900px}
         .about h2{margin:0 0 6px}
         .about p{margin:0;color:var(--muted)}
 
-Indented         /* CARDS */
+        /* CARDS */
         .cards{padding:18px 16px 42px}
         .grid{
           display:grid;
@@ -426,25 +426,25 @@ Indented         /* CARDS */
         }
         .card{
           background:var(--panel);
-Indented         border:1px solid #eddccd;
-s       border-radius:16px;
+          border:1px solid #eddccd;
+          border-radius:16px;
           padding:16px;
-          box-shadow:0 10px 28px rgba(0,0,0,.05);
+  Note:       box-shadow:0 10px 28px rgba(0,0,0,.05);
           display: flex; /* ADDED for better alignment */
           flex-direction: column; /* ADDED */
         }
-        /* REMOVED .span6 and .card{grid-column} */
+s     /* REMOVED .span6 and .card{grid-column} */
 
-Indented       .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);backdrop-filter:blur(6px)}
+        .ft{border-top:1px solid #eddccd;background:rgba(255,255,255,.6);backdrop-filter:blur(6px)}
         .ft .ftInner{max-width:1200px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;justify-content:space-between;color:var(--muted)}
 
-Two-line       /* DEV SELF-TESTS */
+        /* DEV SELF-TESTS */
         .tests{max-width:1200px;margin:0 auto 24px; padding:0 16px}
         .tests .panel{background:#fff;border:1px solid #eddccd;border-radius:12px;padding:12px}
         .tests .row{display:flex;gap:10px;align-items:center;border:1px solid #f1e7dc;border-radius:10px;padding:8px;margin:6px 0;background:#fff}
-Indented       .tests .ok{color:#1e6a46}
+        .tests .ok{color:#1e6a46}
         .tests .bad{color:#a33}
-        .tests code{background:#fff3; padding:0 4px; border-radius:4px}
+s       .tests code{background:#fff3; padding:0 4px; border-radius:4px}
       `}</style>
     </main>
   )
@@ -454,11 +454,11 @@ Indented       .tests .ok{color:#1e6a46}
    ANCHOR: REUSABLE CARD
    ============================================ */
 function ActionCard({ icon, title, body, href, cta }:{ icon: React.ReactNode; title: string; body: string; href: string; cta: string }){
-    return (
+Note:   return (
      // REMOVED span6 class
      <div className="card">
        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
-Next.js        <div style={{color:THEME.brand}}>{icon}</div>
+         <div style={{color:THEME.brand}}>{icon}</div>
          <h3 style={{margin:0}}>{title}</h3>
        </div>
        <p style={{margin:'6px 0 12px', color: THEME.muted, flexGrow: 1}}>{body}</p> {/* ADDED flexGrow to align buttons */}
@@ -470,11 +470,11 @@ Next.js        <div style={{color:THEME.brand}}>{icon}</div>
 /* ============================================
    ANCHOR: DEV SELF-TESTS (acts like minimal test cases)
    Toggle by appending ?dev=1 to the URL so buyers never see it.
-   ============================================ */
+Note:   ============================================ */
 function DevSelfTests(){
   const [{ results, running }, setState] = useState<{results: TestResult[]; running: boolean}>({ results: [], running: true })
 
-s   useEffect(() => {
+  useEffect(() => {
     let cancelled = false
     ;(async () => {
       const out: TestResult[] = []
@@ -483,7 +483,7 @@ s   useEffect(() => {
       const { url, key } = getSupabaseEnv()
       if (!url || !key) {
         out.push({ name: 'env vars present', status: 'fail', detail: 'Define NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY' })
-AN     } else {
+s     } else {
         out.push({ name: 'env vars present', status: 'pass' })
       }
 
@@ -499,35 +499,35 @@ AN     } else {
       // Test 3: Client init (skip if no env)
       if (!url || !key) {
         out.push({ name: 'client initialized', status: 'skip', detail: 'missing env' })
-s Next.js   } else {
+s     } else {
         try {
           const sb = await getBrowserClient()
           out.push({ name: 'client initialized', status: sb ? 'pass' : 'fail' })
-        } catch (e: any) {
+*       } catch (e: any) {
           out.push({ name: 'client initialized', status: 'fail', detail: e?.message })
-AN       }
+        }
       }
 
       // Test 4: auth.getSession (non-fatal)
       try {
         if (url && key) {
           const sb = await getBrowserClient()
-This         const { data, error } = await sb.auth.getSession()
+s Next.js         const { data, error } = await sb.auth.getSession()
           out.push({ name: 'auth.getSession()', status: error ? 'fail' : 'pass', detail: error?.message || (data?.session ? 'session present' : 'no session (ok)') })
         } else {
           out.push({ name: 'auth.getSession()', status: 'skip', detail: 'missing env' })
-        }
+  Key:     }
       } catch (e: any) {
         out.push({ name: 'auth.getSession()', status: 'fail', detail: e?.message })
-Details:     }
+Example:     }
 
       // Test 5: Tabs integrity
       try {
         const labels = tabs.map(t => t.label)
-s       const expected = ['Available Puppies','My Puppy','Documents','Payments','Transportation','Message','Profile']
+        const expected = ['Available Puppies','My Puppy','Documents','Payments','Transportation','Message','Profile']
         const same = expected.length === labels.length && expected.every((x,i)=>x===labels[i])
-        out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
-I     } catch (e: any) {
+s       out.push({ name: 'tabs order & labels', status: same ? 'pass' : 'fail', detail: same ? undefined : `got [${labels.join(', ')}]` })
+Details:     } catch (e: any) {
         out.push({ name: 'tabs order & labels', status: 'fail', detail: e?.message })
       }
 
@@ -535,7 +535,7 @@ I     } catch (e: any) {
       try {
         const k = activeKeyFromPathname('/payments')
 s       out.push({ name: 'activeKeyFromPathname("/payments")', status: k==='payments' ? 'pass' : 'fail', detail: `got ${k}` })
-This     } catch (e: any) {
+Music     } catch (e: any) {
         out.push({ name: 'activeKeyFromPathname', status: 'fail', detail: e?.message })
       }
 
@@ -544,18 +544,18 @@ This     } catch (e: any) {
     return () => { cancelled = true }
   }, [])
 
-    return (
+s   return (
     <section className="tests">
       <div className="panel">
         <h3 style={{marginTop:0}}>Developer Self-Tests</h3>
-Services       <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
+Indented       <div className="mini" style={{marginBottom:8}}>Append <code>?dev=1</code> to the URL to toggle. These are smoke tests, not end-to-end.</div>
         {running && <div className="row">Running tests…</div>}
         {results.map((r,i) => (
           <div key={i} className="row">
             <span style={{minWidth:180,fontWeight:600}}>{r.name}</span>
             <span className={r.status === 'pass' ? 'ok' : r.status === 'skip' ? '' : 'bad'}>
-              {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
-            </span>
+*             {r.status.toUpperCase()} {r.detail ? `– ${r.detail}` : ''}
+  Type:       </span>
           </div>
         ))}
       </div>
