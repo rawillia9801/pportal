@@ -1,482 +1,281 @@
-'use client'
-
-/* ============================================
-   CHANGELOG
-   - 2025-11-15: Admin Dashboard moved to its
-                 own route (/admin) instead of
-                 being mixed with other tabs.
-   ============================================ */
-
-import React, { useEffect, useState } from 'react'
-import { getBrowserClient } from '@/lib/supabase/client'
-
-type DashboardCounts = {
-  buyers: number | null
-  puppies: number | null
-  applications: number | null
-  payments: number | null
-  messages: number | null
-  transports: number | null
-}
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { usePathname } from "next/navigation";
 
-const ADMIN_EMAILS = (
-  process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-  process.env.NEXT_PUBLIC_ADMIN_EMAIL ||
-  ""
-)
-  .split(",")
-  .map((e) => e.trim())
-  .filter(Boolean);
+const navItems = [
+  { label: "Dashboard", href: "/admin" },
+  { label: "Buyers", href: "/admin/buyers" },
+  { label: "Puppies", href: "/admin/puppies" },
+  { label: "Upcoming Litters", href: "/admin/litters" },
+  { label: "Applications", href: "/admin/applications" },
+  { label: "Payments", href: "/admin/payments" },
+  { label: "Messages", href: "/admin/messages" },
+  { label: "Transportation Requests", href: "/admin/transport" },
+  { label: "Breeding Program", href: "/admin/breeding-program" },
+];
 
-export default function AdminDashboardPage() {
-  const [counts, setCounts] = useState<DashboardCounts>({
-    buyers: null,
-    puppies: null,
-    applications: null,
-    payments: null,
-    messages: null,
-    transports: null,
-  })
-  const [loading, setLoading] = useState(true)
-type Status = "checking" | "ok";
-
-export default function AdminLayout({ children }: { children: ReactNode }) {
-  const router = useRouter();
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
-  const [status, setStatus] = useState<Status>("checking");
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      const sb = getBrowserClient()
-
-      async function safeCount(table: string): Promise<number | null> {
-        try {
-          const { count, error } = await sb
-            .from(table)
-            .select('id', { head: true, count: 'exact' })
-          if (error) return null
-          return count ?? null
-        } catch {
-          return null
-        }
-    const supabase = getBrowserClient();
-
-    async function checkAdmin() {
-      const { data, error } = await supabase.auth.getUser();
-
-      if (error || !data?.user) {
-        router.replace("/login");
-        return;
-      }
-
-      const email = data.user.email ?? "";
-
-      if (ADMIN_EMAILS.length && !ADMIN_EMAILS.includes(email)) {
-        router.replace("/");
-        return;
-      }
-
-      const [
-        buyers,
-        puppies,
-        applications,
-        payments,
-        messages,
-        transports,
-      ] = await Promise.all([
-        safeCount('puppy_buyers'),
-        safeCount('puppies'),
-        safeCount('puppy_applications'),
-        safeCount('puppy_payments'),
-        safeCount('puppy_messages'),
-        safeCount('puppy_transport'),
-      ])
-
-      if (!cancelled) {
-        setCounts({
-          buyers,
-          puppies,
-          applications,
-          payments,
-          messages,
-          transports,
-        })
-        setLoading(false)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-      setStatus("ok");
-    }
-  }, [])
-
-  const cards = [
-    {
-      label: 'BUYERS',
-      value: counts.buyers,
-      hint: 'Approved families',
-    },
-    {
-      label: 'PUPPIES',
-      value: counts.puppies,
-      hint: 'In the system',
-    },
-    {
-      label: 'APPLICATIONS',
-      value: counts.applications,
-      hint: 'Pending or reviewed',
-    },
-    {
-      label: 'PAYMENTS',
-      value: counts.payments,
-      hint: 'Recorded payments',
-    },
-    {
-      label: 'MESSAGES',
-      value: counts.messages,
-      hint: 'Conversations',
-    },
-    {
-      label: 'TRANSPORT REQUESTS',
-      value: counts.transports,
-      hint: 'Trips to plan',
-    },
-  ]
-
-    checkAdmin();
-  }, [router]);
-
-  async function handleSignOut() {
-    const supabase = getBrowserClient();
-    await supabase.auth.signOut();
-    router.replace("/login");
-  }
-
-  const navItems = [
-    { href: "/admin", label: "Dashboard" },
-    { href: "/admin/buyers", label: "Buyers" },
-    { href: "/admin/puppies", label: "Puppies" },
-    { href: "/admin/upcoming-litters", label: "Upcoming Litters" },
-    { href: "/admin/applications", label: "Applications" },
-    { href: "/admin/payments", label: "Payments" },
-    { href: "/admin/messages", label: "Messages" },
-    { href: "/admin/transportation-requests", label: "Transportation Requests" },
-    { href: "/admin/breeding-program", label: "Breeding Program" },
-  ];
-
-  function isActive(href: string) {
-    if (href === "/admin") return pathname === "/admin";
-    return pathname?.startsWith(href);
-  }
-
-  if (status === "checking") {
-    return (
-      <div className="admin-shell">
-        <div className="admin-main-only">
-          <p>Checking admin access…</p>
-        </div>
-        <AdminStyles />
-      </div>
-    );
-  }
 
   return (
-    <div>
-      <h1 className="adminPageTitle">Admin Dashboard</h1>
-      <p className="adminPageSub">
-        Quick overview of your program. Use the sidebar to move into each
-        workflow for detailed management.
-      </p>
-
-      <div className="adminStatGrid">
-        {cards.map((c) => (
-          <div key={c.label} className="adminStatCard">
-            <div className="adminStatLabel">{c.label}</div>
-            <div className="adminStatValue">
-              {loading ? '—' : c.value ?? '—'}
-            </div>
-            <div className="adminStatHint">{c.hint}</div>
     <div className="admin-shell">
+      {/* SIDEBAR */}
       <aside className="admin-sidebar">
-        <div className="admin-brand">
-          <div className="admin-logo">
-            <span className="admin-logo-paw" />
+        <div className="admin-logo">
+          <div className="admin-logo-paw">
+            <span className="admin-logo-dot" />
+            <span className="admin-logo-dot" />
+            <span className="admin-logo-dot" />
+            <span className="admin-logo-pad" />
           </div>
-        ))}
-      </div>
-          <div className="admin-brand-text">
-            <div className="admin-brand-title">SWVA Chihuahua</div>
-            <div className="admin-brand-sub">Admin Portal</div>
+          <div className="admin-logo-text">
+            <div className="admin-logo-title">SWVA Chihuahua</div>
+            <div className="admin-logo-sub">Admin Portal</div>
           </div>
         </div>
 
         <nav className="admin-nav">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`admin-nav-link ${isActive(item.href) ? "active" : ""}`}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/admin" && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`admin-nav-item ${active ? "is-active" : ""}`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
-
-        <button className="admin-signout" onClick={handleSignOut}>
-          Sign Out
-        </button>
       </aside>
 
+      {/* MAIN CONTENT */}
       <main className="admin-main">{children}</main>
 
-      <AdminStyles />
-    </div>
-  )
-  );
-}
+      {/* STYLES JUST FOR /admin */}
+      <style jsx global>{`
+        /* ---------- Base ---------- */
+        body {
+          margin: 0;
+        }
 
-function AdminStyles() {
-  return (
-    <style jsx global>{`
-      :root {
-        --admin-bg: #050816;
-        --admin-bg-soft: #0b1020;
-        --admin-panel: #0f172a;
-        --admin-panel-soft: #111827;
-        --admin-border: rgba(148, 163, 184, 0.35);
-        --admin-ring: rgba(251, 191, 80, 0.4);
-        --admin-ink: #f9fafb;
-        --admin-muted: #9ca3af;
-        --admin-accent: #fbbf77; /* warm golden */
-        --admin-accent-deep: #f97316;
-      }
-
-      .admin-shell {
-        min-height: 100vh;
-        display: grid;
-        grid-template-columns: 260px minmax(0, 1fr);
-        background: radial-gradient(
-            130% 200% at 0 0,
-            #0f172a,
-            transparent 60%
-          ),
-          radial-gradient(120% 200% at 100% 0, #020617, transparent 55%),
-          var(--admin-bg);
-        color: var(--admin-ink);
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
-      }
-
-      .admin-sidebar {
-        background: linear-gradient(
-          180deg,
-          #020617,
-          #020617 35%,
-          #0f172a 100%
-        );
-        border-right: 1px solid rgba(15, 23, 42, 0.95);
-        padding: 20px 16px 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
-      }
-
-      .admin-brand {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 8px 6px 4px;
-      }
-
-      .admin-logo {
-        width: 40px;
-        height: 40px;
-        border-radius: 14px;
-        background: radial-gradient(circle at 30% 20%, #ffffffaa, transparent),
-          linear-gradient(135deg, var(--admin-accent), var(--admin-accent-deep));
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
-        position: relative;
-      }
-
-      .admin-logo-paw {
-        width: 18px;
-        height: 18px;
-        border-radius: 999px;
-        border: 3px solid #020617;
-        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.8);
-      }
-
-      .admin-brand-text {
-        line-height: 1.1;
-      }
-
-      .admin-brand-title {
-        font-size: 15px;
-        font-weight: 700;
-      }
-
-      .admin-brand-sub {
-        font-size: 11px;
-        color: var(--admin-muted);
-      }
-
-      .admin-nav {
-        margin-top: 4px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .admin-nav-link {
-        display: flex;
-        align-items: center;
-        padding: 9px 14px;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--admin-ink);
-        text-decoration: none;
-        font-size: 13px;
-        transition: background 0.15s ease, border-color 0.15s ease,
-          transform 0.1s ease, box-shadow 0.15s ease;
-      }
-
-      .admin-nav-link:hover {
-        background: #020617;
-        transform: translateY(-1px);
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.65);
-      }
-
-      .admin-nav-link.active {
-        background: linear-gradient(
-          135deg,
-          var(--admin-accent),
-          var(--admin-accent-deep)
-        );
-        color: #111827;
-        border-color: transparent;
-        box-shadow: 0 14px 30px rgba(248, 181, 82, 0.45);
-      }
-
-      .admin-signout {
-        margin-top: auto;
-        margin-bottom: 4px;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
-        padding: 8px 12px;
-        font-size: 13px;
-        background: transparent;
-        color: var(--admin-muted);
-        cursor: pointer;
-        transition: background 0.15s ease, color 0.15s ease,
-          border-color 0.15s ease;
-      }
-
-      .admin-signout:hover {
-        background: rgba(15, 23, 42, 0.9);
-        color: #fecaca;
-        border-color: rgba(248, 113, 113, 0.7);
-      }
-
-      .admin-main {
-        padding: 24px 32px 32px;
-      }
-
-      .admin-main-only {
-        padding: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .admin-h1 {
-        font-size: 24px;
-        font-weight: 600;
-        margin: 0 0 6px;
-      }
-
-      .admin-subtitle {
-        margin: 0 0 18px;
-        font-size: 14px;
-        color: var(--admin-muted);
-        max-width: 720px;
-      }
-
-      .admin-stat-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-        gap: 18px;
-        margin-top: 10px;
-      }
-
-      .admin-stat-card {
-        background: radial-gradient(
-            160% 200% at 0 0,
-            rgba(248, 181, 82, 0.08),
-            transparent 55%
-          ),
-          var(--admin-panel);
-        border-radius: 18px;
-        border: 1px solid var(--admin-border);
-        padding: 14px 16px 16px;
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
-      }
-
-      .admin-stat-label {
-        font-size: 11px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--admin-muted);
-        margin-bottom: 6px;
-      }
-
-      .admin-stat-value {
-        font-size: 28px;
-        font-weight: 600;
-        margin-bottom: 4px;
-      }
-
-      .admin-stat-helper {
-        font-size: 12px;
-        color: var(--admin-muted);
-      }
-
-      @media (max-width: 900px) {
         .admin-shell {
-          grid-template-columns: minmax(0, 1fr);
+          min-height: 100vh;
+          display: grid;
+          grid-template-columns: 280px minmax(0, 1fr);
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+            sans-serif;
+          background:
+            radial-gradient(140% 140% at 0% 0%, #0f172a 0%, transparent 55%),
+            radial-gradient(160% 160% at 100% 0%, #020617 0%, transparent 60%),
+            #020617;
+          color: #f9fafb;
         }
-        .admin-sidebar {
-          flex-direction: row;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 14px;
-          overflow-x: auto;
-        }
-        .admin-nav {
-          flex-direction: row;
-          flex-wrap: nowrap;
-          gap: 6px;
-          margin-top: 0;
-        }
-        .admin-signout {
-          flex-shrink: 0;
-        }
+
         .admin-main {
-          padding: 18px 16px 24px;
+          padding: 28px 40px 36px;
+          overflow: auto;
         }
-      }
-    `}</style>
+
+        /* ---------- Sidebar ---------- */
+        .admin-sidebar {
+          background: radial-gradient(
+              120% 200% at 0% 0%,
+              #020617,
+              #020617 50%,
+              #020617
+            );
+          border-right: 1px solid rgba(15, 23, 42, 0.9);
+          box-shadow: 14px 0 38px rgba(0, 0, 0, 0.72);
+          padding: 22px 18px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        .admin-logo {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+
+        .admin-logo-paw {
+          position: relative;
+          width: 42px;
+          height: 42px;
+          border-radius: 16px;
+          background: linear-gradient(135deg, #e0a96d, #c47a35);
+          box-shadow:
+            0 0 0 3px #020617,
+            0 12px 20px rgba(0, 0, 0, 0.7);
+        }
+
+        .admin-logo-dot {
+          position: absolute;
+          width: 7px;
+          height: 7px;
+          border-radius: 999px;
+          background: #020617;
+          opacity: 0.8;
+        }
+        .admin-logo-dot:nth-child(1) {
+          top: 7px;
+          left: 11px;
+        }
+        .admin-logo-dot:nth-child(2) {
+          top: 8px;
+          left: 23px;
+        }
+        .admin-logo-dot:nth-child(3) {
+          top: 16px;
+          left: 17px;
+        }
+        .admin-logo-pad {
+          position: absolute;
+          inset: 18px 10px 8px 10px;
+          border-radius: 999px;
+          background: #020617;
+          opacity: 0.9;
+        }
+
+        .admin-logo-text {
+          line-height: 1.15;
+        }
+        .admin-logo-title {
+          font-size: 15px;
+          font-weight: 700;
+        }
+        .admin-logo-sub {
+          font-size: 11px;
+          color: #9ca3af;
+        }
+
+        .admin-nav {
+          margin-top: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .admin-nav-item {
+          display: block;
+          padding: 10px 14px;
+          border-radius: 999px;
+          border: 1px solid #111827;
+          background: #020617;
+          color: #e5e7eb;
+          text-decoration: none;
+          font-size: 13px;
+          transition:
+            background 0.15s ease,
+            border-color 0.15s ease,
+            box-shadow 0.15s ease,
+            transform 0.08s ease;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .admin-nav-item:hover {
+          background: #020617;
+          border-color: #1f2937;
+          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.7);
+          transform: translateY(-1px);
+        }
+
+        .admin-nav-item.is-active {
+          background: linear-gradient(135deg, #e0a96d, #c47a35);
+          border-color: transparent;
+          color: #111827;
+          box-shadow: 0 12px 26px rgba(0, 0, 0, 0.85);
+        }
+
+        /* ---------- Dashboard content ---------- */
+        .admin-h1 {
+          font-size: 26px;
+          font-weight: 650;
+          margin: 0 0 4px;
+        }
+
+        .admin-subtitle {
+          margin: 0 0 22px;
+          font-size: 14px;
+          color: #9ca3af;
+        }
+
+        .admin-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 18px;
+        }
+
+        @media (max-width: 1280px) {
+          .admin-stat-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 960px) {
+          .admin-shell {
+            grid-template-columns: minmax(0, 1fr);
+          }
+          .admin-sidebar {
+            flex-direction: row;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 16px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.8);
+          }
+          .admin-nav {
+            flex-direction: row;
+            overflow-x: auto;
+          }
+          .admin-main {
+            padding: 22px 16px 30px;
+          }
+        }
+
+        .admin-stat-card {
+          border-radius: 18px;
+          padding: 18px 18px 16px;
+          background: radial-gradient(
+              140% 200% at 0% 0%,
+              rgba(15, 23, 42, 0.9),
+              #020617
+            );
+          border: 1px solid rgba(15, 23, 42, 0.95);
+          box-shadow: 0 18px 32px rgba(0, 0, 0, 0.85);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .admin-stat-label {
+          font-size: 12px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #9ca3af;
+        }
+
+        .admin-stat-value {
+          font-size: 32px;
+          font-weight: 700;
+        }
+
+        .admin-stat-helper {
+          font-size: 12px;
+          color: #9ca3af;
+        }
+      `}</style>
+    </div>
   );
 }
