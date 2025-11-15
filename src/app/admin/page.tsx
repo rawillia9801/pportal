@@ -6,56 +6,16 @@
    - 2025-11-13: Dashboard landing (cards for activity)
    - 2025-11-13: Buyers tab with manual puppies/payments/transport
    - 2025-11-13: Buyers tab financial at-a-glance summary
-                 (Price, Credits, Admin Fee Financing, Total Paid, Balance)
    - 2025-11-13: Payments tab with per-year + grand totals
    - 2025-11-13: Sidebar tab buttons enlarged for easier click
    - 2025-11-14: Admin access gate using Supabase auth.getUser()
-                 (requires logged-in user; no middleware required)
+                 (now using shared getBrowserClient from
+                  "@/lib/supabase/client" so login state is consistent)
    ============================================ */
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-
-/* ============================================
-   SUPABASE HELPERS
-   ============================================ */
-
-type AnyClient = SupabaseClient<any, 'public', any>
-let __sb: AnyClient | null = null
-
-function getSupabaseEnv() {
-  const g: any =
-    typeof window !== 'undefined' ? (window as any) : (globalThis as any)
-  const hasProc =
-    typeof process !== 'undefined' &&
-    (process as any) &&
-    (process as any).env
-
-  const url = hasProc
-    ? (process as any).env.NEXT_PUBLIC_SUPABASE_URL
-    : g.NEXT_PUBLIC_SUPABASE_URL || g.__ENV?.NEXT_PUBLIC_SUPABASE_URL || ''
-
-  const key = hasProc
-    ? (process as any).env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    : g.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      g.__ENV?.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      ''
-
-  return { url: String(url || ''), key: String(key || '') }
-}
-
-async function getBrowserClient(): Promise<AnyClient> {
-  if (__sb) return __sb
-  const { url, key } = getSupabaseEnv()
-  if (!url || !key) {
-    throw new Error(
-      'Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY'
-    )
-  }
-  __sb = createClient(url, key)
-  return __sb
-}
+import { getBrowserClient } from '@/lib/supabase/client'
 
 /* ============================================
    ADMIN ACCESS GATE
@@ -73,7 +33,7 @@ export default function AdminPage() {
 
     ;(async () => {
       try {
-        const sb = await getBrowserClient()
+        const sb = getBrowserClient()
         const { data, error } = await sb.auth.getUser()
 
         if (cancelled) return
@@ -445,7 +405,7 @@ function AdminHomeDashboard({
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      const sb = await getBrowserClient()
+      const sb = getBrowserClient()
 
       async function safeCount(table: string): Promise<number | null> {
         try {
@@ -640,7 +600,7 @@ function BuyersView() {
       setLoadingList(true)
       setError(null)
       try {
-        const sb = await getBrowserClient()
+        const sb = getBrowserClient()
         const { data, error } = await sb
           .from('puppy_buyers')
           .select(
@@ -678,7 +638,7 @@ function BuyersView() {
       setLoadingDetail(true)
       setError(null)
       try {
-        const sb = await getBrowserClient()
+        const sb = getBrowserClient()
 
         const buyerRes = await sb
           .from('puppy_buyers')
@@ -743,7 +703,7 @@ function BuyersView() {
       }
     })()
 
-  return () => {
+    return () => {
       cancelled = true
     }
   }, [selectedId])
@@ -751,7 +711,7 @@ function BuyersView() {
   async function handleAddBuyer() {
     if (!newName.trim()) return
     try {
-      const sb = await getBrowserClient()
+      const sb = getBrowserClient()
       const { data, error } = await sb
         .from('puppy_buyers')
         .insert({
@@ -778,7 +738,7 @@ function BuyersView() {
     if (!detail) return
     try {
       setSavingFinancials(true)
-      const sb = await getBrowserClient()
+      const sb = getBrowserClient()
       const base_price = priceEdit ? Number(priceEdit) : null
       const credits = creditsEdit ? Number(creditsEdit) : null
       const admin_fee_financing = adminFeeEdit
@@ -814,7 +774,7 @@ function BuyersView() {
   async function handleAddPuppy() {
     if (!detail || !puppyName.trim()) return
     try {
-      const sb = await getBrowserClient()
+      const sb = getBrowserClient()
       const price = puppyPrice ? Number(puppyPrice) : null
       const { data, error } = await sb
         .from('puppies')
@@ -849,7 +809,7 @@ function BuyersView() {
   async function handleAddPayment() {
     if (!detail || !payAmount.trim()) return
     try {
-      const sb = await getBrowserClient()
+      const sb = getBrowserClient()
       const amount = Number(payAmount)
       const { data, error } = await sb
         .from('puppy_payments')
@@ -890,7 +850,7 @@ function BuyersView() {
   async function handleAddTransport() {
     if (!detail || !tripDate.trim()) return
     try {
-      const sb = await getBrowserClient()
+      const sb = getBrowserClient()
       const miles = tripMiles ? Number(tripMiles) : null
       const tolls = tripTolls ? Number(tripTolls) : null
       const hotel_cost = tripHotel ? Number(tripHotel) : null
@@ -1802,7 +1762,7 @@ function PaymentsView() {
       setLoading(true)
       setError(null)
       try {
-        const sb = await getBrowserClient()
+        const sb = getBrowserClient()
         const { data, error } = await sb
           .from('puppy_payments')
           .select('id, buyer_id, type, amount, payment_date, method')
