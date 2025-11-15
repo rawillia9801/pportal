@@ -2,90 +2,16 @@
 
 /* ============================================
    CHANGELOG
-   - 2025-11-13: Admin shell with LEFT sidebar
-   - 2025-11-13: Dashboard landing (cards for activity)
-   - 2025-11-13: Buyers tab with manual puppies/payments/transport
-   - 2025-11-13: Buyers tab financial at-a-glance summary
-   - 2025-11-13: Payments tab with per-year + grand totals
-   - 2025-11-13: Sidebar tab buttons enlarged for easier click
-   - 2025-11-14: Admin access gate using Supabase auth.getUser()
-                 (now using shared getBrowserClient from
-                  "@/lib/supabase/client" so login state is consistent)
+   - 2025-11-14: Admin gate simplified:
+       • Uses getBrowserClient from "@/lib/supabase/client"
+       • If NO user -> /login?redirect=/admin
+       • If error -> show message on /admin (no redirect to "/")
+   - 2025-11-14: Keeps full admin shell (Dashboard, Buyers, Payments, etc.)
    ============================================ */
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getBrowserClient } from '@/lib/supabase/client'
-
-/* ============================================
-   ADMIN ACCESS GATE
-   - Requires a logged-in Supabase user
-   - If not logged in → /login?redirect=/admin
-   - If logged in → render AdminShell
-   ============================================ */
-
-export default function AdminPage() {
-  const router = useRouter()
-  const [status, setStatus] = useState<'checking' | 'allowed'>('checking')
-
-  useEffect(() => {
-    let cancelled = false
-
-    ;(async () => {
-      try {
-        const sb = getBrowserClient()
-        const { data, error } = await sb.auth.getUser()
-
-        if (cancelled) return
-
-        if (error || !data?.user) {
-          // Not logged in → send to login with redirect back to /admin
-          router.replace('/login?redirect=/admin')
-          return
-        }
-
-        // ✅ Logged-in user – allow access
-        setStatus('allowed')
-      } catch {
-        if (!cancelled) {
-          // On unexpected error, send them to home for now
-          router.replace('/')
-        }
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [router])
-
-  if (status === 'checking') {
-    return (
-      <main
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background:
-            'radial-gradient(60% 100% at 100% 0%, #020617 0%, transparent 60%),' +
-            'radial-gradient(60% 100% at 0% 0%, #111827 0%, transparent 60%),' +
-            '#020617',
-          color: '#f9fafb',
-          fontFamily:
-            'system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-        }}
-      >
-        <div style={{ textAlign: 'center', fontSize: 14, color: '#9ca3af' }}>
-          Checking admin access…
-        </div>
-      </main>
-    )
-  }
-
-  // Once allowed, render the full admin UI
-  return <AdminShell />
-}
 
 /* ============================================
    TYPES
@@ -115,8 +41,6 @@ const ADMIN_TABS: AdminTab[] = [
   { key: 'breeding', label: 'Breeding Program' },
   { key: 'buyers', label: 'Buyers' },
 ]
-
-/* ---- Buyers tab types ---- */
 
 type BuyerRow = {
   id: string
@@ -173,8 +97,6 @@ type BuyerDetail = {
   transports: TransportSummary[]
 }
 
-/* ---- Payments tab types ---- */
-
 type PaymentRow = {
   id: string
   buyer_id: string | null
@@ -200,8 +122,6 @@ type PaymentStats = {
   latestDate: string | null
   byYear: Record<string, PaymentRow[]>
 }
-
-/* ---- Dashboard counts ---- */
 
 type DashboardCounts = {
   buyers: number | null
@@ -232,7 +152,155 @@ function fmtDate(d: string | null | undefined): string {
 }
 
 /* ============================================
-   ROOT ADMIN SHELL (UI)
+   ROOT COMPONENT: ADMIN GATE
+   ============================================ */
+
+export default function AdminPage() {
+  const router = useRouter()
+  const [status, setStatus] = useState<'checking' | 'allowed' | 'error'>(
+    'checking'
+  )
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const sb = getBrowserClient()
+        const { data, error } = await sb.auth.getUser()
+        console.log('[/admin] getUser result:', { data, error })
+
+        if (cancelled) return
+
+        if (error) {
+          setError(error.message)
+          setStatus('error')
+          return
+        }
+
+        if (!data?.user) {
+          // Not logged in → send to login, and then back to /admin
+          router.replace('/login?redirect=/admin')
+          return
+        }
+
+        // ✅ There is a user; let them into the admin
+        setStatus('allowed')
+      } catch (e: any) {
+        if (cancelled) return
+        console.error('[/admin] getUser threw:', e)
+        setError(e?.message || 'Could not check admin session.')
+        setStatus('error')
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router])
+
+  // While checking, show a neutral screen (no redirects to "/")
+  if (status === 'checking') {
+    return (
+      <main
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background:
+            'radial-gradient(60% 100% at 100% 0%, #020617 0%, transparent 60%),' +
+            'radial-gradient(60% 100% at 0% 0%, #111827 0%, transparent 60%),' +
+            '#020617',
+          color: '#f9fafb',
+          fontFamily:
+            'system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+        }}
+      >
+        <div style={{ textAlign: 'center', fontSize: 14, color: '#9ca3af' }}>
+          Checking admin access…
+        </div>
+      </main>
+    )
+  }
+
+  // If there was an error talking to Supabase, stay on /admin and show it
+  if (status === 'error') {
+    return (
+      <main
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background:
+            'radial-gradient(60% 100% at 100% 0%, #020617 0%, transparent 60%),' +
+            'radial-gradient(60% 100% at 0% 0%, #111827 0%, transparent 60%),' +
+            '#020617',
+          color: '#f9fafb',
+          fontFamily:
+            'system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+          padding: 20,
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 420,
+            borderRadius: 16,
+            border: '1px solid #7f1d1d',
+            background: '#451a1a',
+            padding: 16,
+            boxShadow: '0 18px 40px rgba(0,0,0,0.85)',
+          }}
+        >
+          <h1 style={{ fontSize: 18, margin: 0, marginBottom: 6 }}>
+            Admin access error
+          </h1>
+          <p style={{ fontSize: 13, margin: 0, marginBottom: 8 }}>
+            Something went wrong while checking your session. You are still on
+            the <code>/admin</code> page so you can see this message instead of
+            being bounced away.
+          </p>
+          {error && (
+            <p
+              style={{
+                fontSize: 12,
+                margin: 0,
+                marginBottom: 8,
+                color: '#fecaca',
+              }}
+            >
+              {error}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => router.replace('/login?redirect=/admin')}
+            style={{
+              borderRadius: 999,
+              border: '1px solid transparent',
+              padding: '8px 12px',
+              fontSize: 13,
+              background: 'linear-gradient(135deg,#e0a96d,#c47a35)',
+              color: '#111827',
+              cursor: 'pointer',
+            }}
+          >
+            Go to login
+          </button>
+        </div>
+      </main>
+    )
+  }
+
+  // ✅ Allowed → render full admin shell
+  return <AdminShell />
+}
+
+/* ============================================
+   ADMIN SHELL (LAYOUT)
    ============================================ */
 
 function AdminShell() {
@@ -285,7 +353,6 @@ function AdminShell() {
     gap: 8,
   }
 
-  // ENLARGED TAB BUTTONS
   const tabBaseStyle: React.CSSProperties = {
     border: '1px solid #1f2937',
     background: '#020617',
@@ -351,9 +418,7 @@ function AdminShell() {
         {activeTab === 'dashboard' && (
           <AdminHomeDashboard onOpenTab={setActiveTab} />
         )}
-
         {activeTab === 'buyers' && <BuyersView />}
-
         {activeTab === 'payments' && <PaymentsView />}
 
         {activeTab !== 'dashboard' &&
@@ -512,8 +577,6 @@ function AdminHomeDashboard({
               textAlign: 'left',
               cursor: 'pointer',
               boxShadow: '0 8px 24px rgba(0,0,0,0.55)',
-              transition:
-                'transform .12s ease, box-shadow .12s ease, border-color .12s ease',
             }}
           >
             <div
