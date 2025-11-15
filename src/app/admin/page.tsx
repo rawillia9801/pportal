@@ -1,757 +1,481 @@
-"use client";
+// src/app/admin/page.tsx
+'use client';
 
 /* ============================================
-   CHANGELOG (ADMIN DASHBOARD)
-   - 2025-11-15: Keep a single, clear tab set
-                 (sidebar pills only).
-   - 2025-11-15: Remove "Admin Portal" wording
-                 that felt like a second portal.
-   - 2025-11-15: Light, warm colors to match
-                 a Chihuahua breeder audience.
+   Admin Dashboard (Friendlier Dark Theme)
+   - Sidebar with pill-style tabs
+   - Summary stat cards across the top
+   - Uses Supabase to load counts from:
+     buyers, puppies, applications, payments,
+     messages, transport_requests
    ============================================ */
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getBrowserClient } from "@/lib/supabase/client";
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { getBrowserClient } from '@/lib/supabase/client';
 
-type AdminSection =
-  | "overview"
-  | "puppies"
-  | "litters"
-  | "applications"
-  | "messages"
-  | "transport"
-  | "payments"
-  | "breeding";
+type StatCounts = {
+  buyers: number;
+  puppies: number;
+  applications: number;
+  payments: number;
+  messages: number;
+  transports: number;
+};
 
-export default function AdminPage() {
+const initialCounts: StatCounts = {
+  buyers: 0,
+  puppies: 0,
+  applications: 0,
+  payments: 0,
+  messages: 0,
+  transports: 0,
+};
+
+export default function AdminDashboardPage() {
   const router = useRouter();
   const supabase = getBrowserClient();
-
-  const [checking, setChecking] = useState(true);
-  const [allowed, setAllowed] = useState(false);
-  const [active, setActive] = useState<AdminSection>("overview");
+  const [counts, setCounts] = useState<StatCounts>(initialCounts);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    async function loadStats() {
       try {
-        // Require logged-in session
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        const session = data?.session;
-        if (!session) {
-          if (!cancelled) router.replace("/login");
-          return;
-        }
+        setLoading(true);
 
-        // Optional: profiles.is_admin check (fail-open if schema differs)
-        try {
-          const { data: rows, error: profileError } = await supabase
-            .from("profiles")
-            .select("id, is_admin")
-            .eq("id", session.user.id)
-            .limit(1);
+        const [
+          buyersRes,
+          puppiesRes,
+          appsRes,
+          paymentsRes,
+          messagesRes,
+          transportsRes,
+        ] = await Promise.all([
+          supabase.from('buyers').select('*', { count: 'exact', head: true }),
+          supabase.from('puppies').select('*', { count: 'exact', head: true }),
+          supabase
+            .from('applications')
+            .select('*', { count: 'exact', head: true }),
+          supabase.from('payments').select('*', { count: 'exact', head: true }),
+          supabase.from('messages').select('*', { count: 'exact', head: true }),
+          supabase
+            .from('transport_requests')
+            .select('*', { count: 'exact', head: true }),
+        ]);
 
-          if (!profileError && rows && rows.length > 0) {
-            const profile = rows[0] as { id: string; is_admin?: boolean | null };
-            if (profile.is_admin !== true) {
-              if (!cancelled) router.replace("/");
-              return;
-            }
-          }
-        } catch {
-          // If the column doesn't exist, we don't block you.
-        }
+        if (cancelled) return;
 
-        if (!cancelled) setAllowed(true);
-      } catch {
-        if (!cancelled) router.replace("/login");
+        setCounts({
+          buyers: buyersRes.count ?? 0,
+          puppies: puppiesRes.count ?? 0,
+          applications: appsRes.count ?? 0,
+          payments: paymentsRes.count ?? 0,
+          messages: messagesRes.count ?? 0,
+          transports: transportsRes.count ?? 0,
+        });
+      } catch (err) {
+        console.error('Failed to load admin stats', err);
       } finally {
-        if (!cancelled) setChecking(false);
+        if (!cancelled) setLoading(false);
       }
-    })();
+    }
 
+    loadStats();
     return () => {
       cancelled = true;
     };
-  }, [router, supabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
-    router.replace("/login");
+    router.replace('/login');
   }
-
-  if (checking && !allowed) {
-    return (
-      <main className="admin-page">
-        <div className="checking">Checking admin access…</div>
-        <style jsx>{`
-          .admin-page {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont,
-              "Segoe UI", sans-serif;
-            background: #f3f4f6;
-            color: #111827;
-          }
-          .checking {
-            padding: 12px 18px;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.5);
-            background: #ffffff;
-            box-shadow: 0 12px 28px rgba(148, 163, 184, 0.4);
-            font-size: 13px;
-          }
-        `}</style>
-      </main>
-    );
-  }
-
-  if (!allowed) return null;
 
   return (
-    <main className="admin-page">
-      <div className="shell">
-        {/* SIDEBAR: the ONE set of “tabs” */}
-        <aside className="sidebar">
-          <div className="brand">
-            <div className="brandMark" aria-hidden>
-              <span className="paw paw-1" />
-              <span className="paw paw-2" />
-              <span className="paw paw-3" />
-            </div>
-            <div className="brandText">
-              <div className="brandLine1">SWVA Chihuahua</div>
-              <div className="brandLine2">Breeder Admin</div>
-            </div>
+    <div className="admin-shell">
+      {/* SIDEBAR */}
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-icon">
+            <span className="paw-dot" />
+            <span className="paw-dot" />
+            <span className="paw-dot" />
           </div>
+          <div className="brand-text">
+            <div className="brand-line1">SWVA Chihuahua</div>
+            <div className="brand-line2">Admin Portal</div>
+          </div>
+        </div>
 
-          <nav className="nav">
-            <SidebarItem
-              label="Dashboard"
-              section="overview"
-              active={active}
-              onClick={setActive}
-            />
-            <SidebarItem
-              label="Puppies"
-              section="puppies"
-              active={active}
-              onClick={setActive}
-            />
-            <SidebarItem
-              label="Litters"
-              section="litters"
-              active={active}
-              onClick={setActive}
-            />
-            <SidebarItem
-              label="Applications"
-              section="applications"
-              active={active}
-              onClick={setActive}
-            />
-            <SidebarItem
-              label="Messages"
-              section="messages"
-              active={active}
-              onClick={setActive}
-            />
-            <SidebarItem
-              label="Transport"
-              section="transport"
-              active={active}
-              onClick={setActive}
-            />
-            <SidebarItem
-              label="Payments"
-              section="payments"
-              active={active}
-              onClick={setActive}
-            />
-            <SidebarItem
-              label="Breeding Program"
-              section="breeding"
-              active={active}
-              onClick={setActive}
-            />
-          </nav>
+        <nav className="nav">
+          <SidebarLink href="/admin" active>
+            Dashboard
+          </SidebarLink>
+          <SidebarLink href="/admin/buyers">Buyers</SidebarLink>
+          <SidebarLink href="/admin/puppies">Puppies</SidebarLink>
+          <SidebarLink href="/admin/upcoming-litters">
+            Upcoming Litters
+          </SidebarLink>
+          <SidebarLink href="/admin/applications">Applications</SidebarLink>
+          <SidebarLink href="/admin/payments">Payments</SidebarLink>
+          <SidebarLink href="/admin/messages">Messages</SidebarLink>
+          <SidebarLink href="/admin/transport-requests">
+            Transportation Requests
+          </SidebarLink>
+          <SidebarLink href="/admin/breeding-program">
+            Breeding Program
+          </SidebarLink>
+        </nav>
 
-          <button className="signout" onClick={handleSignOut}>
-            Sign out
-          </button>
-        </aside>
+        <button className="signout" onClick={handleSignOut}>
+          Sign Out
+        </button>
+      </aside>
 
-        {/* MAIN CONTENT */}
-        <section className="main">
-          {active === "overview" && <Overview onNavigate={setActive} />}
+      {/* MAIN */}
+      <main className="main">
+        <header className="header">
+          <h1>Admin Dashboard</h1>
+          <p>
+            Quick overview of your program. Use the sidebar to move into each
+            workflow for detailed management.
+          </p>
+        </header>
 
-          {active === "puppies" && (
-            <SectionShell
-              title="Puppies"
-              subtitle="Manage all puppies in your program: status, pricing, and buyer assignments."
-            >
-              <p>
-                This will tie into your existing <code>puppies</code> table so
-                you can:
-              </p>
-              <ul>
-                <li>Search and filter by status (available, reserved, sold)</li>
-                <li>Update prices, deposits, registry, and notes</li>
-                <li>Assign approved buyers from your applications</li>
-              </ul>
-            </SectionShell>
-          )}
-
-          {active === "litters" && (
-            <SectionShell
-              title="Litters"
-              subtitle="Track litters, due dates, and connect each litter to its puppies."
-            >
-              <p>
-                This will connect to your <code>litters</code> table to show:
-              </p>
-              <ul>
-                <li>Current, past, and planned litters</li>
-                <li>Dam, sire, registry, and notes</li>
-                <li>Links to view puppies in each litter</li>
-              </ul>
-            </SectionShell>
-          )}
-
-          {active === "applications" && (
-            <SectionShell
-              title="Applications"
-              subtitle="Review, approve, deny, or waitlist applications and link them to puppies."
-            >
-              <p>
-                Built on your <code>applications</code> table. Here you&apos;ll
-                be able to:
-              </p>
-              <ul>
-                <li>Filter by status (new, approved, denied, waitlist)</li>
-                <li>Open full application details</li>
-                <li>Assign a specific puppy when you approve</li>
-              </ul>
-            </SectionShell>
-          )}
-
-          {active === "messages" && (
-            <SectionShell
-              title="Messages"
-              subtitle="View and respond to buyer messages in one place."
-            >
-              <p>
-                This can tie into your <code>messages</code> table so you can:
-              </p>
-              <ul>
-                <li>See conversations by buyer or by puppy</li>
-                <li>Respond directly from this panel</li>
-                <li>Mark threads as resolved or needing follow-up</li>
-              </ul>
-            </SectionShell>
-          )}
-
-          {active === "transport" && (
-            <SectionShell
-              title="Transport Requests"
-              subtitle="Review delivery / pickup requests and manage transport charges or credits."
-            >
-              <p>
-                Using <code>transport_requests</code> /{" "}
-                <code>transportations</code>, you&apos;ll be able to:
-              </p>
-              <ul>
-                <li>See requested delivery options per buyer</li>
-                <li>Approve or deny requests</li>
-                <li>Adjust charges or credits when needed</li>
-              </ul>
-            </SectionShell>
-          )}
-
-          {active === "payments" && (
-            <SectionShell
-              title="Payments"
-              subtitle="See deposits, balances, and payment plans across all puppies."
-            >
-              <p>
-                This will be wired to your <code>puppy_payments</code> /{" "}
-                <code>payments</code> tables. On this screen we can build:
-              </p>
-              <ul>
-                <li>Per-puppy balance views</li>
-                <li>Filters by status (current, behind, paid in full)</li>
-                <li>Payment plan details and history</li>
-              </ul>
-            </SectionShell>
-          )}
-
-          {active === "breeding" && (
-            <SectionShell
-              title="Breeding Program"
-              subtitle="Manage your core breeding dogs and see their litters and sales history."
-            >
-              <p>
-                This will connect to your <code>dogs</code> table and related
-                litters/puppies so you can:
-              </p>
-              <ul>
-                <li>See each breeding dog as a card with key details</li>
-                <li>Open a profile with litter history and puppy counts</li>
-                <li>
-                  Summaries of puppy sales amounts broken down by year, per dog
-                </li>
-              </ul>
-            </SectionShell>
-          )}
+        <section className="cards-row">
+          <StatCard
+            label="BUYERS"
+            value={counts.buyers}
+            helper="Approved families"
+            loading={loading}
+          />
+          <StatCard
+            label="PUPPIES"
+            value={counts.puppies}
+            helper="In the system"
+            loading={loading}
+          />
+          <StatCard
+            label="APPLICATIONS"
+            value={counts.applications}
+            helper="Pending or reviewed"
+            loading={loading}
+          />
+          <StatCard
+            label="PAYMENTS"
+            value={counts.payments}
+            helper="Recorded payments"
+            loading={loading}
+          />
+          <StatCard
+            label="MESSAGES"
+            value={counts.messages}
+            helper="Conversations"
+            loading={loading}
+          />
+          <StatCard
+            label="TRANSPORT REQUESTS"
+            value={counts.transports}
+            helper="Trips to plan"
+            loading={loading}
+          />
         </section>
-      </div>
+      </main>
 
+      {/* STYLES */}
       <style jsx>{`
         :root {
-          --bg: #f3f4f6;
-          --panel: #ffffff;
-          --ink: #111827;
-          --muted: #6b7280;
-          --border-subtle: rgba(148, 163, 184, 0.35);
-          --accent: #d89c5a;
-          --accent-deep: #b3722c;
-          --tab-bg: #f9fafb;
-          --tab-active-bg: #fef3c7;
+          /* Friendlier dark theme: deep navy with warm gold accent */
+          --bg: #07101f;
+          --bg-soft: #0b1728;
+          --panel: #0f1b30;
+          --panel-soft: #122037;
+          --border: rgba(148, 163, 184, 0.2);
+          --border-soft: rgba(148, 163, 184, 0.12);
+          --ink: #f9fafb;
+          --muted: #9ca3af;
+          --brand: #f5c37a;
+          --brand-deep: #d69740;
+          --danger: #f97373;
         }
 
-        .admin-page {
+        .admin-shell {
           min-height: 100vh;
-          background: radial-gradient(
-              120% 180% at 0 0,
-              rgba(254, 249, 195, 0.6),
-              transparent 50%
-            ),
-            radial-gradient(
-              120% 200% at 100% 0,
-              rgba(254, 226, 226, 0.6),
-              transparent 55%
-            ),
-            var(--bg);
-          padding: 24px 16px 32px;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-            sans-serif;
-          color: var(--ink);
-        }
-
-        .shell {
-          max-width: 1200px;
-          margin: 0 auto;
           display: grid;
           grid-template-columns: 260px minmax(0, 1fr);
-          gap: 18px;
+          background: radial-gradient(
+              circle at top left,
+              #1b2740 0%,
+              transparent 55%
+            ),
+            radial-gradient(circle at top right, #14213d 0%, transparent 55%),
+            var(--bg);
+          color: var(--ink);
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+            sans-serif;
         }
 
+        /* SIDEBAR */
         .sidebar {
-          border-radius: 20px;
-          padding: 16px 14px 14px;
-          background: linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.98),
-            rgba(255, 250, 240, 0.95)
-          );
-          border: 1px solid var(--border-subtle);
-          box-shadow: 0 18px 40px rgba(148, 163, 184, 0.35);
+          padding: 18px 16px 20px;
+          border-right: 1px solid var(--border-soft);
+          background: radial-gradient(
+              circle at top left,
+              rgba(255, 255, 255, 0.03),
+              transparent 60%
+            ),
+            #050b14;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 18px;
         }
 
         .brand {
           display: flex;
-          gap: 10px;
           align-items: center;
+          gap: 10px;
         }
 
-        .brandMark {
+        .brand-icon {
           position: relative;
-          width: 40px;
-          height: 40px;
-          border-radius: 14px;
-          background: linear-gradient(
-            135deg,
-            var(--accent),
-            var(--accent-deep)
-          );
-          box-shadow: 0 0 0 3px #fefce8;
+          width: 44px;
+          height: 44px;
+          border-radius: 18px;
+          background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+          box-shadow: 0 12px 22px rgba(0, 0, 0, 0.6);
         }
 
-        .paw {
+        .paw-dot {
           position: absolute;
-          width: 7px;
-          height: 7px;
+          width: 9px;
+          height: 9px;
           border-radius: 999px;
-          background: #fefce8;
-          opacity: 0.9;
+          background: #020617;
+          opacity: 0.7;
         }
-        .paw-1 {
-          top: 8px;
-          left: 10px;
+        .paw-dot:nth-child(1) {
+          top: 9px;
+          left: 11px;
         }
-        .paw-2 {
-          top: 8px;
-          right: 9px;
+        .paw-dot:nth-child(2) {
+          top: 13px;
+          right: 11px;
         }
-        .paw-3 {
+        .paw-dot:nth-child(3) {
           bottom: 10px;
-          left: 50%;
-          transform: translateX(-50%);
+          left: 17px;
         }
 
-        .brandText {
+        .brand-text {
           line-height: 1.1;
         }
-        .brandLine1 {
-          font-size: 14px;
+        .brand-line1 {
           font-weight: 700;
+          font-size: 15px;
         }
-        .brandLine2 {
+        .brand-line2 {
           font-size: 11px;
           color: var(--muted);
         }
 
         .nav {
+          margin-top: 6px;
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 8px;
+        }
+
+        .nav-link {
+          display: flex;
+          align-items: center;
+          padding: 9px 12px;
+          border-radius: 999px;
+          border: 1px solid transparent;
+          background: transparent;
+          color: var(--muted);
+          font-size: 13px;
+          text-decoration: none;
+          transition: background 0.12s ease, border-color 0.12s ease,
+            color 0.12s ease, transform 0.08s ease;
+        }
+
+        .nav-link:hover {
+          background: rgba(148, 163, 184, 0.08);
+          border-color: rgba(148, 163, 184, 0.25);
+          color: var(--ink);
+          transform: translateY(-1px);
+        }
+
+        .nav-link.active {
+          background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+          border-color: transparent;
+          color: #111827;
+          font-weight: 600;
         }
 
         .signout {
           margin-top: auto;
-          border-radius: 999px;
-          border: 1px solid rgba(248, 113, 113, 0.55);
-          background: #fef2f2;
-          color: #b91c1c;
-          font-size: 12px;
-          padding: 7px 10px;
-          cursor: pointer;
-          text-align: center;
-          transition: background 0.12s ease, box-shadow 0.12s ease,
-            transform 0.12s ease;
-        }
-        .signout:hover {
-          background: #fee2e2;
-          box-shadow: 0 10px 22px rgba(248, 113, 113, 0.5);
-          transform: translateY(-1px);
-        }
-
-        .main {
-          border-radius: 22px;
-          background: linear-gradient(
-            135deg,
-            rgba(255, 255, 255, 0.98),
-            rgba(255, 251, 235, 0.98)
-          );
-          border: 1px solid var(--border-subtle);
-          box-shadow: 0 18px 44px rgba(148, 163, 184, 0.4);
-          padding: 18px 18px 20px;
-          min-height: 400px;
-        }
-
-        @media (max-width: 900px) {
-          .shell {
-            grid-template-columns: 1fr;
-          }
-          .sidebar {
-            order: 1;
-          }
-          .main {
-            order: 2;
-          }
-        }
-      `}</style>
-    </main>
-  );
-}
-
-/* ========== SIDEBAR PILL "TABS" ========== */
-
-function SidebarItem(props: {
-  label: string;
-  section: AdminSection;
-  active: AdminSection;
-  onClick: (s: AdminSection) => void;
-}) {
-  const { label, section, active, onClick } = props;
-  const isActive = active === section;
-
-  return (
-    <>
-      <button
-        type="button"
-        className={`nav-item ${isActive ? "active" : ""}`}
-        onClick={() => onClick(section)}
-      >
-        <span className="nav-label">{label}</span>
-      </button>
-      <style jsx>{`
-        .nav-item {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: flex-start;
           padding: 8px 12px;
           border-radius: 999px;
-          border: 1px solid transparent;
-          background: var(--tab-bg);
+          border: 1px solid rgba(248, 113, 113, 0.65);
+          background: transparent;
+          color: #fecaca;
           font-size: 13px;
           cursor: pointer;
-          color: var(--ink);
-          transition: background 0.12s ease, border-color 0.12s ease,
-            box-shadow 0.12s ease, transform 0.12s ease;
+          transition: background 0.12s ease, transform 0.08s ease;
         }
 
-        .nav-item:hover {
-          background: #fefce8;
-          border-color: rgba(180, 83, 9, 0.5);
+        .signout:hover {
+          background: rgba(248, 113, 113, 0.12);
           transform: translateY(-1px);
-          box-shadow: 0 10px 22px rgba(248, 191, 104, 0.4);
         }
 
-        .nav-item.active {
-          background: var(--tab-active-bg);
-          border-color: rgba(180, 83, 9, 0.7);
-          box-shadow: 0 10px 24px rgba(248, 191, 104, 0.6);
-        }
-
-        .nav-label {
-          flex: 1;
-          text-align: left;
-        }
-      `}</style>
-    </>
-  );
-}
-
-/* ========== OVERVIEW DASHBOARD ========== */
-
-function Overview(props: { onNavigate: (s: AdminSection) => void }) {
-  const { onNavigate } = props;
-
-  return (
-    <div className="overview">
-      <header className="overview-header">
-        <p className="eyebrow">Breeder Admin</p>
-        <h1>Admin Dashboard</h1>
-        <p className="lead">
-          Manage puppies, litters, buyer applications, messages, transport
-          requests, payments, and your breeding dogs from one place.
-        </p>
-      </header>
-
-      <section className="cards-grid">
-        <OverviewCard
-          title="Puppies"
-          body="Update status, pricing, registry, and assigned buyer."
-          cta="Manage puppies"
-          onClick={() => onNavigate("puppies")}
-        />
-        <OverviewCard
-          title="Litters"
-          body="Track dams, sires, whelping dates, and litter notes."
-          cta="View litters"
-          onClick={() => onNavigate("litters")}
-        />
-        <OverviewCard
-          title="Applications"
-          body="Review, approve, deny, or waitlist new families."
-          cta="Review applications"
-          onClick={() => onNavigate("applications")}
-        />
-        <OverviewCard
-          title="Messages"
-          body="See and respond to questions from buyers."
-          cta="Open messages"
-          onClick={() => onNavigate("messages")}
-        />
-        <OverviewCard
-          title="Transport"
-          body="Approve transport plans and adjust fees or credits."
-          cta="Manage transport"
-          onClick={() => onNavigate("transport")}
-        />
-        <OverviewCard
-          title="Payments"
-          body="Watch deposits, balances, and payment plans."
-          cta="View payments"
-          onClick={() => onNavigate("payments")}
-        />
-        <OverviewCard
-          title="Breeding Program"
-          body="View breeding dogs, their litters, and sales history."
-          cta="Open breeding program"
-          onClick={() => onNavigate("breeding")}
-        />
-      </section>
-
-      <style jsx>{`
-        .overview {
+        /* MAIN */
+        .main {
+          padding: 22px 26px 26px;
           display: flex;
           flex-direction: column;
           gap: 18px;
         }
 
-        .overview-header {
-          max-width: 720px;
-        }
-
-        .eyebrow {
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: #6b7280;
-          margin-bottom: 4px;
-        }
-
-        .overview-header h1 {
-          margin: 0 0 6px;
+        .header h1 {
+          margin: 0 0 4px;
           font-size: 22px;
-          color: #111827;
         }
 
-        .lead {
+        .header p {
           margin: 0;
-          font-size: 13px;
-          color: #4b5563;
+          color: var(--muted);
+          font-size: 14px;
+          max-width: 620px;
         }
 
-        .cards-grid {
+        .cards-row {
+          margin-top: 10px;
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 12px;
+          grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+          gap: 16px;
+        }
+
+        .card {
+          border-radius: 18px;
+          padding: 14px 16px 16px;
+          background: radial-gradient(
+              circle at top left,
+              rgba(245, 195, 122, 0.15),
+              transparent 60%
+            ),
+            var(--panel);
+          border: 1px solid var(--border);
+          box-shadow: 0 16px 32px rgba(15, 23, 42, 0.75);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .card-label {
+          font-size: 11px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--muted);
+        }
+
+        .card-value {
+          font-size: 26px;
+          font-weight: 700;
+        }
+
+        .card-helper {
+          font-size: 12px;
+          color: var(--muted);
+        }
+
+        .card-loading {
+          width: 52px;
+          height: 16px;
+          border-radius: 999px;
+          background: linear-gradient(
+            90deg,
+            rgba(148, 163, 184, 0.15),
+            rgba(148, 163, 184, 0.35),
+            rgba(148, 163, 184, 0.15)
+          );
+          background-size: 200% 100%;
+          animation: shimmer 1.1s infinite;
+        }
+
+        @keyframes shimmer {
+          0% {
+            background-position: 200% 0;
+          }
+          100% {
+            background-position: -200% 0;
+          }
+        }
+
+        @media (max-width: 900px) {
+          .admin-shell {
+            grid-template-columns: 1fr;
+          }
+          .sidebar {
+            flex-direction: row;
+            align-items: center;
+            overflow-x: auto;
+            padding: 12px 12px 10px;
+            gap: 12px;
+          }
+          .nav {
+            flex-direction: row;
+            flex-wrap: nowrap;
+            gap: 8px;
+          }
+          .signout {
+            margin-top: 0;
+            margin-left: auto;
+            flex-shrink: 0;
+          }
+          .main {
+            padding: 18px 16px 24px;
+          }
         }
       `}</style>
     </div>
   );
 }
 
-function OverviewCard(props: {
-  title: string;
-  body: string;
-  cta: string;
-  onClick: () => void;
+function SidebarLink(props: {
+  href: string;
+  children: React.ReactNode;
+  active?: boolean;
 }) {
-  const { title, body, cta, onClick } = props;
-
+  const { href, children, active } = props;
   return (
-    <button type="button" className="card" onClick={onClick}>
-      <div className="card-title">{title}</div>
-      <p className="card-body">{body}</p>
-      <div className="card-cta">{cta}</div>
-
-      <style jsx>{`
-        .card {
-          text-align: left;
-          border-radius: 16px;
-          border: 1px solid rgba(148, 163, 184, 0.55);
-          background: #ffffff;
-          box-shadow: 0 12px 26px rgba(148, 163, 184, 0.35);
-          padding: 12px 12px 11px;
-          cursor: pointer;
-          transition: box-shadow 0.12s ease, transform 0.12s ease,
-            border-color 0.12s ease, background 0.12s ease;
-        }
-
-        .card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 18px 34px rgba(148, 163, 184, 0.5);
-          border-color: rgba(180, 83, 9, 0.6);
-          background: #fffbeb;
-        }
-
-        .card-title {
-          font-weight: 600;
-          font-size: 14px;
-          margin-bottom: 4px;
-          color: #111827;
-        }
-
-        .card-body {
-          margin: 0 0 8px;
-          font-size: 12px;
-          color: #4b5563;
-        }
-
-        .card-cta {
-          font-size: 12px;
-          font-weight: 600;
-          color: #b45309;
-        }
-      `}</style>
-    </button>
+    <Link href={href} className={`nav-link ${active ? 'active' : ''}`}>
+      {children}
+    </Link>
   );
 }
 
-/* ========== GENERIC SECTION SHELL ========== */
-
-function SectionShell(props: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
+function StatCard(props: {
+  label: string;
+  value: number;
+  helper: string;
+  loading?: boolean;
 }) {
-  const { title, subtitle, children } = props;
-
+  const { label, value, helper, loading } = props;
   return (
-    <div className="section">
-      <header className="section-header">
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
-      </header>
-      <div className="section-body">{children}</div>
-
-      <style jsx>{`
-        .section {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .section-header h1 {
-          margin: 0;
-          font-size: 18px;
-          color: #111827;
-        }
-
-        .section-header p {
-          margin: 2px 0 0;
-          font-size: 13px;
-          color: #6b7280;
-        }
-
-        .section-body {
-          margin-top: 6px;
-          padding: 10px 10px 12px;
-          border-radius: 14px;
-          border: 1px dashed rgba(148, 163, 184, 0.7);
-          background: rgba(255, 255, 255, 0.9);
-          font-size: 13px;
-          color: #4b5563;
-        }
-
-        .section-body ul {
-          margin: 6px 0 0 18px;
-          padding: 0;
-        }
-        .section-body li {
-          margin-bottom: 3px;
-        }
-
-        code {
-          background: #f3f4f6;
-          padding: 1px 4px;
-          border-radius: 4px;
-          font-size: 12px;
-        }
-      `}</style>
+    <div className="card">
+      <div className="card-label">{label}</div>
+      {loading ? (
+        <div className="card-loading" />
+      ) : (
+        <div className="card-value">{value}</div>
+      )}
+      <div className="card-helper">{helper}</div>
     </div>
   );
 }
