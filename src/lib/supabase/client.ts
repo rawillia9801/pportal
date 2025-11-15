@@ -1,20 +1,24 @@
-'use client';
+// src/lib/supabase/client.ts
+// Single browser Supabase client used across the app.
 
-import { createBrowserClient } from '@supabase/ssr';
+import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-/**
- * Browser-only Supabase client.
- * Reads NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY.
- */
-export function getBrowserClient() {
-  const url  = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-  // Only warn/throw in the browser (never during build)
-  if ((!url || !anon) && typeof window !== 'undefined') {
-    throw new Error('Supabase env vars are not configured.');
+let browserClient: SupabaseClient | null = null
+
+export function getBrowserClient(): SupabaseClient {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error(
+      'Supabase env missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.'
+    )
   }
 
-  // Fallbacks never used in prod, but keep types happy during build.
-  return createBrowserClient(url ?? 'http://127.0.0.1', anon ?? 'anon');
+  if (!browserClient) {
+    browserClient = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  }
+
+  return browserClient
 }
