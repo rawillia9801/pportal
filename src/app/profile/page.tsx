@@ -4,437 +4,379 @@
 /* ============================================
    CHANGELOG
    - 2025-11-14: New Profile page
-                 • Loads logged-in user from Supabase
-                 • Reads/writes contact info in `profiles`
-                 • Field for Puppy Name (display name)
-                 • Light, friendly layout to match dashboard
+                 • Loads logged-in user's profile
+                 • Lets user update contact info
+                   and their puppy's name
    ============================================ */
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 
-type ProfileForm = {
-  full_name: string;
+type ProfileState = {
+  userId: string | null;
+  fullName: string;
   phone: string;
-  address_line1: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  puppy_name: string;
+  address: string;
+  puppyName: string;
+  loading: boolean;
+  saving: boolean;
+  message: string;
+  error: string;
 };
 
 export default function ProfilePage() {
   const router = useRouter();
   const supabase = getBrowserClient();
 
-  const [email, setEmail] = useState<string>("");
-  const [form, setForm] = useState<ProfileForm>({
-    full_name: "",
+  const [state, setState] = useState<ProfileState>({
+    userId: null,
+    fullName: "",
     phone: "",
-    address_line1: "",
-    city: "",
-    state: "",
-    postal_code: "",
-    puppy_name: "",
+    address: "",
+    puppyName: "",
+    loading: true,
+    saving: false,
+    message: "",
+    error: "",
   });
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
-    let cancelled = false;
+    loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    (async () => {
-      setLoading(true);
-      setMessage(null);
-      setError(null);
-
-      try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          if (!cancelled) router.replace("/login");
-          return;
-        }
-
-        if (!cancelled) {
-          setEmail(user.email || "");
-        }
-
-        const { data, error: profileError } = await supabase
-          .from("profiles")
-          .select(
-            "full_name, phone, address_line1, city, state, postal_code, puppy_name"
-          )
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (profileError && profileError.code !== "PGRST116") {
-          throw profileError;
-        }
-
-        if (!cancelled && data) {
-          setForm({
-            full_name: data.full_name ?? "",
-            phone: data.phone ?? "",
-            address_line1: data.address_line1 ?? "",
-            city: data.city ?? "",
-            state: data.state ?? "",
-            postal_code: data.postal_code ?? "",
-            puppy_name: data.puppy_name ?? "",
-          });
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          setError(e?.message || "Unable to load your profile right now.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [supabase, router]);
-
-  function updateField<K extends keyof ProfileForm>(key: K, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setMessage(null);
-    setError(null);
-
+  async function loadProfile() {
     try {
+      setState((s) => ({ ...s, loading: true, message: "", error: "" }));
+
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError || !user) {
+      if (userError) {
+        throw userError;
+      }
+
+      if (!user) {
         router.replace("/login");
         return;
       }
 
-      const payload = {
-        id: user.id,
-        full_name: form.full_name || null,
-        phone: form.phone || null,
-        address_line1: form.address_line1 || null,
-        city: form.city || null,
-        state: form.state || null,
-        postal_code: form.postal_code || null,
-        puppy_name: form.puppy_name || null,
-      };
-
-      const { error: upsertError } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
-        .upsert(payload, { onConflict: "id" });
+        .select("full_name, phone, address, puppy_name")
+        .eq("id", user.id)
+        .maybeSingle();
 
-      if (upsertError) throw upsertError;
+      if (error && error.code !== "PGRST116") {
+        // PGRST116 = no rows (safe to ignore)
+        throw error;
+      }
 
-      setMessage("Your profile has been updated.");
-    } catch (e: any) {
-      setError(e?.message || "Could not save your profile.");
-    } finally {
-      setSaving(false);
+      setState((s) => ({
+        ...s,
+        userId: user.id,
+        fullName: data?.full_name ?? "",
+        phone: data?.phone ?? "",
+        address: data?.address ?? "",
+        puppyName: data?.puppy_name ?? "",
+        loading: false,
+      }));
+    } catch (err: any) {
+      setState((s) => ({
+        ...s,
+        loading: false,
+        error:
+          err?.message ||
+          "We couldn't load your profile right now. Please try again.",
+      }));
     }
   }
 
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!state.userId) return;
+
+    try {
+      setState((s) => ({
+        ...s,
+        saving: true,
+        message: "",
+        error: "",
+      }));
+
+      const { error } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: state.userId,
+            full_name: state.fullName.trim(),
+            phone: state.phone.trim(),
+            address: state.address.trim(),
+            puppy_name: state.puppyName.trim(),
+          },
+          { onConflict: "id" }
+        );
+
+      if (error) {
+        throw error;
+      }
+
+      setState((s) => ({
+        ...s,
+        saving: false,
+        message: "Your profile has been updated.",
+      }));
+    } catch (err: any) {
+      setState((s) => ({
+        ...s,
+        saving: false,
+        error:
+          err?.message ||
+          "We couldn't save your changes right now. Please try again.",
+      }));
+    }
+  }
+
+  function updateField<K extends keyof ProfileState>(key: K, value: any) {
+    setState((s) => ({ ...s, [key]: value }));
+  }
+
   return (
-    <div className="shell">
-      <div className="card">
-        <header className="header">
-          <div>
-            <h1>Profile</h1>
-            <p>Update your contact information and your puppy’s display name.</p>
-          </div>
-          {email && <div className="email">{email}</div>}
-        </header>
+    <main>
+      <div className="shell">
+        <section className="card">
+          <header className="header">
+            <h1>My Profile</h1>
+            <p>
+              Keep your contact information and your puppy&apos;s name up to
+              date so we can reach you quickly when there are updates.
+            </p>
+          </header>
 
-        {loading ? (
-          <p className="muted">Loading your profile…</p>
-        ) : (
-          <form onSubmit={handleSave} className="form">
-            {error && <div className="alert alert-error">{error}</div>}
-            {message && <div className="alert alert-ok">{message}</div>}
+          {state.loading ? (
+            <div className="statusRow">Loading your profile…</div>
+          ) : (
+            <form onSubmit={handleSave} className="form">
+              {state.error && (
+                <div className="alert error">{state.error}</div>
+              )}
+              {state.message && (
+                <div className="alert success">{state.message}</div>
+              )}
 
-            <div className="grid">
-              <div className="field">
-                <label>Full Name</label>
+              <div className="fieldGroup">
+                <label className="label">Full Name</label>
                 <input
-                  value={form.full_name}
-                  onChange={(e) => updateField("full_name", e.target.value)}
-                  placeholder="First Last"
+                  type="text"
+                  value={state.fullName}
+                  onChange={(e) => updateField("fullName", e.target.value)}
+                  placeholder="First and Last Name"
                   autoComplete="name"
                 />
               </div>
 
-              <div className="field">
-                <label>Phone Number</label>
+              <div className="fieldGroup">
+                <label className="label">Phone Number</label>
                 <input
-                  value={form.phone}
+                  type="tel"
+                  value={state.phone}
                   onChange={(e) => updateField("phone", e.target.value)}
-                  placeholder="(555) 555-5555"
+                  placeholder="Best number to reach you"
                   autoComplete="tel"
                 />
               </div>
 
-              <div className="field">
-                <label>Street Address</label>
-                <input
-                  value={form.address_line1}
-                  onChange={(e) =>
-                    updateField("address_line1", e.target.value)
-                  }
-                  placeholder="123 Main St"
-                  autoComplete="street-address"
+              <div className="fieldGroup">
+                <label className="label">Mailing Address</label>
+                <textarea
+                  rows={3}
+                  value={state.address}
+                  onChange={(e) => updateField("address", e.target.value)}
+                  placeholder="Street, City, State, ZIP"
                 />
               </div>
 
-              <div className="field">
-                <label>City</label>
+              <div className="fieldGroup">
+                <label className="label">Puppy&apos;s Name</label>
                 <input
-                  value={form.city}
-                  onChange={(e) => updateField("city", e.target.value)}
-                  placeholder="City"
-                  autoComplete="address-level2"
-                />
-              </div>
-
-              <div className="field">
-                <label>State</label>
-                <input
-                  value={form.state}
-                  onChange={(e) => updateField("state", e.target.value)}
-                  placeholder="VA"
-                  autoComplete="address-level1"
-                />
-              </div>
-
-              <div className="field">
-                <label>ZIP Code</label>
-                <input
-                  value={form.postal_code}
-                  onChange={(e) =>
-                    updateField("postal_code", e.target.value)
-                  }
-                  placeholder="12345"
-                  autoComplete="postal-code"
-                />
-              </div>
-
-              <div className="field full">
-                <label>Puppy Name</label>
-                <input
-                  value={form.puppy_name}
-                  onChange={(e) => updateField("puppy_name", e.target.value)}
-                  placeholder="Your puppy’s call name (e.g., Gizmo)"
+                  type="text"
+                  value={state.puppyName}
+                  onChange={(e) => updateField("puppyName", e.target.value)}
+                  placeholder="What would you like your puppy to be called?"
                 />
                 <p className="hint">
-                  This is the name we’ll reference in messages and notes about
-                  your puppy.
+                  This helps us personalize your updates (for example:
+                  “Gizmo&apos;s weight chart has been updated”).
                 </p>
               </div>
-            </div>
 
-            <button className="saveBtn" type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save Profile"}
-            </button>
-          </form>
-        )}
+              <div className="actions">
+                <button
+                  type="submit"
+                  className="btn primary"
+                  disabled={state.saving}
+                >
+                  {state.saving ? "Saving…" : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
       </div>
 
-      {/* Light theme to match dashboard */}
-      <style jsx global>{`
-        :root {
-          --ink: #1e232d;
-          --muted: #6b7280;
-          --bg-grad-a: #f7f9ff;
-          --bg-grad-b: #eef3ff;
-          --bg-grad-c: #e9f6ff;
-          --panel: #ffffff;
-          --panel-border: rgba(15, 23, 42, 0.08);
-          --panel-ring: rgba(37, 99, 235, 0.16);
-          --accent: #5a6cff;
-          --accent-ink: #28306b;
-        }
-      `}</style>
-
       <style jsx>{`
-        .shell {
+        :root {
+          --bg: #020617;
+          --panelBorder: #1f2937;
+          --ink: #f9fafb;
+          --muted: #d1d5db;
+          --brand: #e0a96d;
+          --brandAlt: #c47a35;
+        }
+
+        main {
           min-height: 100vh;
-          padding: 24px;
           display: flex;
-          justify-content: center;
           align-items: center;
-          background: linear-gradient(
-            180deg,
-            var(--bg-grad-a),
-            var(--bg-grad-b) 40%,
-            var(--bg-grad-c)
-          );
+          justify-content: center;
+          padding: 24px 16px;
+          background:
+            radial-gradient(60% 100% at 100% 0%, #020617 0%, transparent 60%),
+            radial-gradient(60% 100% at 0% 0%, #111827 0%, transparent 60%),
+            #020617;
           color: var(--ink);
           font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
             sans-serif;
         }
 
-        .card {
+        .shell {
           width: 100%;
           max-width: 720px;
-          border-radius: 20px;
-          background: var(--panel);
-          border: 1px solid var(--panel-border);
-          box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
-          padding: 20px 22px 22px;
         }
 
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 12px;
-          margin-bottom: 14px;
+        .card {
+          border-radius: 22px;
+          border: 1px solid var(--panelBorder);
+          background: #020617;
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.85);
+          padding: 18px 18px 20px;
         }
 
         .header h1 {
-          margin: 0 0 4px;
-          font-size: 1.4rem;
+          margin: 0 0 6px;
+          font-size: 22px;
         }
 
         .header p {
           margin: 0;
-          font-size: 0.9rem;
+          font-size: 14px;
           color: var(--muted);
         }
 
-        .email {
-          font-size: 0.82rem;
+        .statusRow {
+          margin-top: 16px;
+          font-size: 14px;
           color: var(--muted);
-          padding: 4px 10px;
-          border-radius: 999px;
-          border: 1px solid var(--panel-border);
-          background: #f9fafb;
-        }
-
-        .muted {
-          color: var(--muted);
-          font-size: 0.9rem;
-          margin: 8px 0 0;
         }
 
         .form {
-          margin-top: 6px;
+          margin-top: 16px;
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 12px;
         }
 
-        .grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px 14px;
-        }
-
-        .field {
+        .fieldGroup {
           display: flex;
           flex-direction: column;
-          gap: 3px;
-          font-size: 0.9rem;
+          gap: 4px;
         }
 
-        .field.full {
-          grid-column: 1 / -1;
+        .label {
+          font-size: 13px;
+          font-weight: 500;
         }
 
-        label {
-          font-size: 0.8rem;
-          font-weight: 600;
-          color: #4b5563;
-        }
-
-        input {
+        input,
+        textarea {
           border-radius: 10px;
-          border: 1px solid var(--panel-border);
-          padding: 7px 9px;
-          font-size: 0.9rem;
-          outline: none;
+          border: 1px solid #374151;
+          background: #020617;
+          color: var(--ink);
+          padding: 8px 10px;
+          font-size: 13px;
         }
 
-        input:focus {
-          border-color: var(--panel-ring);
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        input:focus,
+        textarea:focus {
+          outline: none;
+          border-color: var(--brand);
+          box-shadow: 0 0 0 2px rgba(224, 169, 109, 0.25);
         }
 
         .hint {
-          margin: 2px 0 0;
-          font-size: 0.78rem;
+          margin: 0;
+          font-size: 11px;
           color: var(--muted);
         }
 
-        .saveBtn {
-          align-self: flex-start;
+        .actions {
+          margin-top: 6px;
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           border-radius: 999px;
-          border: 1px solid transparent;
-          padding: 8px 16px;
-          background: linear-gradient(135deg, #e0a96d, #c47a35);
-          color: #111827;
-          font-size: 0.9rem;
-          font-weight: 600;
+          padding: 8px 14px;
+          font-size: 13px;
           cursor: pointer;
-          transition: transform 0.08s ease, box-shadow 0.12s ease;
-          margin-top: 4px;
+          border: 1px solid #374151;
+          background: #020617;
+          color: var(--ink);
         }
 
-        .saveBtn:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 10px 25px rgba(15, 23, 42, 0.18);
+        .btn.primary {
+          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
+          color: #111827;
+          border-color: transparent;
         }
 
-        .saveBtn:disabled {
+        .btn.primary:disabled {
           opacity: 0.7;
           cursor: default;
         }
 
         .alert {
+          padding: 8px 10px;
           border-radius: 10px;
-          padding: 7px 9px;
-          font-size: 0.82rem;
+          font-size: 12px;
         }
 
-        .alert-error {
-          border: 1px solid rgba(239, 68, 68, 0.35);
-          background: #fef2f2;
-          color: #991b1b;
+        .alert.error {
+          border: 1px solid #fecaca;
+          background: #7f1d1d;
+          color: #fee2e2;
         }
 
-        .alert-ok {
-          border: 1px solid rgba(22, 163, 74, 0.35);
-          background: #ecfdf3;
-          color: #166534;
+        .alert.success {
+          border: 1px solid #bbf7d0;
+          background: #14532d;
+          color: #dcfce7;
         }
 
-        @media (max-width: 720px) {
-          .shell {
-            padding: 16px;
-          }
+        @media (max-width: 640px) {
           .card {
-            padding: 18px 16px 20px;
-          }
-          .grid {
-            grid-template-columns: minmax(0, 1fr);
+            padding: 16px 14px 18px;
           }
         }
       `}</style>
-    </div>
+    </main>
   );
 }
