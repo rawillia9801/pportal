@@ -2,17 +2,15 @@
 
 /* ============================================
    CHANGELOG (ADMIN DASHBOARD)
-   - 2025-11-15: Reintroduce Payments tab in sidebar.
-   - 2025-11-15: Restore dashboard-style landing page
-                 with cards for each admin area instead
-                 of plain placeholder text.
-   - 2025-11-15: Keep simple Supabase session guard for
-                 /admin + optional profiles.is_admin
-                 (no fragile schema assumptions).
+   - 2025-11-15: Keep a single, clear tab set
+                 (sidebar pills only).
+   - 2025-11-15: Remove "Admin Portal" wording
+                 that felt like a second portal.
+   - 2025-11-15: Light, warm colors to match
+                 a Chihuahua breeder audience.
    ============================================ */
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 
@@ -39,7 +37,7 @@ export default function AdminPage() {
 
     (async () => {
       try {
-        // 1) Require logged-in session
+        // Require logged-in session
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
         const session = data?.session;
@@ -48,35 +46,26 @@ export default function AdminPage() {
           return;
         }
 
-        // 2) Optional: check profiles.is_admin if it exists.
-        //    If the query fails because the column doesn't exist,
-        //    we just allow access instead of breaking.
+        // Optional: profiles.is_admin check (fail-open if schema differs)
         try {
-          const { data: profileRows, error: profileError } = await supabase
+          const { data: rows, error: profileError } = await supabase
             .from("profiles")
             .select("id, is_admin")
             .eq("id", session.user.id)
             .limit(1);
 
-          if (!profileError && profileRows && profileRows.length > 0) {
-            const profile = profileRows[0] as {
-              id: string;
-              is_admin?: boolean | null;
-            };
-
+          if (!profileError && rows && rows.length > 0) {
+            const profile = rows[0] as { id: string; is_admin?: boolean | null };
             if (profile.is_admin !== true) {
               if (!cancelled) router.replace("/");
               return;
             }
           }
-          // If profileError exists (e.g., column missing), we silently allow.
         } catch {
-          // Do nothing – fail-open for now instead of breaking admin.
+          // If the column doesn't exist, we don't block you.
         }
 
-        if (!cancelled) {
-          setAllowed(true);
-        }
+        if (!cancelled) setAllowed(true);
       } catch {
         if (!cancelled) router.replace("/login");
       } finally {
@@ -97,9 +86,7 @@ export default function AdminPage() {
   if (checking && !allowed) {
     return (
       <main className="admin-page">
-        <div className="checking">
-          Checking admin access…
-        </div>
+        <div className="checking">Checking admin access…</div>
         <style jsx>{`
           .admin-page {
             min-height: 100vh;
@@ -124,15 +111,12 @@ export default function AdminPage() {
     );
   }
 
-  if (!allowed) {
-    // We’ve already redirected at this point.
-    return null;
-  }
+  if (!allowed) return null;
 
   return (
     <main className="admin-page">
       <div className="shell">
-        {/* SIDEBAR */}
+        {/* SIDEBAR: the ONE set of “tabs” */}
         <aside className="sidebar">
           <div className="brand">
             <div className="brandMark" aria-hidden>
@@ -142,7 +126,7 @@ export default function AdminPage() {
             </div>
             <div className="brandText">
               <div className="brandLine1">SWVA Chihuahua</div>
-              <div className="brandLine2">Admin Portal</div>
+              <div className="brandLine2">Breeder Admin</div>
             </div>
           </div>
 
@@ -178,12 +162,11 @@ export default function AdminPage() {
               onClick={setActive}
             />
             <SidebarItem
-              label="Transport Requests"
+              label="Transport"
               section="transport"
               active={active}
               onClick={setActive}
             />
-            {/* 🔑 Payments tab restored here */}
             <SidebarItem
               label="Payments"
               section="payments"
@@ -205,44 +188,37 @@ export default function AdminPage() {
 
         {/* MAIN CONTENT */}
         <section className="main">
-          {active === "overview" && <OverviewCards onNavigate={setActive} />}
+          {active === "overview" && <Overview onNavigate={setActive} />}
 
           {active === "puppies" && (
             <SectionShell
               title="Puppies"
-              subtitle="Manage all puppies in your program, including status (available, reserved, sold), pricing, and buyer assignment."
+              subtitle="Manage all puppies in your program: status, pricing, and buyer assignments."
             >
               <p>
-                This view will connect to your existing <code>puppies</code>{" "}
-                table. We can add:
+                This will tie into your existing <code>puppies</code> table so
+                you can:
               </p>
               <ul>
-                <li>Search and filters by status, registry, color, and sex</li>
-                <li>Edit price, deposit amounts, and notes</li>
-                <li>Assign puppies to approved buyers</li>
+                <li>Search and filter by status (available, reserved, sold)</li>
+                <li>Update prices, deposits, registry, and notes</li>
+                <li>Assign approved buyers from your applications</li>
               </ul>
-              <p>
-                When you’re ready, we can wire this section directly to your
-                Supabase tables instead of this placeholder text.
-              </p>
             </SectionShell>
           )}
 
           {active === "litters" && (
             <SectionShell
               title="Litters"
-              subtitle="Track litters, due dates, and link each litter to its puppies."
+              subtitle="Track litters, due dates, and connect each litter to its puppies."
             >
               <p>
-                This will connect to your <code>litters</code> table and show:
+                This will connect to your <code>litters</code> table to show:
               </p>
               <ul>
-                <li>Current and past litters</li>
-                <li>Dam, sire, registry, and litter notes</li>
-                <li>
-                  Quick links to view puppies in each litter from the Puppies
-                  tab
-                </li>
+                <li>Current, past, and planned litters</li>
+                <li>Dam, sire, registry, and notes</li>
+                <li>Links to view puppies in each litter</li>
               </ul>
             </SectionShell>
           )}
@@ -250,15 +226,16 @@ export default function AdminPage() {
           {active === "applications" && (
             <SectionShell
               title="Applications"
-              subtitle="Review, approve, deny, or waitlist adoption applications."
+              subtitle="Review, approve, deny, or waitlist applications and link them to puppies."
             >
               <p>
-                This will use your <code>applications</code> table to show:
+                Built on your <code>applications</code> table. Here you&apos;ll
+                be able to:
               </p>
               <ul>
-                <li>Submitted applications with status filters</li>
-                <li>Ability to approve, deny, or move to waitlist</li>
-                <li>Assign an approved application to a specific puppy</li>
+                <li>Filter by status (new, approved, denied, waitlist)</li>
+                <li>Open full application details</li>
+                <li>Assign a specific puppy when you approve</li>
               </ul>
             </SectionShell>
           )}
@@ -269,13 +246,12 @@ export default function AdminPage() {
               subtitle="View and respond to buyer messages in one place."
             >
               <p>
-                This can tie into your existing <code>messages</code> setup so
-                you can:
+                This can tie into your <code>messages</code> table so you can:
               </p>
               <ul>
-                <li>See messages per buyer or per puppy</li>
-                <li>Reply and keep a simple history</li>
-                <li>Mark conversations as resolved</li>
+                <li>See conversations by buyer or by puppy</li>
+                <li>Respond directly from this panel</li>
+                <li>Mark threads as resolved or needing follow-up</li>
               </ul>
             </SectionShell>
           )}
@@ -283,18 +259,16 @@ export default function AdminPage() {
           {active === "transport" && (
             <SectionShell
               title="Transport Requests"
-              subtitle="Review delivery / pickup requests and manage fees or credits."
+              subtitle="Review delivery / pickup requests and manage transport charges or credits."
             >
               <p>
-                This will connect to <code>transport_requests</code> (and/or{" "}
-                <code>transportations</code>) so you can:
+                Using <code>transport_requests</code> /{" "}
+                <code>transportations</code>, you&apos;ll be able to:
               </p>
               <ul>
                 <li>See requested delivery options per buyer</li>
                 <li>Approve or deny requests</li>
-                <li>
-                  Adjust charges or apply transport credits when needed
-                </li>
+                <li>Adjust charges or credits when needed</li>
               </ul>
             </SectionShell>
           )}
@@ -305,43 +279,32 @@ export default function AdminPage() {
               subtitle="See deposits, balances, and payment plans across all puppies."
             >
               <p>
-                This section is meant to tie into your{" "}
-                <code>puppy_payments</code> and/or <code>payments</code> tables.
-                On this page we can build:
+                This will be wired to your <code>puppy_payments</code> /{" "}
+                <code>payments</code> tables. On this screen we can build:
               </p>
               <ul>
-                <li>
-                  A list of deposits, payments, and remaining balances per
-                  puppy
-                </li>
-                <li>Filters by status (current, paid in full, behind, etc.)</li>
-                <li>Click-through to see payment history for each buyer</li>
+                <li>Per-puppy balance views</li>
+                <li>Filters by status (current, behind, paid in full)</li>
+                <li>Payment plan details and history</li>
               </ul>
-              <p>
-                Right now this is a layout-only placeholder so we don’t break
-                your build with schema guesses. Next step: we can wire it once
-                you give me the exact columns you’re using in{" "}
-                <code>puppy_payments</code>.
-              </p>
             </SectionShell>
           )}
 
           {active === "breeding" && (
             <SectionShell
               title="Breeding Program"
-              subtitle="View and manage your core breeding dogs and their litters."
+              subtitle="Manage your core breeding dogs and see their litters and sales history."
             >
               <p>
-                This will connect to your <code>dogs</code> table (and related
-                litters/puppies) so you can:
+                This will connect to your <code>dogs</code> table and related
+                litters/puppies so you can:
               </p>
               <ul>
-                <li>See each breeding dog as a card with picture and details</li>
+                <li>See each breeding dog as a card with key details</li>
+                <li>Open a profile with litter history and puppy counts</li>
                 <li>
-                  Open a dog profile to see litters, puppy counts, and sales per
-                  year
+                  Summaries of puppy sales amounts broken down by year, per dog
                 </li>
-                <li>Record purchase price, retained value, and notes</li>
               </ul>
             </SectionShell>
           )}
@@ -355,19 +318,17 @@ export default function AdminPage() {
           --ink: #111827;
           --muted: #6b7280;
           --border-subtle: rgba(148, 163, 184, 0.35);
-          --border-strong: rgba(15, 23, 42, 0.15);
           --accent: #d89c5a;
           --accent-deep: #b3722c;
-          --accent-soft: #fef3c7;
-          --nav-chip-bg: #f9fafb;
-          --nav-chip-active: #fef3c7;
+          --tab-bg: #f9fafb;
+          --tab-active-bg: #fef3c7;
         }
 
         .admin-page {
           min-height: 100vh;
           background: radial-gradient(
               120% 180% at 0 0,
-              rgba(254, 249, 195, 0.5),
+              rgba(254, 249, 195, 0.6),
               transparent 50%
             ),
             radial-gradient(
@@ -430,7 +391,7 @@ export default function AdminPage() {
           height: 7px;
           border-radius: 999px;
           background: #fefce8;
-          opacity: 0.85;
+          opacity: 0.9;
         }
         .paw-1 {
           top: 8px;
@@ -462,47 +423,6 @@ export default function AdminPage() {
           display: flex;
           flex-direction: column;
           gap: 6px;
-        }
-
-        .nav-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 8px 10px;
-          border-radius: 999px;
-          border: 1px solid transparent;
-          background: var(--nav-chip-bg);
-          font-size: 13px;
-          cursor: pointer;
-          text-align: left;
-          color: var(--ink);
-          transition: background 0.12s ease, border-color 0.12s ease,
-            box-shadow 0.12s ease, transform 0.12s ease;
-        }
-
-        .nav-item span {
-          flex: 1;
-        }
-
-        .nav-item .pill {
-          font-size: 10px;
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: rgba(148, 163, 184, 0.14);
-          color: #4b5563;
-        }
-
-        .nav-item:hover {
-          background: #fefce8;
-          border-color: rgba(250, 204, 21, 0.5);
-          transform: translateY(-1px);
-          box-shadow: 0 10px 22px rgba(250, 204, 21, 0.35);
-        }
-
-        .nav-item.active {
-          background: var(--nav-chip-active);
-          border-color: rgba(180, 83, 9, 0.4);
-          box-shadow: 0 10px 22px rgba(248, 191, 104, 0.4);
         }
 
         .signout {
@@ -553,9 +473,7 @@ export default function AdminPage() {
   );
 }
 
-/* ============================================
-   SIDEBAR ITEM COMPONENT
-   ============================================ */
+/* ========== SIDEBAR PILL "TABS" ========== */
 
 function SidebarItem(props: {
   label: string;
@@ -567,96 +485,111 @@ function SidebarItem(props: {
   const isActive = active === section;
 
   return (
-    <button
-      type="button"
-      className={`nav-item ${isActive ? "active" : ""}`}
-      onClick={() => onClick(section)}
-    >
-      <span>{label}</span>
-      {section === "overview" && <span className="pill">Home</span>}
-      {section === "payments" && <span className="pill">Balances</span>}
-    </button>
+    <>
+      <button
+        type="button"
+        className={`nav-item ${isActive ? "active" : ""}`}
+        onClick={() => onClick(section)}
+      >
+        <span className="nav-label">{label}</span>
+      </button>
+      <style jsx>{`
+        .nav-item {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          padding: 8px 12px;
+          border-radius: 999px;
+          border: 1px solid transparent;
+          background: var(--tab-bg);
+          font-size: 13px;
+          cursor: pointer;
+          color: var(--ink);
+          transition: background 0.12s ease, border-color 0.12s ease,
+            box-shadow 0.12s ease, transform 0.12s ease;
+        }
+
+        .nav-item:hover {
+          background: #fefce8;
+          border-color: rgba(180, 83, 9, 0.5);
+          transform: translateY(-1px);
+          box-shadow: 0 10px 22px rgba(248, 191, 104, 0.4);
+        }
+
+        .nav-item.active {
+          background: var(--tab-active-bg);
+          border-color: rgba(180, 83, 9, 0.7);
+          box-shadow: 0 10px 24px rgba(248, 191, 104, 0.6);
+        }
+
+        .nav-label {
+          flex: 1;
+          text-align: left;
+        }
+      `}</style>
+    </>
   );
 }
 
-/* ============================================
-   OVERVIEW DASHBOARD CONTENT
-   (Restores "cards" landing page feel)
-   ============================================ */
+/* ========== OVERVIEW DASHBOARD ========== */
 
-function OverviewCards(props: {
-  onNavigate: (s: AdminSection) => void;
-}) {
+function Overview(props: { onNavigate: (s: AdminSection) => void }) {
   const { onNavigate } = props;
 
   return (
     <div className="overview">
       <header className="overview-header">
-        <p className="eyebrow">Admin Dashboard</p>
-        <h1>Welcome to the Admin Portal</h1>
+        <p className="eyebrow">Breeder Admin</p>
+        <h1>Admin Dashboard</h1>
         <p className="lead">
-          Use this portal to manage every part of your Chihuahua breeding
-          program: puppies, litters, applications, messages, transport
-          requests, payments, and your core breeding dogs.
-        </p>
-        <p className="note">
-          Pick a section below or from the left to get started. As we wire more
-          features, this dashboard can show live stats from your Supabase
-          tables instead of placeholder text.
+          Manage puppies, litters, buyer applications, messages, transport
+          requests, payments, and your breeding dogs from one place.
         </p>
       </header>
 
       <section className="cards-grid">
         <OverviewCard
           title="Puppies"
-          body="View and update every puppy’s status, pricing, and assigned buyer."
+          body="Update status, pricing, registry, and assigned buyer."
           cta="Manage puppies"
           onClick={() => onNavigate("puppies")}
         />
         <OverviewCard
           title="Litters"
-          body="Track litters, due dates, and quickly jump into litter details."
+          body="Track dams, sires, whelping dates, and litter notes."
           cta="View litters"
           onClick={() => onNavigate("litters")}
         />
         <OverviewCard
           title="Applications"
-          body="Review applications, approve or deny, and assign puppies to buyers."
+          body="Review, approve, deny, or waitlist new families."
           cta="Review applications"
           onClick={() => onNavigate("applications")}
         />
         <OverviewCard
           title="Messages"
-          body="See and respond to buyer messages from one central place."
+          body="See and respond to questions from buyers."
           cta="Open messages"
           onClick={() => onNavigate("messages")}
         />
         <OverviewCard
-          title="Transport Requests"
-          body="Approve or adjust transport plans, fees, and delivery details."
+          title="Transport"
+          body="Approve transport plans and adjust fees or credits."
           cta="Manage transport"
           onClick={() => onNavigate("transport")}
         />
         <OverviewCard
           title="Payments"
-          body="Watch deposits, balances, and payment plans across all puppies."
+          body="Watch deposits, balances, and payment plans."
           cta="View payments"
           onClick={() => onNavigate("payments")}
         />
         <OverviewCard
           title="Breeding Program"
-          body="See your breeding dogs, their litters, and sales history by year."
+          body="View breeding dogs, their litters, and sales history."
           cta="Open breeding program"
           onClick={() => onNavigate("breeding")}
-        />
-        <OverviewCard
-          title="Portal Links"
-          body="Quick links back to the public portal, applications, and FAQ."
-          cta="Open puppy portal"
-          onClick={() => {
-            // Just a link out to the user-side portal home.
-            window.location.href = "/";
-          }}
         />
       </section>
 
@@ -686,19 +619,9 @@ function OverviewCards(props: {
         }
 
         .lead {
-          margin: 0 0 8px;
+          margin: 0;
           font-size: 13px;
           color: #4b5563;
-        }
-
-        .note {
-          margin: 0;
-          font-size: 12px;
-          color: #6b7280;
-          padding: 8px 10px;
-          border-radius: 10px;
-          background: #fffbeb;
-          border: 1px dashed rgba(180, 83, 9, 0.4);
         }
 
         .cards-grid {
@@ -729,7 +652,7 @@ function OverviewCard(props: {
         .card {
           text-align: left;
           border-radius: 16px;
-          border: 1px solid rgba(148, 163, 184, 0.5);
+          border: 1px solid rgba(148, 163, 184, 0.55);
           background: #ffffff;
           box-shadow: 0 12px 26px rgba(148, 163, 184, 0.35);
           padding: 12px 12px 11px;
@@ -768,10 +691,7 @@ function OverviewCard(props: {
   );
 }
 
-/* ============================================
-   GENERIC SECTION SHELL
-   (For non-overview sections – currently layout only)
-   ============================================ */
+/* ========== GENERIC SECTION SHELL ========== */
 
 function SectionShell(props: {
   title: string;
