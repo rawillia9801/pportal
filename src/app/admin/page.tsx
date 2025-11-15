@@ -1,21 +1,9 @@
-// src/app/admin/page.tsx
-'use client';
+"use client";
 
-/* ============================================
-   Admin Dashboard – LIGHT / FRIENDLY THEME
-   - Sidebar with pill-style tabs
-   - Light main background + white cards
-   - Loads counts from:
-     buyers, puppies, applications, payments,
-     messages, transport_requests
-   ============================================ */
+import { useEffect, useState } from "react";
+import { getBrowserClient } from "@/lib/supabase/client";
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { getBrowserClient } from '@/lib/supabase/client';
-
-type StatCounts = {
+type AdminStats = {
   buyers: number;
   puppies: number;
   applications: number;
@@ -24,7 +12,7 @@ type StatCounts = {
   transports: number;
 };
 
-const initialCounts: StatCounts = {
+const EMPTY_STATS: AdminStats = {
   buyers: 0,
   puppies: 0,
   applications: 0,
@@ -34,441 +22,119 @@ const initialCounts: StatCounts = {
 };
 
 export default function AdminDashboardPage() {
-  const router = useRouter();
-  const supabase = getBrowserClient();
-  const [counts, setCounts] = useState<StatCounts>(initialCounts);
+  const [stats, setStats] = useState<AdminStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
+    const supabase = getBrowserClient();
 
-    async function loadStats() {
+    async function countRows(table: string) {
+      const { count, error } = await supabase
+        .from(table)
+        .select("*", { head: true, count: "exact" });
+      if (error) {
+        console.error("Failed to count", table, error.message);
+        return 0;
+      }
+      return count ?? 0;
+    }
+
+    async function load() {
       try {
-        setLoading(true);
-
         const [
-          buyersRes,
-          puppiesRes,
-          appsRes,
-          paymentsRes,
-          messagesRes,
-          transportsRes,
+          buyers,
+          puppies,
+          applications,
+          payments,
+          messages,
+          transports,
         ] = await Promise.all([
-          supabase.from('buyers').select('*', { count: 'exact', head: true }),
-          supabase.from('puppies').select('*', { count: 'exact', head: true }),
-          supabase
-            .from('applications')
-            .select('*', { count: 'exact', head: true }),
-          supabase.from('payments').select('*', { count: 'exact', head: true }),
-          supabase.from('messages').select('*', { count: 'exact', head: true }),
-          supabase
-            .from('transport_requests')
-            .select('*', { count: 'exact', head: true }),
+          countRows("buyers"),
+          countRows("puppies"),
+          countRows("applications"),
+          countRows("payments"),
+          countRows("messages"),
+          countRows("transport_requests"),
         ]);
 
-        if (cancelled) return;
-
-        setCounts({
-          buyers: buyersRes.count ?? 0,
-          puppies: puppiesRes.count ?? 0,
-          applications: appsRes.count ?? 0,
-          payments: paymentsRes.count ?? 0,
-          messages: messagesRes.count ?? 0,
-          transports: transportsRes.count ?? 0,
+        setStats({
+          buyers,
+          puppies,
+          applications,
+          payments,
+          messages,
+          transports,
         });
-      } catch (err) {
-        console.error('Failed to load admin stats', err);
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     }
 
-    loadStats();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    load();
   }, []);
 
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.replace('/login');
-  }
-
   return (
-    <div className="admin-shell">
-      {/* SIDEBAR */}
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-icon">
-            <span className="paw-dot" />
-            <span className="paw-dot" />
-            <span className="paw-dot" />
-          </div>
-          <div className="brand-text">
-            <div className="brand-line1">SWVA Chihuahua</div>
-            <div className="brand-line2">Admin Portal</div>
-          </div>
-        </div>
+    <section>
+      <h1 className="admin-h1">Admin Dashboard</h1>
+      <p className="admin-subtitle">
+        Quick overview of your program. Use the sidebar to move into each
+        workflow for detailed management.
+      </p>
 
-        <nav className="nav">
-          <SidebarLink href="/admin" active>
-            Dashboard
-          </SidebarLink>
-          <SidebarLink href="/admin/buyers">Buyers</SidebarLink>
-          <SidebarLink href="/admin/puppies">Puppies</SidebarLink>
-          <SidebarLink href="/admin/upcoming-litters">
-            Upcoming Litters
-          </SidebarLink>
-          <SidebarLink href="/admin/applications">Applications</SidebarLink>
-          <SidebarLink href="/admin/payments">Payments</SidebarLink>
-          <SidebarLink href="/admin/messages">Messages</SidebarLink>
-          <SidebarLink href="/admin/transport-requests">
-            Transportation Requests
-          </SidebarLink>
-          <SidebarLink href="/admin/breeding-program">
-            Breeding Program
-          </SidebarLink>
-        </nav>
-
-        <button className="signout" onClick={handleSignOut}>
-          Sign Out
-        </button>
-      </aside>
-
-      {/* MAIN */}
-      <main className="main">
-        <header className="header">
-          <h1>Admin Dashboard</h1>
-          <p>
-            Quick overview of your program. Use the sidebar to move into each
-            workflow for detailed management.
-          </p>
-        </header>
-
-        <section className="cards-row">
-          <StatCard
-            label="BUYERS"
-            value={counts.buyers}
-            helper="Approved families"
-            loading={loading}
-          />
-          <StatCard
-            label="PUPPIES"
-            value={counts.puppies}
-            helper="In the system"
-            loading={loading}
-          />
-          <StatCard
-            label="APPLICATIONS"
-            value={counts.applications}
-            helper="Pending or reviewed"
-            loading={loading}
-          />
-          <StatCard
-            label="PAYMENTS"
-            value={counts.payments}
-            helper="Recorded payments"
-            loading={loading}
-          />
-          <StatCard
-            label="MESSAGES"
-            value={counts.messages}
-            helper="Conversations"
-            loading={loading}
-          />
-          <StatCard
-            label="TRANSPORT REQUESTS"
-            value={counts.transports}
-            helper="Trips to plan"
-            loading={loading}
-          />
-        </section>
-      </main>
-
-      {/* STYLES */}
-      <style jsx>{`
-        :root {
-          /* Light, friendly palette */
-          --bg: #f3f4f6; /* page background */
-          --sidebar-bg: #111827; /* dark navy sidebar */
-          --sidebar-border: rgba(15, 23, 42, 0.25);
-          --panel: #ffffff; /* white cards */
-          --panel-border: rgba(148, 163, 184, 0.4);
-          --panel-shadow: 0 16px 35px rgba(15, 23, 42, 0.15);
-          --ink: #111827;
-          --muted: #6b7280;
-          --brand: #fbbf77; /* warm gold */
-          --brand-deep: #f59e0b;
-          --danger-border: rgba(239, 68, 68, 0.7);
-          --danger-bg: rgba(239, 68, 68, 0.08);
-        }
-
-        .admin-shell {
-          min-height: 100vh;
-          display: grid;
-          grid-template-columns: 260px minmax(0, 1fr);
-          background: var(--bg);
-          color: var(--ink);
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-            sans-serif;
-        }
-
-        /* SIDEBAR */
-        .sidebar {
-          padding: 18px 16px 20px;
-          border-right: 1px solid var(--sidebar-border);
-          background: radial-gradient(
-              circle at top left,
-              rgba(251, 191, 80, 0.18),
-              transparent 60%
-            ),
-            var(--sidebar-bg);
-          color: #e5e7eb;
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
-        }
-
-        .brand {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .brand-icon {
-          position: relative;
-          width: 44px;
-          height: 44px;
-          border-radius: 18px;
-          background: linear-gradient(135deg, var(--brand), var(--brand-deep));
-          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
-        }
-
-        .paw-dot {
-          position: absolute;
-          width: 9px;
-          height: 9px;
-          border-radius: 999px;
-          background: #111827;
-          opacity: 0.8;
-        }
-        .paw-dot:nth-child(1) {
-          top: 9px;
-          left: 11px;
-        }
-        .paw-dot:nth-child(2) {
-          top: 13px;
-          right: 11px;
-        }
-        .paw-dot:nth-child(3) {
-          bottom: 10px;
-          left: 17px;
-        }
-
-        .brand-text {
-          line-height: 1.1;
-        }
-        .brand-line1 {
-          font-weight: 700;
-          font-size: 15px;
-        }
-        .brand-line2 {
-          font-size: 11px;
-          color: #9ca3af;
-        }
-
-        .nav {
-          margin-top: 6px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .nav-link {
-          display: flex;
-          align-items: center;
-          padding: 9px 12px;
-          border-radius: 999px;
-          border: 1px solid transparent;
-          background: transparent;
-          color: #d1d5db;
-          font-size: 13px;
-          text-decoration: none;
-          transition: background 0.12s ease, border-color 0.12s ease,
-            color 0.12s ease, transform 0.08s ease;
-        }
-
-        .nav-link:hover {
-          background: rgba(15, 23, 42, 0.8);
-          border-color: rgba(156, 163, 175, 0.5);
-          color: #f9fafb;
-          transform: translateY(-1px);
-        }
-
-        .nav-link.active {
-          background: linear-gradient(135deg, var(--brand), var(--brand-deep));
-          border-color: transparent;
-          color: #1f2937;
-          font-weight: 600;
-        }
-
-        .signout {
-          margin-top: auto;
-          padding: 8px 12px;
-          border-radius: 999px;
-          border: 1px solid var(--danger-border);
-          background: transparent;
-          color: #fecaca;
-          font-size: 13px;
-          cursor: pointer;
-          transition: background 0.12s ease, transform 0.08s ease;
-        }
-
-        .signout:hover {
-          background: var(--danger-bg);
-          transform: translateY(-1px);
-        }
-
-        /* MAIN */
-        .main {
-          padding: 22px 26px 26px;
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
-        }
-
-        .header h1 {
-          margin: 0 0 4px;
-          font-size: 24px;
-          font-weight: 700;
-        }
-
-        .header p {
-          margin: 0;
-          color: var(--muted);
-          font-size: 14px;
-          max-width: 640px;
-        }
-
-        .cards-row {
-          margin-top: 12px;
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-          gap: 16px;
-        }
-
-        .card {
-          border-radius: 18px;
-          padding: 14px 16px 16px;
-          background: var(--panel);
-          border: 1px solid var(--panel-border);
-          box-shadow: var(--panel-shadow);
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .card-label {
-          font-size: 11px;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: var(--muted);
-        }
-
-        .card-value {
-          font-size: 26px;
-          font-weight: 700;
-          color: var(--ink);
-        }
-
-        .card-helper {
-          font-size: 12px;
-          color: var(--muted);
-        }
-
-        .card-loading {
-          width: 52px;
-          height: 16px;
-          border-radius: 999px;
-          background: linear-gradient(
-            90deg,
-            rgba(148, 163, 184, 0.2),
-            rgba(148, 163, 184, 0.5),
-            rgba(148, 163, 184, 0.2)
-          );
-          background-size: 200% 100%;
-          animation: shimmer 1.1s infinite;
-        }
-
-        @keyframes shimmer {
-          0% {
-            background-position: 200% 0;
-          }
-          100% {
-            background-position: -200% 0;
-          }
-        }
-
-        @media (max-width: 900px) {
-          .admin-shell {
-            grid-template-columns: 1fr;
-          }
-          .sidebar {
-            flex-direction: row;
-            align-items: center;
-            overflow-x: auto;
-            padding: 12px 12px 10px;
-            gap: 12px;
-          }
-          .nav {
-            flex-direction: row;
-            flex-wrap: nowrap;
-            gap: 8px;
-          }
-          .signout {
-            margin-top: 0;
-            margin-left: auto;
-            flex-shrink: 0;
-          }
-          .main {
-            padding: 18px 16px 24px;
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
-
-function SidebarLink(props: {
-  href: string;
-  children: React.ReactNode;
-  active?: boolean;
-}) {
-  const { href, children, active } = props;
-  return (
-    <Link href={href} className={`nav-link ${active ? 'active' : ''}`}>
-      {children}
-    </Link>
+      <div className="admin-stat-grid">
+        <StatCard
+          label="BUYERS"
+          helper="Approved families"
+          value={stats.buyers}
+          loading={loading}
+        />
+        <StatCard
+          label="PUPPIES"
+          helper="In the system"
+          value={stats.puppies}
+          loading={loading}
+        />
+        <StatCard
+          label="APPLICATIONS"
+          helper="Pending or reviewed"
+          value={stats.applications}
+          loading={loading}
+        />
+        <StatCard
+          label="PAYMENTS"
+          helper="Recorded payments"
+          value={stats.payments}
+          loading={loading}
+        />
+        <StatCard
+          label="MESSAGES"
+          helper="Conversations"
+          value={stats.messages}
+          loading={loading}
+        />
+        <StatCard
+          label="TRANSPORT REQUESTS"
+          helper="Trips to plan"
+          value={stats.transports}
+          loading={loading}
+        />
+      </div>
+    </section>
   );
 }
 
 function StatCard(props: {
   label: string;
-  value: number;
   helper: string;
-  loading?: boolean;
+  value: number;
+  loading: boolean;
 }) {
-  const { label, value, helper, loading } = props;
+  const { label, helper, value, loading } = props;
   return (
-    <div className="card">
-      <div className="card-label">{label}</div>
-      {loading ? (
-        <div className="card-loading" />
-      ) : (
-        <div className="card-value">{value}</div>
-      )}
-      <div className="card-helper">{helper}</div>
+    <div className="admin-stat-card">
+      <div className="admin-stat-label">{label}</div>
+      <div className="admin-stat-value">{loading ? "…" : value}</div>
+      <div className="admin-stat-helper">{helper}</div>
     </div>
   );
 }
