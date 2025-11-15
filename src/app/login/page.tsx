@@ -3,26 +3,33 @@
 /* ============================================
    LOGIN PAGE
    - Uses shared getBrowserClient
+   - Reads ?reason=admin from window.location
+     (no useSearchParams → no Suspense error)
    - Redirects to /dashboard on success
-   - Shows extra note if ?reason=admin
    ============================================ */
 
-import React, { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getBrowserClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
-  const search = useSearchParams()
-  const reason = search.get('reason')
+  const supabase = getBrowserClient()
 
+  const [reason, setReason] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const supabase = getBrowserClient()
+  // Read ?reason=admin from the URL on the client
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const r = params.get('reason')
+    setReason(r)
+  }, [])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -46,11 +53,13 @@ export default function LoginPage() {
     <main className="login-shell">
       <section className="login-card">
         <h1>Sign in to your Puppy Portal</h1>
+
         {reason === 'admin' && (
           <p className="login-note">
             Please sign in with your breeder/admin account to access the admin panel.
           </p>
         )}
+
         <form onSubmit={onSubmit} className="login-form">
           <label>
             <span>Email</span>
@@ -62,6 +71,7 @@ export default function LoginPage() {
               required
             />
           </label>
+
           <label>
             <span>Password</span>
             <input
@@ -72,13 +82,19 @@ export default function LoginPage() {
               required
             />
           </label>
+
           <button type="submit" disabled={busy}>
             {busy ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
+
         {msg && <div className="login-error">{msg}</div>}
+
         <p className="login-footer">
-          Need an account? <Link href="/">Create one from the Puppy Portal home page.</Link>
+          Need an account?{' '}
+          <Link href="/">
+            Create one from the Puppy Portal home page.
+          </Link>
         </p>
       </section>
 
