@@ -1,38 +1,19 @@
-// src/app/dashboard/page.tsx
 "use client";
 
 /* ============================================
    CHANGELOG
-   - 2025-11-14: Re-themed user dashboard to
-                 match main portal (dark + gold).
-   - 2025-11-14: Lightened backgrounds so text
-                 is easier to read (less “pure black”).
+   - 2025-11-15: New light dashboard shell
+                 • White/soft-gray background
+                 • Left sidebar nav (matches tabs)
+                 • Main dashboard with summary cards
    ============================================ */
 
-import React from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 
-type NavItem = {
-  href: string;
-  label: string;
-};
-
-const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/available-puppies", label: "Available Puppies" },
-  { href: "/applications", label: "My Applications" },
-  { href: "/my-puppy", label: "My Puppy" },
-  { href: "/health-records", label: "Health Records" },
-  { href: "/payments", label: "Payments" },
-  { href: "/messages", label: "Messages" },
-  { href: "/profile", label: "Profile" },
-];
-
-export default function DashboardPage() {
+export default function Dashboard() {
   const router = useRouter();
-  const pathname = usePathname();
   const supabase = getBrowserClient();
 
   async function signOut() {
@@ -41,612 +22,460 @@ export default function DashboardPage() {
   }
 
   return (
-    <main>
-      <div className="shell">
-        {/* SIDEBAR */}
-        <aside className="sidebar">
-          <div className="brand">
-            <div className="pupmark" aria-hidden>
-              <span className="pawbubble" />
-              <span className="pawbubble" />
-              <span className="pawbubble" />
-            </div>
-            <div className="brandText">
-              <div className="brandLine1">My Puppy Portal</div>
-              <div className="brandLine2">
-                Southwest Virginia Chihuahua Families
-              </div>
-            </div>
+    <div className="shell">
+      {/* SIDEBAR */}
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark" aria-hidden>
+            <span className="paw-dot" />
+            <span className="paw-dot" />
+            <span className="paw-dot" />
           </div>
+          <div className="brand-text">
+            <div className="brand-line1">My Puppy Portal</div>
+            <div className="brand-line2">Southwest Virginia Chihuahua</div>
+          </div>
+        </div>
 
-          <nav className="nav">
-            {NAV_ITEMS.map((item) => (
-              <NavLink
-                key={item.href}
-                href={item.href}
-                active={pathname === item.href}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+        <nav className="nav">
+          <NavLink href="/dashboard">Dashboard</NavLink>
+          <NavLink href="/available-puppies">Available Puppies</NavLink>
+          <NavLink href="/applications">My Applications</NavLink>
+          <NavLink href="/my-puppy">My Puppy</NavLink>
+          <NavLink href="/health-records">Health Records</NavLink>
+          <NavLink href="/payments">Payments</NavLink>
+          <NavLink href="/messages">Messages</NavLink>
+          <NavLink href="/profile">Profile</NavLink>
+        </nav>
 
-          <button className="signout" type="button" onClick={signOut}>
-            Sign Out
-          </button>
-        </aside>
+        <button className="signout" type="button" onClick={signOut}>
+          Sign Out
+        </button>
+      </aside>
 
-        {/* MAIN CONTENT */}
-        <section className="main">
-          {/* HEADER */}
-          <header className="header">
-            <div>
-              <h1>Welcome to Your Puppy Dashboard</h1>
-              <p className="tagline">
-                Your secure hub for applications, payments, health records, and
-                updates from Southwest Virginia Chihuahua.
-              </p>
-            </div>
-          </header>
+      {/* MAIN AREA */}
+      <main className="main">
+        <header className="header">
+          <div>
+            <h1>Welcome to your Puppy Dashboard</h1>
+            <p className="tagline">
+              Follow your Chihuahua&apos;s journey, manage your documents and payments,
+              and stay in touch with the breeder — all in one simple place.
+            </p>
+          </div>
+        </header>
 
-          {/* TOP ROW: OVERVIEW CARDS */}
-          <section className="row">
-            <div className="cardGrid">
-              <InfoCard
-                label="Adoption Status"
-                value="In Progress"
-                helper="View your applications and any required steps."
-                href="/applications"
-                cta="View Applications"
-              />
-              <InfoCard
-                label="Payments"
-                value="Manage & Review"
-                helper="See deposits, balances, and receipts in one place."
-                href="/payments"
-                cta="Go to Payments"
-              />
-              <InfoCard
-                label="My Puppy"
-                value="Growth & Updates"
-                helper="Follow weekly weights, milestones, and photos."
-                href="/my-puppy"
-                cta="Open My Puppy"
-              />
-              <InfoCard
-                label="Messages"
-                value="Two-Way Chat"
-                helper="Send a question or reply to Southwest Virginia Chihuahua."
-                href="/messages"
-                cta="Open Messages"
-              />
-            </div>
-          </section>
-
-          {/* SECOND ROW: TWO COLUMNS */}
-          <section className="row rowSplit">
-            {/* Left: Next Steps */}
-            <div className="panel">
-              <h2>Next Steps in Your Puppy Journey</h2>
-              <p className="muted">
-                Every family’s path is a little different, but most adoptions
-                follow these simple steps:
-              </p>
-              <ol className="steps">
-                <li>
-                  <strong>Submit or review your application.</strong>{" "}
-                  Confirm that your details are accurate and complete.
-                </li>
-                <li>
-                  <strong>Place your deposit or payment.</strong> Use the
-                  Payments tab to pay securely.
-                </li>
-                <li>
-                  <strong>Watch your puppy grow.</strong> Check the My Puppy tab
-                  for weights, milestones, and photos.
-                </li>
-                <li>
-                  <strong>Finalize transportation or pickup.</strong> Coordinate
-                  details through the Transportation and Messages tabs.
-                </li>
-                <li>
-                  <strong>Review your documents.</strong> Keep your contract,
-                  health records, and instructions handy in the Documents or
-                  Health Records areas.
-                </li>
-              </ol>
-              <div className="buttonsRow">
-                <Link href="/application" className="btn primary">
-                  Start / Review Application
-                </Link>
-                <Link href="/payments" className="btn ghost">
-                  View Payments
-                </Link>
-              </div>
-            </div>
-
-            {/* Right: Quick Links & Support */}
-            <div className="panel">
-              <h2>Quick Links & Support</h2>
-              <div className="quickGrid">
-                <QuickLink
-                  title="Available Puppies"
-                  body="Browse puppies that are ready or coming soon."
-                  href="/available-puppies"
-                />
-                <QuickLink
-                  title="Health Records"
-                  body="Review vaccination and deworming information."
-                  href="/health-records"
-                />
-                <QuickLink
-                  title="Documents"
-                  body="View contracts, guarantees, and important paperwork."
-                  href="/documents"
-                />
-                <QuickLink
-                  title="Update My Profile"
-                  body="Make sure your contact information is correct."
-                  href="/profile"
-                />
-              </div>
-
-              <div className="supportBox">
-                <div className="supportTitle">Need help with anything?</div>
-                <p className="muted">
-                  If you have a question about payments, timing, or your puppy’s
-                  care, you can send us a message directly through your portal.
-                </p>
-                <Link href="/messages" className="btn supportBtn">
-                  Message Southwest Virginia Chihuahua
-                </Link>
-              </div>
-            </div>
-          </section>
-
-          {/* FOOTER */}
-          <footer className="ft">
-            <span className="mini">
-              © {new Date().getFullYear()} Southwest Virginia Chihuahua
-            </span>
-            <span className="mini">My Puppy Portal · Private & Secure</span>
-          </footer>
+        {/* TOP SUMMARY CARDS */}
+        <section className="summary-grid">
+          <SummaryCard
+            title="Next Step"
+            body="Review your application status and any requested documents."
+            linkHref="/applications"
+            linkLabel="View applications"
+          />
+          <SummaryCard
+            title="Payments"
+            body="See deposits, balances, and payment history for your puppy."
+            linkHref="/payments"
+            linkLabel="Go to payments"
+          />
+          <SummaryCard
+            title="My Puppy"
+            body="Check weekly weights, milestones, and important notes."
+            linkHref="/my-puppy"
+            linkLabel="View my puppy"
+          />
+          <SummaryCard
+            title="Messages"
+            body="Send a question or check for updates from Southwest Virginia Chihuahua."
+            linkHref="/messages"
+            linkLabel="Open messages"
+          />
         </section>
-      </div>
+
+        {/* TWO-COLUMN DETAILS */}
+        <section className="grid-two">
+          <section className="panel">
+            <h2>Your Puppy Journey</h2>
+            <p className="panel-text">
+              Every family moves through a few simple stages: applying, reserving
+              a puppy, making payments, and getting ready for pickup or transport.
+            </p>
+            <ol className="steps">
+              <li>
+                <strong>1. Application</strong>
+                <span>Submit or review your adoption application.</span>
+              </li>
+              <li>
+                <strong>2. Deposit & Matching</strong>
+                <span>
+                  Pay your deposit and confirm which puppy you&apos;re reserving.
+                </span>
+              </li>
+              <li>
+                <strong>3. Updates & Milestones</strong>
+                <span>
+                  Watch your puppy grow with weights, photos, and socialization notes.
+                </span>
+              </li>
+              <li>
+                <strong>4. Final Payment</strong>
+                <span>Take care of remaining balances before pickup or delivery.</span>
+              </li>
+              <li>
+                <strong>5. Pickup or Transportation</strong>
+                <span>
+                  Coordinate pickup or approved transportation, and review your
+                  puppy packet.
+                </span>
+              </li>
+            </ol>
+          </section>
+
+          <section className="panel">
+            <h2>Quick Links</h2>
+            <p className="panel-text">
+              Use these shortcuts to jump straight to the most common actions.
+            </p>
+            <div className="quick-links">
+              <QuickLink href="/available-puppies" label="See available puppies" />
+              <QuickLink href="/application" label="Start a new application" />
+              <QuickLink href="/documents" label="View my documents" />
+              <QuickLink href="/transportation" label="Request transportation" />
+              <QuickLink href="/faq" label="Read Chihuahua FAQs" />
+              <QuickLink href="/message" label="Contact the breeder" />
+            </div>
+          </section>
+        </section>
+      </main>
 
       {/* STYLES */}
       <style jsx>{`
-        :root {
-          --bg: #020617;
-          --panelBorder: #1f2937; /* lighter border than before */
-          --ink: #f9fafb;
-          --muted: #d1d5db; /* a bit brighter for older eyes */
-          --brand: #e0a96d;
-          --brandAlt: #c47a35;
-        }
-
-        main {
+        .shell {
+          display: grid;
+          grid-template-columns: 260px minmax(0, 1fr);
           min-height: 100vh;
-          background:
-            radial-gradient(60% 100% at 100% 0%, #020617 0%, transparent 60%),
-            radial-gradient(60% 100% at 0% 0%, #111827 0%, transparent 60%),
-            #020617;
-          color: var(--ink);
+          background: #f3f4f6; /* light gray overall */
+          color: #111827;
           font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
             sans-serif;
         }
 
-        .shell {
-          max-width: 1400px;
-          margin: 0 auto;
-          padding: 20px 20px 28px;
-          display: flex;
-          gap: 20px;
-        }
-
+        /* SIDEBAR */
         .sidebar {
-          width: 230px;
-          flex-shrink: 0;
-          background: #020617;
-          border-radius: 20px;
-          border: 1px solid var(--panelBorder);
-          box-shadow: 0 14px 30px rgba(0, 0, 0, 0.7);
-          padding: 16px 14px 18px;
-          display: flex;
-          flex-direction: column;
+          padding: 20px 18px;
+          border-right: 1px solid #e5e7eb;
+          background: #ffffff;
+          display: grid;
+          grid-template-rows: auto 1fr auto;
           gap: 18px;
         }
 
         .brand {
           display: flex;
-          gap: 10px;
           align-items: center;
+          gap: 10px;
         }
 
-        .pupmark {
+        .brand-mark {
           position: relative;
-          width: 42px;
-          height: 42px;
+          width: 40px;
+          height: 40px;
           border-radius: 14px;
-          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          box-shadow: inset 0 0 0 3px #020617;
+          background: linear-gradient(135deg, #facc6b, #f97316);
+          box-shadow: 0 6px 14px rgba(249, 115, 22, 0.35);
         }
 
-        .pawbubble {
+        .paw-dot {
           position: absolute;
-          width: 8px;
-          height: 8px;
+          width: 7px;
+          height: 7px;
           border-radius: 999px;
-          background: #020617;
-          opacity: 0.6;
+          background: #111827;
+          opacity: 0.8;
         }
-        .pawbubble:nth-child(1) {
+        .paw-dot:nth-child(1) {
           top: 9px;
           left: 11px;
         }
-        .pawbubble:nth-child(2) {
-          top: 13px;
-          left: 23px;
+        .paw-dot:nth-child(2) {
+          top: 9px;
+          right: 10px;
         }
-        .pawbubble:nth-child(3) {
-          top: 22px;
-          left: 16px;
+        .paw-dot:nth-child(3) {
+          bottom: 9px;
+          left: 17px;
         }
 
-        .brandText {
+        .brand-text {
           line-height: 1.1;
         }
-        .brandLine1 {
+
+        .brand-line1 {
+          font-size: 15px;
           font-weight: 700;
-          font-size: 14px;
+          color: #111827;
         }
-        .brandLine2 {
+
+        .brand-line2 {
           font-size: 11px;
-          color: var(--muted);
+          color: #6b7280;
         }
 
         .nav {
+          margin-top: 10px;
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          margin-top: 6px;
+          gap: 6px;
+        }
+
+        .link {
+          display: block;
+          width: 100%;
+          padding: 8px 11px;
+          border-radius: 999px;
+          font-size: 13px;
+          text-decoration: none;
+          color: #111827;
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+          transition: background 0.12s ease, border-color 0.12s ease,
+            transform 0.07s ease, box-shadow 0.12s ease;
+        }
+
+        .link:hover {
+          background: #eef2ff;
+          border-color: #c7d2fe;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+        }
+
+        .link-active {
+          background: #4f46e5;
+          color: #ffffff;
+          border-color: #4338ca;
+          box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
         }
 
         .signout {
-          margin-top: auto;
-          width: 100%;
+          margin-top: 10px;
+          padding: 8px 11px;
           border-radius: 999px;
-          padding: 8px 10px;
-          border: 1px solid #374151;
-          background: #020617;
-          color: var(--muted);
+          border: 1px solid #f97373;
+          background: #fef2f2;
+          color: #b91c1c;
           font-size: 13px;
           cursor: pointer;
-          transition: background 0.12s ease, color 0.12s ease,
-            border-color 0.12s ease;
-        }
-        .signout:hover {
-          background: #111827;
-          color: #f9fafb;
-          border-color: #4b5563;
+          transition: background 0.12s ease, border-color 0.12s ease,
+            transform 0.07s ease;
         }
 
+        .signout:hover {
+          background: #fee2e2;
+          border-color: #ef4444;
+          transform: translateY(-1px);
+        }
+
+        /* MAIN */
         .main {
-          flex: 1;
+          padding: 24px 24px 28px;
           display: flex;
           flex-direction: column;
-          gap: 22px;
+          gap: 20px;
         }
 
         .header {
-          border-radius: 24px;
-          padding: 18px 22px;
-          border: 1px solid var(--panelBorder);
-          background:
-            radial-gradient(
-              120% 220% at 0 0,
-              rgba(224, 169, 109, 0.18),
-              transparent 55%
-            ),
-            linear-gradient(145deg, #020617, #0f172a);
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
         }
 
         .header h1 {
-          margin: 0 0 6px;
-          font-size: clamp(22px, 2.7vw, 28px);
+          margin: 0 0 4px;
+          font-size: clamp(22px, 2.6vw, 28px);
         }
 
         .tagline {
           margin: 0;
           font-size: 14px;
-          color: var(--muted);
+          color: #4b5563;
+          max-width: 620px;
         }
 
-        .row {
-          display: flex;
-          flex-direction: column;
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
           gap: 14px;
         }
 
-        .rowSplit {
+        .summary-card {
+          background: #ffffff;
+          border-radius: 16px;
+          border: 1px solid #e5e7eb;
+          padding: 14px 14px 12px;
+          box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .summary-card h3 {
+          margin: 0;
+          font-size: 15px;
+          color: #111827;
+        }
+
+        .summary-body {
+          margin: 0;
+          font-size: 13px;
+          color: #4b5563;
+        }
+
+        .summary-link {
+          margin-top: 4px;
+          font-size: 12px;
+          color: #4f46e5;
+          text-decoration: none;
+          font-weight: 500;
+        }
+
+        .summary-link:hover {
+          text-decoration: underline;
+        }
+
+        .grid-two {
+          margin-top: 8px;
           display: grid;
           grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-          gap: 18px;
-        }
-
-        .cardGrid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-          gap: 14px;
-        }
-
-        .infoCard {
-          border-radius: 18px;
-          padding: 12px 13px 14px;
-          border: 1px solid var(--panelBorder);
-          background: #111827; /* lighter than pure black */
-          box-shadow: 0 12px 26px rgba(0, 0, 0, 0.75);
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          font-size: 13px;
-        }
-
-        .infoLabel {
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: var(--muted);
-        }
-
-        .infoValue {
-          font-size: 15px;
-          font-weight: 600;
-        }
-
-        .infoHelper {
-          font-size: 12px;
-          color: var(--muted);
-        }
-
-        .infoCta {
-          margin-top: 6px;
-          align-self: flex-start;
-          font-size: 12px;
-          color: var(--brand);
-          text-decoration: none;
+          gap: 16px;
         }
 
         .panel {
-          border-radius: 20px;
-          padding: 16px 18px 18px;
-          border: 1px solid var(--panelBorder);
-          background: radial-gradient(
-              120% 220% at 0 0,
-              rgba(30, 64, 175, 0.25),
-              transparent 55%
-            ),
-            #020617;
-          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.8);
-          font-size: 14px;
+          background: #ffffff;
+          border-radius: 18px;
+          border: 1px solid #e5e7eb;
+          padding: 16px 16px 14px;
+          box-shadow: 0 12px 20px rgba(15, 23, 42, 0.08);
         }
 
         .panel h2 {
-          margin: 0 0 8px;
-          font-size: 18px;
+          margin: 0 0 6px;
+          font-size: 16px;
         }
 
-        .muted {
-          color: var(--muted);
+        .panel-text {
+          margin: 0 0 10px;
+          font-size: 13px;
+          color: #4b5563;
         }
 
         .steps {
-          margin: 10px 0 12px 18px;
-          padding: 0;
-        }
-        .steps li {
-          margin-bottom: 6px;
+          margin: 0;
+          padding-left: 18px;
+          font-size: 13px;
+          color: #374151;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
         }
 
-        .buttonsRow {
+        .steps li span {
+          display: block;
+          font-weight: 400;
+          color: #6b7280;
+        }
+
+        .quick-links {
           display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
+          flex-direction: column;
+          gap: 6px;
           margin-top: 4px;
         }
 
-        .btn {
+        .quick-link {
           display: inline-flex;
           align-items: center;
-          justify-content: center;
-          border-radius: 999px;
-          padding: 8px 12px;
-          font-size: 13px;
-          text-decoration: none;
-          cursor: pointer;
-          border: 1px solid #374151;
-        }
-
-        .btn.primary {
-          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          color: #111827;
-          border-color: transparent;
-        }
-
-        .btn.ghost {
-          background: #020617;
-          color: var(--ink);
-        }
-
-        .quickGrid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 10px;
-          margin-top: 8px;
-          margin-bottom: 12px;
-        }
-
-        .quickCard {
-          border-radius: 14px;
-          padding: 10px 11px 11px;
-          border: 1px solid var(--panelBorder);
-          background: #111827;
-        }
-
-        .quickTitle {
-          font-size: 13px;
-          font-weight: 600;
-          margin-bottom: 2px;
-        }
-
-        .quickBody {
-          font-size: 12px;
-          color: var(--muted);
-          margin-bottom: 6px;
-        }
-
-        .quickLink {
-          font-size: 12px;
-          color: var(--brand);
-          text-decoration: none;
-        }
-
-        .supportBox {
-          border-radius: 14px;
-          padding: 10px 12px 12px;
-          border: 1px dashed #4b5563;
-          background: #020617;
-          margin-top: 4px;
-        }
-
-        .supportTitle {
-          font-size: 13px;
-          font-weight: 600;
-          margin-bottom: 4px;
-        }
-
-        .supportBtn {
-          margin-top: 6px;
-          width: 100%;
-          background: linear-gradient(135deg, var(--brand), var(--brandAlt));
-          color: #111827;
-          border-color: transparent;
-          font-size: 13px;
-        }
-
-        .ft {
-          display: flex;
           justify-content: space-between;
-          align-items: center;
-          margin-top: 4px;
-          font-size: 11px;
-          color: var(--muted);
+          padding: 7px 10px;
+          border-radius: 10px;
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+          font-size: 13px;
+          text-decoration: none;
+          color: #111827;
+          transition: background 0.12s ease, border-color 0.12s ease,
+            transform 0.07s ease, box-shadow 0.12s ease;
         }
 
-        .mini {
-          font-size: 11px;
+        .quick-link:hover {
+          background: #eef2ff;
+          border-color: #c7d2fe;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
         }
 
-        @media (max-width: 960px) {
+        .quick-link span:last-child {
+          font-size: 11px;
+          color: #6b7280;
+        }
+
+        @media (max-width: 900px) {
           .shell {
-            flex-direction: column;
+            grid-template-columns: 1fr;
           }
           .sidebar {
-            width: 100%;
+            grid-template-rows: auto auto auto;
+            border-right: none;
+            border-bottom: 1px solid #e5e7eb;
           }
-          .rowSplit {
-            grid-template-columns: minmax(0, 1fr);
+          .main {
+            padding: 18px 16px 22px;
           }
-        }
-
-        @media (max-width: 720px) {
-          .header {
-            padding: 14px 14px 16px;
-          }
-          .panel {
-            padding: 14px 14px 16px;
+          .grid-two {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
-    </main>
+    </div>
   );
 }
 
-function NavLink({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
+function NavLink(props: { href: string; children: React.ReactNode }) {
+  const isActive = typeof window !== "undefined" && window.location.pathname === props.href;
+
   return (
-    <Link href={href} className={`navItem ${active ? "active" : ""}`}>
-      <span className="navLabel">{children}</span>
-      <style jsx>{`
-        .navItem {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 9px 12px;
-          border-radius: 999px;
-          background: #0b1120;
-          border: 1px solid #1f2937;
-          color: #f9fafb;
-          text-decoration: none;
-          font-size: 13px;
-          transition: background 0.12s ease, transform 0.12s ease,
-            border-color 0.12s ease, box-shadow 0.12s ease;
-        }
-        .navItem:hover {
-          transform: translateY(-1px);
-          background: #020617;
-          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
-        }
-        .navItem.active {
-          background: linear-gradient(135deg, #e0a96d, #c47a35);
-          border-color: transparent;
-          color: #111827;
-        }
-        .navLabel {
-          flex: 1;
-        }
-      `}</style>
+    <Link
+      href={props.href}
+      className={`link ${isActive ? "link-active" : ""}`}
+    >
+      {props.children}
     </Link>
   );
 }
 
-function InfoCard(props: {
-  label: string;
-  value: string;
-  helper: string;
-  href: string;
-  cta: string;
+function SummaryCard(props: {
+  title: string;
+  body: string;
+  linkHref: string;
+  linkLabel: string;
 }) {
-  const { label, value, helper, href, cta } = props;
   return (
-    <div className="infoCard">
-      <div className="infoLabel">{label}</div>
-      <div className="infoValue">{value}</div>
-      <div className="infoHelper">{helper}</div>
-      <Link href={href} className="infoCta">
-        {cta}
+    <article className="summary-card">
+      <h3>{props.title}</h3>
+      <p className="summary-body">{props.body}</p>
+      <Link href={props.linkHref} className="summary-link">
+        {props.linkLabel}
       </Link>
-    </div>
+    </article>
   );
 }
 
-function QuickLink(props: { title: string; body: string; href: string }) {
-  const { title, body, href } = props;
+function QuickLink(props: { href: string; label: string }) {
   return (
-    <div className="quickCard">
-      <div className="quickTitle">{title}</div>
-      <div className="quickBody">{body}</div>
-      <Link href={href} className="quickLink">
-        Open
-      </Link>
-    </div>
+    <Link href={props.href} className="quick-link">
+      <span>{props.label}</span>
+      <span>Open →</span>
+    </Link>
   );
 }
