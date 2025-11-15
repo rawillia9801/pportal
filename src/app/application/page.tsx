@@ -1,438 +1,1343 @@
-'use client';
+"use client";
 
-/* ============================================
-   CHANGELOG
-   - 2025-11-11: Initial application page
-   - 2025-11-11: Type fix for PDF declarations array
-                 (decos typed as [string, boolean][])
-   ============================================
-   ANCHOR: PUPPY_APPLICATION_PAGE
-*/
+import { FormEvent, useMemo, useState } from "react";
 
-import React, { useEffect, useRef, useState } from 'react';
-import { getBrowserClient } from '@/lib/supabase/client';
+type DeclarationKey =
+  | "ageCapacity"
+  | "accuracy"
+  | "homeEnvironment"
+  | "puppyCare"
+  | "healthGuarantee"
+  | "nonrefundableDeposit"
+  | "purchasePriceTax"
+  | "contractualObligation"
+  | "returnRehoming"
+  | "releaseLiability"
+  | "agreeTerms"
+  | "consentCommunications";
 
-type AppState = {
-  // Section 1: Applicant
-  full_name: string;
+type FormState = {
+  // Section 1: Applicant Info
+  fullName: string;
   email: string;
   phone: string;
-  address: string;
+  streetAddress: string;
   city: string;
   state: string;
   zip: string;
-  contact_method: string;
+  preferredContact: string;
 
-  // Preferences
-  preferred_coat: string;
-  preferred_gender: string;
-  color_preference: string;
-  desired_date: string;     // yyyy-mm-dd
-  interest_type: string;    // Current Puppy / Future Puppy / Either
-  current_puppy: string;
+  // Puppy Preferences
+  preferredCoatType: string;
+  preferredGender: string;
+  colorPreference: string;
+  desiredAdoptionDate: string;
+  interestType: "current" | "future" | "";
 
   // Lifestyle & Home
-  other_pets: string;       // Yes/No
-  pet_details: string;
-  owned_chi: string;        // Yes/No
-  home_type: string;
-  fenced_yard: string;      // Yes/No
-  work_status: string;
-  caregiver: string;
-  children_at_home: string;
+  haveOtherPets: "yes" | "no" | "";
+  petDetails: string;
+  ownedChihuahuaBefore: "yes" | "no" | "";
+  homeType: string;
+  fencedYard: "yes" | "no" | "";
+  workStatus: string;
+  whoCaresForPuppy: string;
+  childrenAtHome: string;
 
   // Payment & Agreement
-  payment_preference: string;
-  heard_about: string;
-  ready_to_deposit: string; // Yes/No
+  paymentPreference: string;
+  hearAboutUs: string;
+  readyToPlaceDeposit: "yes" | "no" | "";
   questions: string;
 
-  // Terms + Declarations
-  terms_agreed: boolean;
-  decl_age: boolean;
-  decl_accuracy: boolean;
-  decl_home: boolean;
-  decl_care: boolean;
-  decl_health: boolean;
-  decl_deposit: boolean;
-  decl_price_tax: boolean;
-  decl_contract: boolean;
-  decl_return: boolean;
-  decl_release: boolean;
-  decl_terms: boolean;
-  decl_comms: boolean;
+  // Terms & Declarations
+  termsAccepted: boolean;
+  declarations: Record<DeclarationKey, boolean>;
 
+  // Signature
+  signedAt: string;
   signature: string;
-  signature_datetime: string; // yyyy-mm-ddThh:mm
 };
 
+const initialDeclarations: Record<DeclarationKey, boolean> = {
+  ageCapacity: false,
+  accuracy: false,
+  homeEnvironment: false,
+  puppyCare: false,
+  healthGuarantee: false,
+  nonrefundableDeposit: false,
+  purchasePriceTax: false,
+  contractualObligation: false,
+  returnRehoming: false,
+  releaseLiability: false,
+  agreeTerms: false,
+  consentCommunications: false,
+};
+
+const INITIAL_FORM: FormState = {
+  fullName: "",
+  email: "",
+  phone: "",
+  streetAddress: "",
+  city: "",
+  state: "",
+  zip: "",
+  preferredContact: "",
+
+  preferredCoatType: "",
+  preferredGender: "",
+  colorPreference: "",
+  desiredAdoptionDate: "",
+  interestType: "",
+
+  haveOtherPets: "",
+  petDetails: "",
+  ownedChihuahuaBefore: "",
+  homeType: "",
+  fencedYard: "",
+  workStatus: "",
+  whoCaresForPuppy: "",
+  childrenAtHome: "",
+
+  paymentPreference: "",
+  hearAboutUs: "",
+  readyToPlaceDeposit: "",
+  questions: "",
+
+  termsAccepted: false,
+  declarations: initialDeclarations,
+
+  signedAt: "",
+  signature: "",
+};
+
+const DECLARATIONS: {
+  key: DeclarationKey;
+  title: string;
+  text: string;
+}[] = [
+  {
+    key: "ageCapacity",
+    title: "Age and Capacity",
+    text:
+      "I declare that I am at least 18 years of age and legally competent to enter into contracts.",
+  },
+  {
+    key: "accuracy",
+    title: "Accuracy of Information",
+    text:
+      "I declare that all information provided in this application is complete, accurate, and truthful to the best of my knowledge. I understand that providing any false or misleading information may result in immediate rejection of my application or forfeiture of any deposit paid.",
+  },
+  {
+    key: "homeEnvironment",
+    title: "Home Environment & Pet Ownership",
+    text:
+      "I declare that I have permission from my landlord (if renting) to keep a dog at my residence, and that my home environment is suitable for a Chihuahua puppy (e.g., safe, secure, and free of hazards). I further declare that no one in my household is allergic to dogs.",
+  },
+  {
+    key: "puppyCare",
+    title: "Puppy Care Commitment",
+    text:
+      "I declare that I am committed to providing my puppy with proper nutrition, veterinary care (including vaccinations, deworming, and parasite prevention), grooming, exercise, and socialization throughout its life. I understand the financial responsibilities of dog ownership.",
+  },
+  {
+    key: "healthGuarantee",
+    title: "Health Guarantee Understanding",
+    text:
+      "I declare that I have read and understand the Puppy Sales Agreement and Health Guarantee. I agree to take my puppy to a licensed veterinarian within 10 days of coming home. If a covered congenital or genetic condition is diagnosed, I will provide written documentation from the veterinarian to Southwest Virginia Chihuahua within the required timeframe. Failure to comply with these requirements may void the health guarantee.",
+  },
+  {
+    key: "nonrefundableDeposit",
+    title: "Nonrefundable Deposit",
+    text:
+      "I declare that, if my application is approved, I will pay a nonrefundable $250 deposit to reserve my puppy. I understand this deposit is nonrefundable under all circumstances and is applied toward my total purchase price.",
+  },
+  {
+    key: "purchasePriceTax",
+    title: "Purchase Price & Tax Acknowledgment",
+    text:
+      "I declare that I understand the total purchase price is $1,800 for a male puppy or $2,200 for a female puppy. I acknowledge that Virginia sales tax (5.3%) will be calculated and shown separately, and that the remaining balance (minus deposit, plus tax) must be paid in full before I take possession of the puppy.",
+  },
+  {
+    key: "contractualObligation",
+    title: "Contractual Obligation",
+    text:
+      "I declare that, upon paying my deposit, I will sign the Puppy Sales Agreement and Health Guarantee via Zoho Sign. I understand that no puppy will be released to me until the signed contract and all payments are complete.",
+  },
+  {
+    key: "returnRehoming",
+    title: "Return & Rehoming Policy",
+    text:
+      "I declare that, if at any time I am unable to care for this puppy, I will first offer to return it to Southwest Virginia Chihuahua. I will not sell, transfer, or surrender the puppy to any third party, shelter, or pet store without first contacting the breeder.",
+  },
+  {
+    key: "releaseLiability",
+    title: "Release of Liability",
+    text:
+      "I declare that Southwest Virginia Chihuahua, its owners, employees, and agents shall not be held liable for any illness, injury, or damages (including veterinary costs, property damage, or personal injury) that may occur after the date of transfer of ownership.",
+  },
+  {
+    key: "agreeTerms",
+    title: "Agreement to Terms & Conditions",
+    text:
+      "I declare that I have read, understand, and agree to be bound by the Terms and Conditions, Privacy Policy, and any other puppy adoption policies posted on the Southwest Virginia Chihuahua website and provided in the Puppy Packet.",
+  },
+  {
+    key: "consentCommunications",
+    title: "Consent to Communications",
+    text:
+      "I consent to receive emails, text messages, and phone calls from Southwest Virginia Chihuahua regarding my application status, payment reminders, puppy updates, and any other adoption-related communications.",
+  },
+];
+
 export default function PuppyApplicationPage() {
-  const supabase = getBrowserClient();
-  const [saving, setSaving]   = useState(false);
-  const [msg, setMsg]         = useState<string>('');
-  const [pdfUrl, setPdfUrl]   = useState<string>('');
-  const formRef               = useRef<HTMLFormElement>(null);
+  const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  useEffect(() => {
-    // noop: we used to read meEmail; keeping hook in case you want to gate later
-    (async () => { await supabase.auth.getUser(); })();
-  }, [supabase]);
+  const totalDeclarations = DECLARATIONS.length;
+  const completedDeclarations = useMemo(
+    () =>
+      Object.values(form.declarations).filter((v) => v === true).length,
+    [form.declarations]
+  );
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateDeclaration(key: DeclarationKey, value: boolean) {
+    setForm((prev) => ({
+      ...prev,
+      declarations: { ...prev.declarations, [key]: value },
+    }));
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setMsg(''); setSaving(true);
+    setErrorMsg("");
 
-    const fd = new FormData(e.currentTarget);
-    const v  = (name: string) => String(fd.get(name) ?? '').trim();
-
-    const state: AppState = {
-      full_name: v('full_name'),
-      email: v('email'),
-      phone: v('phone'),
-      address: v('address'),
-      city: v('city'),
-      state: v('state'),
-      zip: v('zip'),
-      contact_method: v('contact_method'),
-
-      preferred_coat: v('preferred_coat'),
-      preferred_gender: v('preferred_gender'),
-      color_preference: v('color_preference'),
-      desired_date: v('desired_date'),
-      interest_type: v('interest_type'),
-      current_puppy: v('current_puppy'),
-
-      other_pets: v('other_pets'),
-      pet_details: v('pet_details'),
-      owned_chi: v('owned_chi'),
-      home_type: v('home_type'),
-      fenced_yard: v('fenced_yard'),
-      work_status: v('work_status'),
-      caregiver: v('caregiver'),
-      children_at_home: v('children_at_home'),
-
-      payment_preference: v('payment_preference'),
-      heard_about: v('heard_about'),
-      ready_to_deposit: v('ready_to_deposit'),
-      questions: v('questions'),
-
-      terms_agreed: fd.get('terms_agreed') === 'on',
-      decl_age: fd.get('decl_age') === 'on',
-      decl_accuracy: fd.get('decl_accuracy') === 'on',
-      decl_home: fd.get('decl_home') === 'on',
-      decl_care: fd.get('decl_care') === 'on',
-      decl_health: fd.get('decl_health') === 'on',
-      decl_deposit: fd.get('decl_deposit') === 'on',
-      decl_price_tax: fd.get('decl_price_tax') === 'on',
-      decl_contract: fd.get('decl_contract') === 'on',
-      decl_return: fd.get('decl_return') === 'on',
-      decl_release: fd.get('decl_release') === 'on',
-      decl_terms: fd.get('decl_terms') === 'on',
-      decl_comms: fd.get('decl_comms') === 'on',
-
-      signature: v('signature'),
-      signature_datetime: v('signature_datetime')
-    };
-
-    if (!state.full_name || !state.state || !state.terms_agreed) {
-      setSaving(false);
-      setMsg('Please complete required fields (Full Name, State, and Terms).');
+    // Basic validation: required fields, terms, all declarations
+    if (!form.fullName || !form.email || !form.phone || !form.state) {
+      setErrorMsg(
+        "Please complete your name, email, phone, and state before submitting."
+      );
       return;
     }
 
+    if (!form.termsAccepted) {
+      setErrorMsg("You must read and accept the Terms and Conditions.");
+      return;
+    }
+
+    if (completedDeclarations !== totalDeclarations) {
+      setErrorMsg(
+        "Please review and check each Applicant Declaration before submitting."
+      );
+      return;
+    }
+
+    if (!form.signature || !form.signedAt) {
+      setErrorMsg("Please provide the date/time and your typed signature.");
+      return;
+    }
+
+    setSubmitting(true);
+
     try {
-      // attach user_id if logged in
-      const { data: auth } = await supabase.auth.getUser();
-      const user_id = auth.user?.id ?? null;
-
-      const insertRow = {
-        user_id,
-        full_name: state.full_name,
-        buyer_name: state.full_name,   // keeps admin view compatibility
-        email: state.email,
-        phone: state.phone,
-        address: state.address,
-        city: state.city,
-        state: state.state,
-        zip: state.zip,
-        contact_method: state.contact_method,
-        preferred_coat: state.preferred_coat,
-        preferred_gender: state.preferred_gender,
-        color_preference: state.color_preference,
-        desired_date: state.desired_date || null,
-        interest_type: state.interest_type,
-        current_puppy: state.current_puppy,
-        other_pets: state.other_pets.toLowerCase() === 'yes',
-        pet_details: state.pet_details,
-        owned_chi: state.owned_chi.toLowerCase() === 'yes',
-        home_type: state.home_type,
-        fenced_yard: state.fenced_yard.toLowerCase() === 'yes',
-        work_status: state.work_status,
-        caregiver: state.caregiver,
-        children_at_home: state.children_at_home,
-        payment_preference: state.payment_preference,
-        heard_about: state.heard_about,
-        ready_to_deposit: state.ready_to_deposit.toLowerCase() === 'yes',
-        questions: state.questions,
-        terms_agreed: state.terms_agreed,
-        declarations: {
-          age: state.decl_age,
-          accuracy: state.decl_accuracy,
-          home: state.decl_home,
-          care: state.decl_care,
-          health: state.decl_health,
-          deposit: state.decl_deposit,
-          price_tax: state.decl_price_tax,
-          contract: state.decl_contract,
-          return: state.decl_return,
-          release: state.decl_release,
-          terms: state.decl_terms,
-          comms: state.decl_comms
-        },
-        signature: state.signature,
-        signature_datetime: state.signature_datetime ? new Date(state.signature_datetime).toISOString() : null,
-        status: 'submitted'
-      };
-
-      const { data: appIns, error: appErr } =
-        await supabase.from('applications').insert(insertRow).select('id,user_id').single();
-      if (appErr) throw appErr;
-      const appId = appIns!.id as string;
-
-      // Generate PDF in-browser
-      const { jsPDF } = await import('jspdf');
-      const doc = new jsPDF({ unit: 'pt', compress: true });
-
-      const NL = '\n';
-      const title = 'Southwest Virginia Chihuahua — Puppy Application';
-      doc.setFont('Helvetica', 'bold'); doc.setFontSize(14);
-      doc.text(title, 40, 50);
-      doc.setFont('Helvetica', 'normal'); doc.setFontSize(10);
-
-      function block(label: string, value: string) {
-        const lines = doc.splitTextToSize(`${label}: ${value || '-'}`, 535);
-        const h = lines.length * 14;
-        doc.text(lines, 40, y);
-        y += h + 6;
-      }
-      let y = 80;
-
-      // Applicant
-      doc.setFont('Helvetica','bold'); doc.text('Applicant Info', 40, y); y+=16; doc.setFont('Helvetica','normal');
-      block('Full Name', state.full_name);
-      block('Email', state.email);
-      block('Phone', state.phone);
-      block('Address', `${state.address}, ${state.city}, ${state.state} ${state.zip}`);
-      block('Preferred Contact', state.contact_method);
-
-      // Preferences
-      doc.setFont('Helvetica','bold'); doc.text('Puppy Preferences', 40, y); y+=16; doc.setFont('Helvetica','normal');
-      block('Coat', state.preferred_coat);
-      block('Gender', state.preferred_gender);
-      block('Color', state.color_preference);
-      block('Desired Date', state.desired_date);
-      block('Interest Type', state.interest_type);
-      block('Current Puppy', state.current_puppy);
-
-      // Lifestyle
-      doc.setFont('Helvetica','bold'); doc.text('Lifestyle & Home', 40, y); y+=16; doc.setFont('Helvetica','normal');
-      block('Other Pets', state.other_pets);
-      block('Pet Details', state.pet_details);
-      block('Owned a Chihuahua Before', state.owned_chi);
-      block('Home Type', state.home_type);
-      block('Fenced Yard', state.fenced_yard);
-      block('Work Status', state.work_status);
-      block('Who Cares for Puppy', state.caregiver);
-      block('Children at Home', state.children_at_home);
-
-      // Payment
-      doc.setFont('Helvetica','bold'); doc.text('Payment & Agreement', 40, y); y+=16; doc.setFont('Helvetica','normal');
-      block('Payment Preference', state.payment_preference);
-      block('Heard About Us', state.heard_about);
-      block('Ready to Place Deposit', state.ready_to_deposit);
-      block('Questions', state.questions);
-
-      // Declarations (typed correctly)
-      doc.setFont('Helvetica','bold'); doc.text('Applicant Declarations', 40, y); y+=16; doc.setFont('Helvetica','normal');
-      const decos: [string, boolean][] = [
-        ['Age and Capacity', state.decl_age],
-        ['Accuracy of Information', state.decl_accuracy],
-        ['Home Environment & Pet Ownership', state.decl_home],
-        ['Puppy Care Commitment', state.decl_care],
-        ['Health Guarantee Understanding', state.decl_health],
-        ['Nonrefundable Deposit', state.decl_deposit],
-        ['Purchase Price & Tax Acknowledgment', state.decl_price_tax],
-        ['Contractual Obligation', state.decl_contract],
-        ['Return & Rehoming Policy', state.decl_return],
-        ['Release of Liability', state.decl_release],
-        ['Agreement to Terms & Conditions', state.decl_terms],
-        ['Consent to Communications', state.decl_comms],
-      ];
-      for (const [label, ok] of decos) block(label, ok ? 'Yes' : 'No');
-
-      // Signature
-      doc.setFont('Helvetica','bold'); doc.text('Signature', 40, y); y+=16; doc.setFont('Helvetica','normal');
-      block('Name / Typed Signature', state.signature);
-      block('Date-Time', state.signature_datetime);
-
-      // Footer
-      if (y > 760) { doc.addPage(); y = 60; }
-      doc.setFontSize(9);
-      doc.text(`Application ID: ${appId}${NL}Saved for your records.`, 40, 780);
-
-      const pdfBlob = doc.output('blob');
-      const key = `applications/${appId}.pdf`;
-      const up = await supabase.storage.from('docs').upload(key, pdfBlob, { contentType: 'application/pdf', upsert: true });
-      if (up.error) throw up.error;
-
-      // Create a document row (attach to user if known)
-      const { error: dErr } = await supabase.from('documents').insert({
-        user_id: appIns!.user_id ?? null,
-        application_id: appId,
-        label: 'Puppy Application',
-        file_key: key
-      });
-      if (dErr) throw dErr;
-
-      // Public URL to hand back immediately
-      const pub = await supabase.storage.from('docs').getPublicUrl(key);
-      setPdfUrl(pub.data.publicUrl || '');
-      setMsg('Thank you! Your application was submitted and a PDF copy has been saved.');
-      (formRef.current as HTMLFormElement)?.reset();
-    } catch (err: any) {
-      setMsg(err.message || 'Sorry, something went wrong.');
+      // At this point you can:
+      // 1) Insert into Supabase "applications"
+      // 2) Generate a PDF and save to "documents"
+      // For now, we just mark as submitted so you can review the UI
+      setSubmitted(true);
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   }
 
   return (
-    <main className="apply">
-      <header className="hero">
-        <div className="wrap">
+    <main className="app-root">
+      <div className="app-shell">
+        <header className="app-header">
           <h1>Puppy Application</h1>
-          <p className="lead">Apply to adopt a Chihuahua from Southwest Virginia Chihuahua.</p>
-        </div>
-      </header>
+          <p>
+            Please complete this application as accurately as possible. It helps
+            us match you with the best Chihuahua for your home and lifestyle.
+          </p>
+        </header>
 
-      <section className="wrap">
-        <form ref={formRef} onSubmit={onSubmit} className="card">
-          <h2>Section 1: Applicant Info</h2>
-          <div className="grid">
-            <div className="col6"><label>First and Last Name *</label><input name="full_name" required /></div>
-            <div className="col6"><label>Email Address</label><input type="email" name="email" /></div>
-            <div className="col6"><label>Phone Number</label><input name="phone" /></div>
-            <div className="col12"><label>Street Address</label><input name="address" /></div>
-            <div className="col4"><label>City</label><input name="city" /></div>
-            <div className="col4"><label>State *</label><input name="state" required /></div>
-            <div className="col4"><label>Zip Code</label><input name="zip" /></div>
-            <div className="col6"><label>Preferred Contact Method</label><input name="contact_method" placeholder="Email / Phone / Text" /></div>
+        {errorMsg && <div className="banner banner-error">{errorMsg}</div>}
+
+        {submitted && (
+          <div className="banner banner-success">
+            Thank you! Your application has been submitted. This page also
+            shows a summary of your answers for your records.
           </div>
+        )}
 
-          <h2>Puppy Preferences</h2>
-          <div className="grid">
-            <div className="col4"><label>Preferred Coat Type</label><input name="preferred_coat" /></div>
-            <div className="col4"><label>Preferred Gender</label><input name="preferred_gender" /></div>
-            <div className="col4"><label>Color Preference</label><input name="color_preference" /></div>
-            <div className="col4"><label>Desired Adoption Date</label><input type="date" name="desired_date" /></div>
-            <div className="col4"><label>Interest Type</label>
-              <select name="interest_type">
-                <option value="">—</option>
-                <option>Current Puppy</option>
-                <option>Future Puppy</option>
-                <option>Either</option>
-              </select>
+        <form className="app-grid" onSubmit={handleSubmit}>
+          {/* SECTION 1: APPLICANT INFO */}
+          <section className="card">
+            <h2>Section 1: Applicant Information</h2>
+            <div className="grid-2">
+              <div className="field">
+                <label>
+                  First and Last Name <span className="req">*</span>
+                </label>
+                <input
+                  value={form.fullName}
+                  onChange={(e) => updateField("fullName", e.target.value)}
+                  placeholder="First and Last Name"
+                  required
+                />
+              </div>
+              <div className="field">
+                <label>Email Address</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => updateField("email", e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                />
+              </div>
             </div>
-            <div className="col4"><label>Current Puppy</label><input name="current_puppy" placeholder="(If applicable)" /></div>
-          </div>
 
-          <h2>Lifestyle & Home</h2>
-          <div className="grid">
-            <div className="col4"><label>Do You Have Other Pets?</label><select name="other_pets"><option>—</option><option>Yes</option><option>No</option></select></div>
-            <div className="col8"><label>Pet Details</label><input name="pet_details" /></div>
-            <div className="col4"><label>Owned A Chihuahua Before?</label><select name="owned_chi"><option>—</option><option>Yes</option><option>No</option></select></div>
-            <div className="col4"><label>Home Type</label><input name="home_type" /></div>
-            <div className="col4"><label>Fenced Yard?</label><select name="fenced_yard"><option>—</option><option>Yes</option><option>No</option></select></div>
-            <div className="col4"><label>Work Status</label><input name="work_status" /></div>
-            <div className="col4"><label>Who Cares for Puppy?</label><input name="caregiver" /></div>
-            <div className="col4"><label>Children at Home</label><input name="children_at_home" /></div>
-          </div>
-
-          <h2>Payment & Agreement</h2>
-          <div className="grid">
-            <div className="col4"><label>Payment Preference</label><input name="payment_preference" /></div>
-            <div className="col4"><label>How Did you Hear about us?</label><input name="heard_about" /></div>
-            <div className="col4"><label>Ready to Place Deposit?</label><select name="ready_to_deposit"><option>—</option><option>Yes</option><option>No</option></select></div>
-            <div className="col12"><label>Please input any questions that you may have here.</label><textarea name="questions" rows={3} /></div>
-          </div>
-
-          <h2>Terms and Conditions *</h2>
-          <div className="terms">
-            <p><b>Read carefully:</b> By submitting, you agree to the Terms and Conditions and all declarations you check below. (Full text is referenced; this form stores your acceptance and a PDF copy.)</p>
-          </div>
-          <label className="chk"><input type="checkbox" name="terms_agreed" /> <span>I have read and agree to the Terms and Conditions.</span></label>
-
-          <h2>Applicant Declarations</h2>
-          <div className="grid">
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_age" /> <span>Age and Capacity</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_accuracy" /> <span>Accuracy of Information</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_home" /> <span>Home Environment & Pet Ownership</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_care" /> <span>Puppy Care Commitment</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_health" /> <span>Health Guarantee Understanding</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_deposit" /> <span>Nonrefundable Deposit</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_price_tax" /> <span>Purchase Price & Tax</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_contract" /> <span>Contractual Obligation</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_return" /> <span>Return & Rehoming Policy</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_release" /> <span>Release of Liability</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_terms" /> <span>Agreement to Terms & Conditions</span></label></div>
-            <div className="col6"><label className="chk"><input type="checkbox" name="decl_comms" /> <span>Consent to Communications</span></label></div>
-          </div>
-
-          <h2>Signature</h2>
-          <div className="grid">
-            <div className="col6"><label>E-Signature (type your full name)</label><input name="signature" placeholder="Full Name" /></div>
-            <div className="col6"><label>Date-Time</label><input type="datetime-local" name="signature_datetime" /></div>
-          </div>
-
-          <div className="actions">
-            <button className="btn primary" type="submit" disabled={saving}>{saving ? 'Submitting…' : 'Submit Application'}</button>
-            {msg && <span className="note">{msg}</span>}
-          </div>
-
-          {pdfUrl && (
-            <div className="notice">
-              <a href={pdfUrl} target="_blank" rel="noreferrer">Open your saved PDF application</a>
+            <div className="grid-2">
+              <div className="field">
+                <label>Phone Number</label>
+                <input
+                  value={form.phone}
+                  onChange={(e) => updateField("phone", e.target.value)}
+                  placeholder="(555) 555-5555"
+                  required
+                />
+              </div>
+              <div className="field">
+                <label>Preferred Contact Method</label>
+                <select
+                  value={form.preferredContact}
+                  onChange={(e) =>
+                    updateField("preferredContact", e.target.value)
+                  }
+                >
+                  <option value="">Select one</option>
+                  <option value="phone">Phone</option>
+                  <option value="email">Email</option>
+                  <option value="text">Text Message</option>
+                </select>
+              </div>
             </div>
-          )}
+
+            <div className="field">
+              <label>Street Address</label>
+              <input
+                value={form.streetAddress}
+                onChange={(e) =>
+                  updateField("streetAddress", e.target.value)
+                }
+                placeholder="Street address"
+              />
+            </div>
+
+            <div className="grid-3">
+              <div className="field">
+                <label>City</label>
+                <input
+                  value={form.city}
+                  onChange={(e) => updateField("city", e.target.value)}
+                  placeholder="City"
+                />
+              </div>
+              <div className="field">
+                <label>
+                  State <span className="req">*</span>
+                </label>
+                <input
+                  value={form.state}
+                  onChange={(e) => updateField("state", e.target.value)}
+                  placeholder="VA"
+                  required
+                />
+              </div>
+              <div className="field">
+                <label>Zip Code</label>
+                <input
+                  value={form.zip}
+                  onChange={(e) => updateField("zip", e.target.value)}
+                  placeholder="Zip"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 2: PUPPY PREFERENCES */}
+          <section className="card">
+            <h2>Puppy Preferences</h2>
+            <div className="grid-2">
+              <div className="field">
+                <label>Preferred Coat Type</label>
+                <select
+                  value={form.preferredCoatType}
+                  onChange={(e) =>
+                    updateField("preferredCoatType", e.target.value)
+                  }
+                >
+                  <option value="">No preference</option>
+                  <option value="short">Short Coat</option>
+                  <option value="long">Long Coat</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>Preferred Gender</label>
+                <select
+                  value={form.preferredGender}
+                  onChange={(e) =>
+                    updateField("preferredGender", e.target.value)
+                  }
+                >
+                  <option value="">No preference</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Color Preference</label>
+              <input
+                value={form.colorPreference}
+                onChange={(e) =>
+                  updateField("colorPreference", e.target.value)
+                }
+                placeholder="Example: blue fawn, chocolate, no preference"
+              />
+            </div>
+
+            <div className="grid-2">
+              <div className="field">
+                <label>Desired Adoption Date</label>
+                <input
+                  type="date"
+                  value={form.desiredAdoptionDate}
+                  onChange={(e) =>
+                    updateField("desiredAdoptionDate", e.target.value)
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Interest Type</label>
+                <div className="radio-row">
+                  <label>
+                    <input
+                      type="radio"
+                      name="interestType"
+                      value="current"
+                      checked={form.interestType === "current"}
+                      onChange={() =>
+                        updateField("interestType", "current")
+                      }
+                    />
+                    Current Puppy
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="interestType"
+                      value="future"
+                      checked={form.interestType === "future"}
+                      onChange={() =>
+                        updateField("interestType", "future")
+                      }
+                    />
+                    Future Puppy
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 3: LIFESTYLE & HOME */}
+          <section className="card">
+            <h2>Lifestyle &amp; Home</h2>
+
+            <div className="grid-2">
+              <div className="field">
+                <label>Do you have other pets?</label>
+                <div className="radio-row">
+                  <label>
+                    <input
+                      type="radio"
+                      name="haveOtherPets"
+                      value="yes"
+                      checked={form.haveOtherPets === "yes"}
+                      onChange={() =>
+                        updateField("haveOtherPets", "yes")
+                      }
+                    />
+                    Yes
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="haveOtherPets"
+                      value="no"
+                      checked={form.haveOtherPets === "no"}
+                      onChange={() =>
+                        updateField("haveOtherPets", "no")
+                      }
+                    />
+                    No
+                  </label>
+                </div>
+              </div>
+              <div className="field">
+                <label>Owned a Chihuahua before?</label>
+                <div className="radio-row">
+                  <label>
+                    <input
+                      type="radio"
+                      name="ownedChi"
+                      value="yes"
+                      checked={form.ownedChihuahuaBefore === "yes"}
+                      onChange={() =>
+                        updateField("ownedChihuahuaBefore", "yes")
+                      }
+                    />
+                    Yes
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="ownedChi"
+                      value="no"
+                      checked={form.ownedChihuahuaBefore === "no"}
+                      onChange={() =>
+                        updateField("ownedChihuahuaBefore", "no")
+                      }
+                    />
+                    No
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Pet Details (type, age, temperament, etc.)</label>
+              <textarea
+                rows={3}
+                value={form.petDetails}
+                onChange={(e) =>
+                  updateField("petDetails", e.target.value)
+                }
+                placeholder="Tell us about your other pets, if any."
+              />
+            </div>
+
+            <div className="grid-2">
+              <div className="field">
+                <label>Home Type</label>
+                <select
+                  value={form.homeType}
+                  onChange={(e) =>
+                    updateField("homeType", e.target.value)
+                  }
+                >
+                  <option value="">Select one</option>
+                  <option value="house">House</option>
+                  <option value="apartment">Apartment</option>
+                  <option value="townhome">Townhome</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label>Fenced Yard?</label>
+                <div className="radio-row">
+                  <label>
+                    <input
+                      type="radio"
+                      name="fencedYard"
+                      value="yes"
+                      checked={form.fencedYard === "yes"}
+                      onChange={() =>
+                        updateField("fencedYard", "yes")
+                      }
+                    />
+                    Yes
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="fencedYard"
+                      value="no"
+                      checked={form.fencedYard === "no"}
+                      onChange={() =>
+                        updateField("fencedYard", "no")
+                      }
+                    />
+                    No
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="field">
+                <label>Work Status</label>
+                <input
+                  value={form.workStatus}
+                  onChange={(e) =>
+                    updateField("workStatus", e.target.value)
+                  }
+                  placeholder="Example: full-time, part-time, retired"
+                />
+              </div>
+              <div className="field">
+                <label>Who will primarily care for the puppy?</label>
+                <input
+                  value={form.whoCaresForPuppy}
+                  onChange={(e) =>
+                    updateField("whoCaresForPuppy", e.target.value)
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Children at Home (ages, part-time / full-time)</label>
+              <textarea
+                rows={2}
+                value={form.childrenAtHome}
+                onChange={(e) =>
+                  updateField("childrenAtHome", e.target.value)
+                }
+              />
+            </div>
+          </section>
+
+          {/* SECTION 4: PAYMENT & AGREEMENT */}
+          <section className="card">
+            <h2>Payment &amp; Agreement</h2>
+
+            <div className="grid-2">
+              <div className="field">
+                <label>Payment Preference</label>
+                <select
+                  value={form.paymentPreference}
+                  onChange={(e) =>
+                    updateField("paymentPreference", e.target.value)
+                  }
+                >
+                  <option value="">Select one</option>
+                  <option value="zoho_checkout">Zoho Checkout</option>
+                  <option value="paypal">PayPal</option>
+                  <option value="stripe">Stripe</option>
+                  <option value="cashier">Cashier’s Check</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label>How did you hear about us?</label>
+                <input
+                  value={form.hearAboutUs}
+                  onChange={(e) =>
+                    updateField("hearAboutUs", e.target.value)
+                  }
+                  placeholder="Example: Facebook, referral, website, GoodDog, etc."
+                />
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Ready to place deposit?</label>
+              <div className="radio-row">
+                <label>
+                  <input
+                    type="radio"
+                    name="readyDeposit"
+                    value="yes"
+                    checked={form.readyToPlaceDeposit === "yes"}
+                    onChange={() =>
+                      updateField("readyToPlaceDeposit", "yes")
+                    }
+                  />
+                  Yes
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="readyDeposit"
+                    value="no"
+                    checked={form.readyToPlaceDeposit === "no"}
+                    onChange={() =>
+                      updateField("readyToPlaceDeposit", "no")
+                    }
+                  />
+                  No
+                </label>
+              </div>
+            </div>
+
+            <div className="field">
+              <label>
+                Please input any questions that you may have here.
+              </label>
+              <textarea
+                rows={3}
+                value={form.questions}
+                onChange={(e) =>
+                  updateField("questions", e.target.value)
+                }
+              />
+            </div>
+          </section>
+
+          {/* SECTION 5: TERMS & CONDITIONS (scrollable) */}
+          <section className="card">
+            <h2>Terms and Conditions</h2>
+            <p className="small">
+              Please review these Terms and Conditions. This is the same
+              content you provided in your written terms for Southwest
+              Virginia Chihuahua.
+            </p>
+
+            <div className="terms-scroll">
+              <h3>1. Application Process</h3>
+              <p>
+                1.1 Incomplete or Incorrect Information – You agree to
+                provide complete, accurate, and truthful information in
+                your application. Providing false, incomplete, or
+                misleading information may result in immediate
+                disqualification of your application or rehoming of the
+                puppy at our sole discretion.
+              </p>
+              <p>
+                1.2 Non-Binding Application – Submission of an application
+                does not guarantee approval or reservation of any puppy.
+                All applications are subject to Breeder review and
+                approval. We reserve the right, in our sole discretion, to
+                accept or reject any application for any reason.
+              </p>
+              <p>
+                1.3 Application Fee – As of the date of this application,
+                there is no separate application fee. However, once an
+                application is approved, a nonrefundable $250 deposit will
+                be required to reserve the puppy. By submitting this
+                application, you acknowledge that, if approved, you will
+                be asked to pay the deposit within a specified timeframe
+                and that this deposit is nonrefundable under all
+                circumstances.
+              </p>
+
+              <h3>2. Deposit and Reservation</h3>
+              <p>
+                2.1 Deposit Requirement – If your application is approved,
+                we will provide you with a link to pay a nonrefundable
+                $250 deposit (“Deposit”). Your puppy will be reserved once
+                we receive cleared payment of this Deposit.
+              </p>
+              <p>
+                2.2 Nonrefundable Nature of Deposit – Under no
+                circumstances will the Deposit be refunded. The Deposit
+                covers part of our administrative and care costs incurred
+                to date (e.g., vaccinations, deworming, health checks,
+                socialization, and documentation). Should you fail to
+                complete payment of the Deposit within the timeframe
+                specified, your reservation may be canceled and the puppy
+                may be released to another approved applicant.
+              </p>
+              <p>
+                2.3 Reservation Period – Upon receipt of the Deposit, the
+                puppy will be marked as “Reserved” in our records. If you
+                do not complete the remaining balance payment within the
+                “Balance Due” deadline (as communicated in your Approval
+                Packet), the reservation may be forfeited, and the Deposit
+                will not be refunded.
+              </p>
+
+              <h3>3. Approval, Rejection, and Waitlist</h3>
+              <p>
+                3.1 Approval Criteria – We evaluate applications based on
+                factors including, but not limited to: household
+                environment, reason for adoption, ability to provide
+                lifelong care, and understanding of Chihuahua-specific
+                needs.
+              </p>
+              <p>
+                3.2 Right to Reject – We reserve the right to reject any
+                application for any reason, including (but not limited to)
+                concerns about your living conditions, inability to meet
+                our health guarantee requirements, or concern over
+                potential resale or mistreatment.
+              </p>
+              <p>
+                3.3 Waitlist – If your application is declined but you
+                wish to remain on a waitlist for future litters, you may
+                notify us and we will keep your contact information on
+                file. Being on the waitlist does not guarantee future
+                availability; all applicants are reviewed for each litter.
+              </p>
+
+              <h3>4. Privacy and Data Use</h3>
+              <p>
+                4.1 Personal Information – By submitting this application,
+                you authorize Southwest Virginia Chihuahua to collect,
+                store, and use your personal information solely for
+                purposes of reviewing and processing your application,
+                facilitating puppy reservation, and providing
+                post-adoption support. We do not share your personal data
+                with outside parties except as required by law or as
+                necessary for completing transactions (e.g., payment
+                processors).
+              </p>
+              <p>
+                4.2 Communications – You consent to receive communications
+                from us via email, SMS/text, or phone regarding your
+                application status, payment instructions, puppy updates,
+                and any required appointments. You agree to notify us of
+                changes to your contact information.
+              </p>
+
+              <h3>5. Health Guarantee and Contractual Terms</h3>
+              <p>
+                5.1 Health Guarantee – All puppies are sold with a limited
+                health guarantee as described in our Puppy Sales Agreement
+                and Health Guarantee. That document covers congenital and
+                genetic disorders for one year from the puppy’s date of
+                birth, subject to the specific conditions, exclusions, and
+                processes it describes.
+              </p>
+              <p>
+                5.2 Contract Requirement – After paying the Deposit, you
+                must sign our Puppy Sales Agreement and Health Guarantee
+                through Zoho Sign before finalizing any reservation. This
+                contract outlines purchase price, payment schedules,
+                responsibilities, health guarantees, and return policies.
+                Failure to sign within the required timeframe may result
+                in cancellation of the reservation and forfeiture of the
+                Deposit.
+              </p>
+
+              <h3>6. Ownership Transfer and Delivery</h3>
+              <p>
+                6.1 Balance Due Before Transfer – The remaining balance
+                (purchase price minus Deposit) plus applicable tax must be
+                paid in full prior to pickup or delivery of the puppy.
+              </p>
+              <p>
+                6.2 Delivery Options Only – We do not offer in-person
+                pickups at our facility. All puppies are released through
+                pre-arranged delivery or transport options as described in
+                your Approval Packet (local hand-off, professional
+                shipment, or courier).
+              </p>
+              <p>
+                6.3 Transfer of Ownership – Ownership transfers only after
+                full payment and signed contract, at the time of delivery
+                or hand-off of the puppy to you or your chosen transport.
+              </p>
+
+              <h3>7. Post-Approval Responsibilities</h3>
+              <p>
+                7.1 Veterinary Examination – You agree to have your puppy
+                examined by a licensed veterinarian within ten (10) days
+                of taking possession and to follow the process outlined in
+                the Health Guarantee if a covered issue is found.
+              </p>
+              <p>
+                7.2 Ongoing Care – You agree to provide regular veterinary
+                care, age-appropriate vaccinations, deworming, parasite
+                prevention, and proper nutrition. You assume full
+                responsibility for all ongoing costs.
+              </p>
+              <p>
+                7.3 Lifetime Support and Return Policy – If you cannot
+                care for your dog at any time, you must contact us first.
+                We reserve right of first refusal. No refunds will be
+                provided for dogs returned after initial transfer.
+              </p>
+
+              <h3>8. Liability and Disclaimers</h3>
+              <p>
+                8.1 No Warranty Beyond Health Guarantee – Except as
+                expressly stated in the Health Guarantee, the puppy is
+                sold “as is,” and we make no additional warranties—
+                express or implied—as to health, temperament, or
+                performance.
+              </p>
+              <p>
+                8.2 Limitation of Liability – In no event shall Southwest
+                Virginia Chihuahua be liable for incidental, consequential,
+                or punitive damages arising from or related to your
+                application, adoption, or ownership. Remedies are limited
+                to those stated in the Health Guarantee.
+              </p>
+
+              <h3>9. Governing Law and Dispute Resolution</h3>
+              <p>
+                9.1 Governing Law – These Terms are governed by the laws
+                of the Commonwealth of Virginia, without regard to its
+                conflict-of-law rules.
+              </p>
+              <p>
+                9.2 Dispute Resolution – You agree to attempt informal
+                resolution first. If that fails, you agree to mediation,
+                and only then may either party pursue remedies in the
+                state or federal courts located in Smyth County, Virginia.
+              </p>
+
+              <h3>10. Miscellaneous</h3>
+              <p>
+                10.1 Severability – If any provision is held invalid, the
+                remaining provisions continue in full force.
+              </p>
+              <p>
+                10.2 No Waiver – No waiver of any term is a continuing
+                waiver of that term or any other provision.
+              </p>
+              <p>
+                10.3 Amendments – We may modify or update these Terms at
+                any time by posting updated terms on our website. Your
+                continued use of the application process after such
+                changes constitutes acceptance of the revised Terms.
+              </p>
+
+              <p className="terms-bottom">
+                By clicking “I Agree” and submitting your application, you
+                acknowledge that you have read, understood, and agree to
+                be bound by these Terms and Conditions.
+              </p>
+            </div>
+
+            <div className="field checkbox-field">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.termsAccepted}
+                  onChange={(e) =>
+                    updateField("termsAccepted", e.target.checked)
+                  }
+                />{" "}
+                I have read and agree to the Terms and Conditions above.
+              </label>
+            </div>
+          </section>
+
+          {/* SECTION 6: APPLICANT DECLARATIONS */}
+          <section className="card">
+            <h2>Applicant Declarations</h2>
+            <p className="small">
+              Please read each statement carefully. By checking the box,
+              you confirm that the statement is true and that you agree to
+              abide by it.
+            </p>
+
+            <div className="declarations">
+              {DECLARATIONS.map((d) => (
+                <label key={d.key} className="decl-item">
+                  <div className="decl-header">
+                    <input
+                      type="checkbox"
+                      checked={form.declarations[d.key]}
+                      onChange={(e) =>
+                        updateDeclaration(d.key, e.target.checked)
+                      }
+                    />
+                    <span className="decl-title">{d.title}</span>
+                  </div>
+                  <div className="decl-text">{d.text}</div>
+                </label>
+              ))}
+            </div>
+          </section>
+
+          {/* SECTION 7: SIGNATURE & SUMMARY */}
+          <section className="card">
+            <h2>Signature &amp; Summary</h2>
+
+            <div className="grid-2">
+              <div className="field">
+                <label>
+                  Date-Time (when you are signing this){""}
+                </label>
+                <input
+                  type="datetime-local"
+                  value={form.signedAt}
+                  onChange={(e) =>
+                    updateField("signedAt", e.target.value)
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Signature (type your full name)</label>
+                <input
+                  value={form.signature}
+                  onChange={(e) =>
+                    updateField("signature", e.target.value)
+                  }
+                  placeholder="Type your full name"
+                />
+              </div>
+            </div>
+
+            <div className="summary">
+              <h3>Application Summary</h3>
+              <div className="summary-grid">
+                <div>
+                  <h4>Applicant</h4>
+                  <p>{form.fullName || "Name not entered"}</p>
+                  <p>{form.email || "Email not entered"}</p>
+                  <p>{form.phone || "Phone not entered"}</p>
+                  <p>
+                    {form.city} {form.state && `, ${form.state}`}{" "}
+                    {form.zip}
+                  </p>
+                </div>
+                <div>
+                  <h4>Puppy Preference</h4>
+                  <p>
+                    Coat:{" "}
+                    {form.preferredCoatType || "No specific preference"}
+                  </p>
+                  <p>
+                    Gender:{" "}
+                    {form.preferredGender || "No specific preference"}
+                  </p>
+                  <p>
+                    Color:{" "}
+                    {form.colorPreference || "No specific preference"}
+                  </p>
+                  <p>
+                    Interest:{" "}
+                    {form.interestType === "current"
+                      ? "Current puppy"
+                      : form.interestType === "future"
+                      ? "Future puppy"
+                      : "Not specified"}
+                  </p>
+                </div>
+                <div>
+                  <h4>Home & Lifestyle</h4>
+                  <p>
+                    Other pets:{" "}
+                    {form.haveOtherPets === "yes"
+                      ? "Yes"
+                      : form.haveOtherPets === "no"
+                      ? "No"
+                      : "Not specified"}
+                  </p>
+                  <p>Home type: {form.homeType || "Not specified"}</p>
+                  <p>
+                    Fenced yard:{" "}
+                    {form.fencedYard === "yes"
+                      ? "Yes"
+                      : form.fencedYard === "no"
+                      ? "No"
+                      : "Not specified"}
+                  </p>
+                  <p>
+                    Work status:{" "}
+                    {form.workStatus || "Not specified"}
+                  </p>
+                </div>
+                <div>
+                  <h4>Declarations</h4>
+                  <p>
+                    Declarations accepted: {completedDeclarations} /{" "}
+                    {totalDeclarations}
+                  </p>
+                  <p>
+                    Terms & Conditions:{" "}
+                    {form.termsAccepted ? "Accepted" : "Not accepted"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="submit-btn"
+              disabled={submitting}
+            >
+              {submitting ? "Submitting…" : "Submit Application"}
+            </button>
+          </section>
         </form>
-      </section>
+      </div>
 
-      <style jsx global>{`
-        :root{
-          --bg:#f7e8d7; --panel:#fff9f2; --ink:#2e2a24; --muted:#6f6257;
-          --accent:#b5835a; --accentHover:#9a6c49; --ring:rgba(181,131,90,.25);
+      <style jsx>{`
+        .app-root {
+          min-height: 100vh;
+          background:
+            radial-gradient(60% 100% at 100% 0%, #020617 0%, transparent 60%),
+            radial-gradient(60% 100% at 0% 0%, #111827 0%, transparent 60%),
+            #020617;
+          color: #f9fafb;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+            sans-serif;
         }
-        html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
-        .wrap{max-width:1000px;margin:0 auto;padding:24px 16px}
-        .hero{background:linear-gradient(180deg,var(--panel),transparent);border-bottom:1px solid #ecdccc}
-        .hero h1{margin:0 0 6px}
-        .lead{margin:0;color:var(--muted)}
-        .card{background:#fff;border:1px solid #ecdccc;border-radius:14px;padding:16px}
-        h2{margin:18px 0 8px;font-size:1.1rem}
-        .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
-        .col12{grid-column:span 12}.col8{grid-column:span 12}.col6{grid-column:span 12}.col4{grid-column:span 12}
-        @media (min-width:900px){ .col8{grid-column:span 8}.col6{grid-column:span 6}.col4{grid-column:span 4} }
-        label{display:block;font-size:.9rem;margin:6px 0}
-        input,select,textarea{width:100%;padding:10px;border:1px solid #e3d6c9;border-radius:10px;background:#fff;outline:0}
-        input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--ring)}
-        .chk{display:flex;align-items:center;gap:8px}
-        .terms{max-height:180px;overflow:auto;border:1px solid #ecdccc;border-radius:10px;padding:10px;background:var(--panel)}
-        .actions{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
-        .btn{appearance:none;border:1px solid #e3d6c9;background:#fff;color:var(--ink);padding:10px 14px;border-radius:12px;cursor:pointer}
-        .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-        .btn.primary:hover{background:var(--accentHover);border-color:var(--accentHover)}
-        .note{color:var(--muted)}
-        .notice{margin-top:12px;padding:10px;border-left:4px solid var(--accent);background:#fff;border:1px solid #ecdccc;border-radius:10px}
+
+        .app-shell {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 20px 20px 28px;
+        }
+
+        .app-header h1 {
+          margin: 0 0 4px;
+          font-size: 26px;
+          font-weight: 700;
+        }
+
+        .app-header p {
+          margin: 0;
+          font-size: 13px;
+          color: #9ca3af;
+        }
+
+        .banner {
+          margin-top: 12px;
+          border-radius: 12px;
+          padding: 8px 10px;
+          font-size: 12px;
+        }
+
+        .banner-error {
+          background: rgba(239, 68, 68, 0.08);
+          border: 1px solid rgba(239, 68, 68, 0.7);
+          color: #fecaca;
+        }
+
+        .banner-success {
+          background: rgba(34, 197, 94, 0.09);
+          border: 1px solid rgba(34, 197, 94, 0.7);
+          color: #bbf7d0;
+        }
+
+        .app-grid {
+          margin-top: 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .card {
+          border-radius: 20px;
+          border: 1px solid #111827;
+          background: radial-gradient(
+              120% 220% at 0 0,
+              rgba(15, 23, 42, 0.8),
+              transparent 55%
+            ),
+            #020617;
+          box-shadow: 0 20px 42px rgba(0, 0, 0, 0.85);
+          padding: 15px 16px 16px;
+        }
+
+        .card h2 {
+          margin: 0 0 10px;
+          font-size: 17px;
+        }
+
+        .small {
+          font-size: 12px;
+          color: #9ca3af;
+          margin-bottom: 8px;
+        }
+
+        .grid-2 {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .grid-3 {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .field {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          font-size: 12px;
+        }
+
+        .field label {
+          color: #e5e7eb;
+          font-size: 12px;
+        }
+
+        .req {
+          color: #f97316;
+        }
+
+        input,
+        select,
+        textarea {
+          border-radius: 10px;
+          border: 1px solid #1f2937;
+          background: #020617;
+          color: #f9fafb;
+          padding: 7px 9px;
+          font-size: 12px;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+          outline: none;
+          border-color: #e0a96d;
+          box-shadow: 0 0 0 2px rgba(224, 169, 109, 0.3);
+        }
+
+        textarea {
+          resize: vertical;
+        }
+
+        .radio-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          font-size: 12px;
+        }
+
+        .radio-row label {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .terms-scroll {
+          max-height: 260px;
+          overflow-y: auto;
+          padding: 10px;
+          border-radius: 12px;
+          border: 1px solid #1f2937;
+          background: rgba(15, 23, 42, 0.95);
+          font-size: 12px;
+          line-height: 1.45;
+        }
+
+        .terms-scroll h3 {
+          margin-top: 10px;
+          margin-bottom: 4px;
+          font-size: 13px;
+        }
+
+        .terms-scroll p {
+          margin: 0 0 6px;
+        }
+
+        .terms-bottom {
+          margin-top: 8px;
+          font-style: italic;
+        }
+
+        .checkbox-field {
+          margin-top: 10px;
+        }
+
+        .checkbox-field input[type="checkbox"] {
+          margin-right: 6px;
+        }
+
+        .declarations {
+          margin-top: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .decl-item {
+          border-radius: 14px;
+          border: 1px solid #1f2937;
+          padding: 8px 9px;
+          background: #020617;
+          font-size: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .decl-header {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-weight: 600;
+        }
+
+        .decl-title {
+          font-size: 13px;
+        }
+
+        .decl-text {
+          color: #9ca3af;
+        }
+
+        .summary {
+          margin-top: 12px;
+          padding-top: 10px;
+          border-top: 1px solid #1f2937;
+        }
+
+        .summary h3 {
+          margin: 0 0 8px;
+          font-size: 14px;
+        }
+
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 10px;
+          font-size: 12px;
+        }
+
+        .summary-grid h4 {
+          margin: 0 0 4px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .summary-grid p {
+          margin: 0 0 3px;
+          color: #d1d5db;
+        }
+
+        .submit-btn {
+          margin-top: 12px;
+          border-radius: 999px;
+          border: 1px solid #1f2937;
+          padding: 8px 16px;
+          font-size: 13px;
+          cursor: pointer;
+          background: linear-gradient(135deg, #e0a96d, #c47a35);
+          color: #111827;
+        }
+
+        .submit-btn:disabled {
+          opacity: 0.7;
+          cursor: default;
+        }
+
+        @media (max-width: 900px) {
+          .grid-2 {
+            grid-template-columns: minmax(0, 1fr);
+          }
+          .grid-3 {
+            grid-template-columns: minmax(0, 1fr);
+          }
+        }
+
+        @media (max-width: 640px) {
+          .app-shell {
+            padding-inline: 12px;
+          }
+        }
       `}</style>
     </main>
   );
