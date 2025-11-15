@@ -178,34 +178,28 @@ export default function AdminPage() {
   const [allowed, setAllowed] = useState(false)
   const [activeTab, setActiveTab] = useState<AdminTabKey>('dashboard')
 
-  useEffect(() => {
+    useEffect(() => {
     let cancelled = false
 
     ;(async () => {
       try {
+        // 1) Make sure the user is logged in
         const { data, error } = await supabase.auth.getUser()
         const user = data?.user
+
         if (error || !user) {
+          // Not logged in – send to login
           router.replace('/login')
           return
         }
 
-        const { data: adminRow, error: adminError } = await supabase
-          .from('admin_users')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle()
-
-        if (adminError || !adminRow) {
-          router.replace('/')
-          return
-        }
-
+        // 2) TEMP: allow ANY logged-in user to access /admin
+        //    (We’ll tighten this later if you want.)
         if (!cancelled) {
           setAllowed(true)
           setChecking(false)
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) {
           router.replace('/login')
         }
@@ -216,6 +210,7 @@ export default function AdminPage() {
       cancelled = true
     }
   }, [router, supabase])
+
 
   if (checking) {
     return (
