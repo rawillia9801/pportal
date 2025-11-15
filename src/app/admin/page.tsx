@@ -3524,3 +3524,1050 @@ function BreedingTab() {
     </>
   )
 }
+// ============================================
+// Breeding Program types
+// ============================================
+
+type BreedingDogRow = {
+  id: string;
+  name?: string | null;
+  call_name?: string | null;
+  sex?: string | null;
+  dob?: string | null;
+  registry?: string | null;
+  registration_number?: string | null;
+  origin?: string | null;
+  price_paid?: number | null;
+  retained?: boolean | null;
+};
+
+type DogLitterRow = {
+  id: string;
+  litter_name?: string | null;
+  whelp_date?: string | null;
+  expected_date?: string | null;
+};
+
+type DogPuppyRow = {
+  id: string;
+  name?: string | null;
+  status?: string | null;
+  price?: number | null;
+  litter_id?: string | null;
+};
+
+type YearStat = {
+  year: string;
+  litters: number;
+  puppies: number;
+  totalSales: number;
+};
+
+// ============================================
+// Breeding Program view
+// ============================================
+
+function BreedingProgramView() {
+  const [dogs, setDogs] = useState<BreedingDogRow[]>([]);
+  const [selectedDogId, setSelectedDogId] = useState<string | null>(null);
+  const [loadingList, setLoadingList] = useState<boolean>(true);
+  const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
+  const [detail, setDetail] = useState<{
+    dog: BreedingDogRow;
+    litters: DogLitterRow[];
+    puppies: DogPuppyRow[];
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [addForm, setAddForm] = useState({
+    name: "",
+    call_name: "",
+    sex: "female",
+    dob: "",
+    registry: "",
+    registration_number: "",
+    origin: "",
+  });
+
+  // Load list of breeding dogs once
+  useEffect(() => {
+    let alive = true;
+    async function loadDogs() {
+      try {
+        setLoadingList(true);
+        const supabase = getBrowserClient();
+        const { data, error: err } = await supabase
+          .from("breeding_dogs")
+          .select(
+            "id, name, call_name, sex, dob, registry, registration_number, origin, price_paid, retained, created_at"
+          )
+          .order("name", { ascending: true });
+
+        if (!alive) return;
+        if (err) throw err;
+
+        const rows = (data ?? []) as BreedingDogRow[];
+        setDogs(rows);
+        if (!selectedDogId && rows[0]) {
+          setSelectedDogId(rows[0].id);
+        }
+      } catch (e: any) {
+        if (!alive) return;
+        console.error(e);
+        setError(e?.message ?? "Failed to load breeding dogs.");
+      } finally {
+        if (alive) setLoadingList(false);
+      }
+    }
+
+    loadDogs();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Load details for the selected dog
+  useEffect(() => {
+    if (!selectedDogId) {
+      setDetail(null);
+      return;
+    }
+
+    let alive = true;
+
+    async function loadDetail() {
+      try {
+        setLoadingDetail(true);
+        setError(null);
+        const supabase = getBrowserClient();
+
+        const { data: dogRow, error: dogErr } = await supabase
+          .from("breeding_dogs")
+          .select(
+            "id, name, call_name, sex, dob, registry, registration_number, origin, price_paid, retained, created_at"
+          )
+          .eq("id", selectedDogId)
+          .maybeSingle();
+
+        if (!alive) return;
+        if (dogErr) throw dogErr;
+        if (!dogRow) {
+          setDetail(null);
+          return;
+        }
+
+        const dog = dogRow as BreedingDogRow;
+
+        const { data: litterRows, error: litterErr } = await supabase
+          .from("puppy_litters")
+          .select("id, litter_name, whelp_date, expected_date")
+          .or(`dam_id.eq.${selectedDogId},sire_id.eq.${selectedDogId}`)
+          .order("whelp_date", { ascending: false });
+
+        if (!alive) return;
+        if (litterErr) throw litterErr;
+
+        const litters = (litterRows ?? []) as DogLitterRow[];
+
+        let puppies: DogPuppyRow[] = [];
+        if (litters.length) {
+          const litterIds = litters.map((l) => l.id);
+          const { data: puppyRows, error: puppyErr } = await supabase
+            .from("puppies")
+            .select("id, name, status, price, litter_id")
+            .in("litter_id", litterIds);
+
+          if (!alive) return;
+          if (puppyErr) throw puppyErr;
+
+          puppies = (puppyRows ?? []) as DogPuppyRow[];
+        }
+
+        setDetail({ dog, litters, puppies });
+      } catch (e: any) {
+        if (!alive) return;
+        console.error(e);
+        setError(e?.message ?? "Failed to load breeding dog details.");
+      } finally {
+        if (alive) setLoadingDetail(false);
+      }
+    }
+
+    loadDetail();
+
+    return () => {
+      alive = false;
+    };
+  }, [selectedDogId]);
+
+  // Add a new breeding dog
+  async function handleAddDog(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      setError(null);
+      if (!addForm.name.trim()) {
+        throw new Error("Please enter a name for the dog.");
+      }
+      const supabase = getBrowserClient();
+      const { data, error: insertErr } = await supabase
+        .from("breeding_dogs")
+        .insert([
+          {
+            name: addForm.name.trim(),
+            call_name: addForm.call_name.trim() || null,
+            sex: addForm.sex,
+            dob: addForm.dob || null,
+            registry: addForm.registry || null,
+            registration_number: addForm.registration_number || null,
+            origin: addForm.origin || null,
+          },
+        ])
+        .select(
+          "id, name, call_name, sex, dob, registry, registration_number, origin, price_paid, retained, created_at"
+        )
+        .maybeSingle();
+
+      if (insertErr) throw insertErr;
+      const newDog = data as BreedingDogRow;
+      const next = [...dogs, newDog].sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "")
+      );
+      setDogs(next);
+      setSelectedDogId(newDog.id);
+      setAddOpen(false);
+      setAddForm({
+        name: "",
+        call_name: "",
+        sex: "female",
+        dob: "",
+        registry: "",
+        registration_number: "",
+        origin: "",
+      });
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.message ?? "Failed to add breeding dog.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function formatDate(value?: string | null) {
+    if (!value) return "—";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleDateString("en-US");
+  }
+
+  const shellStyle: React.CSSProperties = {
+    marginTop: 8,
+    display: "grid",
+    gridTemplateColumns: "minmax(260px, 320px) minmax(0, 1fr)",
+    gap: 16,
+    alignItems: "flex-start",
+  };
+
+  const leftCardStyle: React.CSSProperties = {
+    borderRadius: 16,
+    border: "1px solid #1f2937",
+    background: "#020617",
+    padding: 16,
+    boxShadow: "0 18px 40px rgba(0,0,0,0.7)",
+  };
+
+  const rightCardStyle: React.CSSProperties = {
+    borderRadius: 16,
+    border: "1px solid #1f2937",
+    background: "#020617",
+    padding: 16,
+    boxShadow: "0 18px 40px rgba(0,0,0,0.7)",
+  };
+
+  const badgeStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "2px 8px",
+    borderRadius: 999,
+    fontSize: 11,
+    border: "1px solid #1f2937",
+    background: "#0b1120",
+  };
+
+  // Aggregate yearly stats for this dog
+  let yearStats: YearStat[] = [];
+  let totalLitters = 0;
+  let totalPuppies = 0;
+  let totalSales = 0;
+
+  if (detail) {
+    const map: { [year: string]: YearStat } = {};
+    const litterYear: { [id: string]: string } = {};
+
+    detail.litters.forEach((l) => {
+      const base = l.whelp_date || l.expected_date || "";
+      const year = base ? base.slice(0, 4) : "Unknown";
+      const key = year || "Unknown";
+      litterYear[l.id] = key;
+      if (!map[key]) {
+        map[key] = { year: key, litters: 0, puppies: 0, totalSales: 0 };
+      }
+      map[key].litters += 1;
+    });
+
+    detail.puppies.forEach((p) => {
+      const lid = p.litter_id || "";
+      const key = lid ? litterYear[lid] || "Unknown" : "Unknown";
+      if (!map[key]) {
+        map[key] = { year: key, litters: 0, puppies: 0, totalSales: 0 };
+      }
+      map[key].puppies += 1;
+      const price =
+        typeof p.price === "number"
+          ? p.price
+          : parseFloat(String(p.price ?? "0")) || 0;
+      map[key].totalSales += price;
+    });
+
+    yearStats = Object.values(map).sort((a, b) => b.year.localeCompare(a.year));
+    totalLitters = yearStats.reduce((sum, s) => sum + s.litters, 0);
+    totalPuppies = yearStats.reduce((sum, s) => sum + s.puppies, 0);
+    totalSales = yearStats.reduce((sum, s) => sum + s.totalSales, 0);
+  }
+
+  // Group puppies by litter for display
+  const pupsByLitter: Record<string, DogPuppyRow[]> = {};
+  if (detail) {
+    detail.puppies.forEach((p) => {
+      const lid = p.litter_id;
+      if (!lid) return;
+      if (!pupsByLitter[lid]) pupsByLitter[lid] = [];
+      pupsByLitter[lid].push(p);
+    });
+  }
+
+  return (
+    <section style={shellStyle}>
+      {/* LEFT: list of breeding dogs */}
+      <aside style={leftCardStyle}>
+        <header style={{ marginBottom: 10 }}>
+          <h2 style={{ fontSize: 16, margin: 0 }}>Breeding Dogs</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 12, opacity: 0.7 }}>
+            Manage your active sires and dams in the program.
+          </p>
+        </header>
+
+        <button
+          type="button"
+          onClick={() => setAddOpen((v) => !v)}
+          style={{
+            width: "100%",
+            marginBottom: 10,
+            padding: "8px 10px",
+            borderRadius: 999,
+            border: "1px solid #1f2937",
+            background: addOpen
+              ? "linear-gradient(135deg,#e0a96d,#c47a35)"
+              : "#020617",
+            color: addOpen ? "#111827" : "#e5e7eb",
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          {addOpen ? "Cancel" : "+ New Breeding Dog"}
+        </button>
+
+        {addOpen && (
+          <form onSubmit={handleAddDog} style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 6 }}>
+              <label style={{ fontSize: 11, opacity: 0.8 }}>Name</label>
+              <input
+                style={{
+                  width: "100%",
+                  borderRadius: 8,
+                  border: "1px solid #1f2937",
+                  padding: "6px 8px",
+                  fontSize: 13,
+                  marginTop: 2,
+                  background: "#020617",
+                  color: "#e5e7eb",
+                }}
+                value={addForm.name}
+                onChange={(e) =>
+                  setAddForm((f) => ({ ...f, name: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <label style={{ fontSize: 11, opacity: 0.8 }}>Call Name</label>
+              <input
+                style={{
+                  width: "100%",
+                  borderRadius: 8,
+                  border: "1px solid #1f2937",
+                  padding: "6px 8px",
+                  fontSize: 13,
+                  marginTop: 2,
+                  background: "#020617",
+                  color: "#e5e7eb",
+                }}
+                value={addForm.call_name}
+                onChange={(e) =>
+                  setAddForm((f) => ({ ...f, call_name: e.target.value }))
+                }
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 6,
+                marginBottom: 6,
+              }}
+            >
+              <div>
+                <label style={{ fontSize: 11, opacity: 0.8 }}>Sex</label>
+                <select
+                  style={{
+                    width: "100%",
+                    borderRadius: 8,
+                    border: "1px solid #1f2937",
+                    padding: "6px 8px",
+                    fontSize: 13,
+                    marginTop: 2,
+                    background: "#020617",
+                    color: "#e5e7eb",
+                  }}
+                  value={addForm.sex}
+                  onChange={(e) =>
+                    setAddForm((f) => ({ ...f, sex: e.target.value }))
+                  }
+                >
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, opacity: 0.8 }}>
+                  DOB (YYYY-MM-DD)
+                </label>
+                <input
+                  type="date"
+                  style={{
+                    width: "100%",
+                    borderRadius: 8,
+                    border: "1px solid #1f2937",
+                    padding: "6px 8px",
+                    fontSize: 13,
+                    marginTop: 2,
+                    background: "#020617",
+                    color: "#e5e7eb",
+                  }}
+                  value={addForm.dob}
+                  onChange={(e) =>
+                    setAddForm((f) => ({ ...f, dob: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <label style={{ fontSize: 11, opacity: 0.8 }}>Registry</label>
+              <input
+                style={{
+                  width: "100%",
+                  borderRadius: 8,
+                  border: "1px solid #1f2937",
+                  padding: "6px 8px",
+                  fontSize: 13,
+                  marginTop: 2,
+                  background: "#020617",
+                  color: "#e5e7eb",
+                }}
+                value={addForm.registry}
+                onChange={(e) =>
+                  setAddForm((f) => ({ ...f, registry: e.target.value }))
+                }
+                placeholder="AKC / CKC / ACA"
+              />
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <label style={{ fontSize: 11, opacity: 0.8 }}>
+                Registration #
+              </label>
+              <input
+                style={{
+                  width: "100%",
+                  borderRadius: 8,
+                  border: "1px solid #1f2937",
+                  padding: "6px 8px",
+                  fontSize: 13,
+                  marginTop: 2,
+                  background: "#020617",
+                  color: "#e5e7eb",
+                }}
+                value={addForm.registration_number}
+                onChange={(e) =>
+                  setAddForm((f) => ({
+                    ...f,
+                    registration_number: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 11, opacity: 0.8 }}>
+                From (Location)
+              </label>
+              <input
+                style={{
+                  width: "100%",
+                  borderRadius: 8,
+                  border: "1px solid #1f2937",
+                  padding: "6px 8px",
+                  fontSize: 13,
+                  marginTop: 2,
+                  background: "#020617",
+                  color: "#e5e7eb",
+                }}
+                value={addForm.origin}
+                onChange={(e) =>
+                  setAddForm((f) => ({ ...f, origin: e.target.value }))
+                }
+                placeholder="City, State or breeder"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                width: "100%",
+                marginTop: 4,
+                padding: "8px 10px",
+                borderRadius: 999,
+                border: "1px solid #1f2937",
+                background: "linear-gradient(135deg,#e0a96d,#c47a35)",
+                color: "#111827",
+                fontSize: 13,
+                cursor: "pointer",
+                opacity: saving ? 0.7 : 1,
+              }}
+            >
+              {saving ? "Saving…" : "Save Breeding Dog"}
+            </button>
+          </form>
+        )}
+
+        {loadingList && (
+          <p style={{ fontSize: 12, opacity: 0.7 }}>Loading breeding dogs…</p>
+        )}
+
+        {!loadingList && dogs.length === 0 && (
+          <p style={{ fontSize: 12, opacity: 0.7 }}>
+            No breeding dogs have been added yet.
+          </p>
+        )}
+
+        {!loadingList && dogs.length > 0 && (
+          <div
+            style={{
+              marginTop: 4,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              maxHeight: 420,
+              overflowY: "auto",
+              paddingRight: 4,
+            }}
+          >
+            {dogs.map((dog) => {
+              const isActive = dog.id === selectedDogId;
+              const initials = (dog.name || "?")
+                .split(" ")
+                .map((p) => p[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
+
+              return (
+                <button
+                  key={dog.id}
+                  type="button"
+                  onClick={() => setSelectedDogId(dog.id)}
+                  style={{
+                    textAlign: "left",
+                    borderRadius: 12,
+                    border: isActive
+                      ? "1px solid #e0a96d"
+                      : "1px solid #1f2937",
+                    background: isActive ? "#111827" : "#020617",
+                    padding: "8px 9px",
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: "999px",
+                      background:
+                        "radial-gradient(circle at 30% 20%,#facc15,#e0a96d)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#111827",
+                    }}
+                  >
+                    {initials}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        textOverflow: "ellipsis",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {dog.name || "Unnamed"}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        opacity: 0.75,
+                        whiteSpace: "nowrap",
+                        textOverflow: "ellipsis",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {dog.call_name ? `“${dog.call_name}” • ` : ""}
+                      {dog.registry || "Unregistered"}
+                    </div>
+                    <div style={{ fontSize: 11, opacity: 0.6 }}>
+                      DOB: {formatDate(dog.dob)} • From: {dog.origin || "—"}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </aside>
+
+      {/* RIGHT: selected dog profile + stats */}
+      <section style={rightCardStyle}>
+        {error && (
+          <div
+            style={{
+              marginBottom: 10,
+              padding: "6px 8px",
+              borderRadius: 8,
+              border: "1px solid #7f1d1d",
+              background: "#450a0a",
+              fontSize: 12,
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {!selectedDogId && (
+          <p style={{ fontSize: 13, opacity: 0.8 }}>
+            Select a dog on the left to see their profile and program stats.
+          </p>
+        )}
+
+        {selectedDogId && loadingDetail && (
+          <p style={{ fontSize: 13, opacity: 0.8 }}>Loading dog details…</p>
+        )}
+
+        {detail && !loadingDetail && (
+          <>
+            <header
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                alignItems: "flex-start",
+                marginBottom: 10,
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: 18 }}>
+                  {detail.dog.name || "Unnamed"}
+                </h2>
+                {detail.dog.call_name && (
+                  <p
+                    style={{
+                      margin: "2px 0 0",
+                      fontSize: 13,
+                      opacity: 0.8,
+                    }}
+                  >
+                    “{detail.dog.call_name}”
+                  </p>
+                )}
+                <p
+                  style={{
+                    margin: "4px 0 0",
+                    fontSize: 12,
+                    opacity: 0.75,
+                  }}
+                >
+                  DOB: {formatDate(detail.dog.dob)} • Registry:{" "}
+                  {detail.dog.registry || "Unregistered"}
+                </p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {detail.dog.sex && (
+                  <span style={badgeStyle}>
+                    {detail.dog.sex === "female" ? "Dam" : "Sire"}
+                  </span>
+                )}
+                {detail.dog.retained && (
+                  <span style={badgeStyle}>Retained by breeder</span>
+                )}
+              </div>
+            </header>
+
+            {/* Program overview fields */}
+            <section
+              style={{
+                marginTop: 4,
+                paddingTop: 8,
+                borderTop: "1px solid #1f2937",
+              }}
+            >
+              <h3 style={{ fontSize: 14, margin: "0 0 6px" }}>
+                Program Overview
+              </h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
+                  gap: 8,
+                  fontSize: 12,
+                }}
+              >
+                <div>
+                  <div style={{ opacity: 0.7 }}>Registered Name</div>
+                  <div>{detail.dog.name || "—"}</div>
+                </div>
+                <div>
+                  <div style={{ opacity: 0.7 }}>Call Name</div>
+                  <div>{detail.dog.call_name || "—"}</div>
+                </div>
+                <div>
+                  <div style={{ opacity: 0.7 }}>Registry</div>
+                  <div>{detail.dog.registry || "—"}</div>
+                </div>
+                <div>
+                  <div style={{ opacity: 0.7 }}>Registration #</div>
+                  <div>{detail.dog.registration_number || "—"}</div>
+                </div>
+                <div>
+                  <div style={{ opacity: 0.7 }}>From (Location)</div>
+                  <div>{detail.dog.origin || "—"}</div>
+                </div>
+                <div>
+                  <div style={{ opacity: 0.7 }}>Price Paid / Value</div>
+                  <div>
+                    {typeof detail.dog.price_paid === "number"
+                      ? `$${detail.dog.price_paid.toLocaleString("en-US", {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0,
+                        })}`
+                      : "—"}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Litters + puppy stats */}
+            <section
+              style={{
+                marginTop: 14,
+                paddingTop: 10,
+                borderTop: "1px solid #1f2937",
+              }}
+            >
+              <h3 style={{ fontSize: 14, margin: "0 0 6px" }}>
+                Litters & Puppy Production
+              </h3>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <div
+                  style={{
+                    borderRadius: 12,
+                    border: "1px solid #1f2937",
+                    padding: "8px 10px",
+                    minWidth: 120,
+                  }}
+                >
+                  <div style={{ fontSize: 11, opacity: 0.7 }}>
+                    Total Litters
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 600 }}>
+                    {totalLitters}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    borderRadius: 12,
+                    border: "1px solid #1f2937",
+                    padding: "8px 10px",
+                    minWidth: 140,
+                  }}
+                >
+                  <div style={{ fontSize: 11, opacity: 0.7 }}>
+                    Total Puppies
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 600 }}>
+                    {totalPuppies}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    borderRadius: 12,
+                    border: "1px solid #1f2937",
+                    padding: "8px 10px",
+                    minWidth: 160,
+                  }}
+                >
+                  <div style={{ fontSize: 11, opacity: 0.7 }}>
+                    Puppy Sales (All Years)
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>
+                    {`$${totalSales.toLocaleString("en-US", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })}`}
+                  </div>
+                </div>
+              </div>
+
+              {yearStats.length > 0 ? (
+                <div
+                  style={{
+                    overflowX: "auto",
+                    marginTop: 4,
+                  }}
+                >
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: 12,
+                    }}
+                  >
+                    <thead>
+                      <tr style={{ textAlign: "left" }}>
+                        <th
+                          style={{
+                            borderBottom: "1px solid #1f2937",
+                            padding: "4px 6px",
+                          }}
+                        >
+                          Year
+                        </th>
+                        <th
+                          style={{
+                            borderBottom: "1px solid #1f2937",
+                            padding: "4px 6px",
+                          }}
+                        >
+                          Litters
+                        </th>
+                        <th
+                          style={{
+                            borderBottom: "1px solid #1f2937",
+                            padding: "4px 6px",
+                          }}
+                        >
+                          Puppies
+                        </th>
+                        <th
+                          style={{
+                            borderBottom: "1px solid #1f2937",
+                            padding: "4px 6px",
+                          }}
+                        >
+                          Puppy Sales
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {yearStats.map((row) => (
+                        <tr key={row.year}>
+                          <td
+                            style={{
+                              borderBottom: "1px solid #020617",
+                              padding: "4px 6px",
+                            }}
+                          >
+                            {row.year}
+                          </td>
+                          <td
+                            style={{
+                              borderBottom: "1px solid #020617",
+                              padding: "4px 6px",
+                            }}
+                          >
+                            {row.litters}
+                          </td>
+                          <td
+                            style={{
+                              borderBottom: "1px solid #020617",
+                              padding: "4px 6px",
+                            }}
+                          >
+                            {row.puppies}
+                          </td>
+                          <td
+                            style={{
+                              borderBottom: "1px solid #020617",
+                              padding: "4px 6px",
+                            }}
+                          >
+                            {`$${row.totalSales.toLocaleString("en-US", {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })}`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p style={{ fontSize: 12, opacity: 0.7 }}>
+                  No litters or puppies recorded yet for this dog.
+                </p>
+              )}
+            </section>
+
+            {/* Litters detail with puppy chips */}
+            <section
+              style={{
+                marginTop: 14,
+                paddingTop: 10,
+                borderTop: "1px solid #1f2937",
+              }}
+            >
+              <h3 style={{ fontSize: 14, margin: "0 0 6px" }}>
+                Litters (Detail)
+              </h3>
+              {detail.litters.length === 0 && (
+                <p style={{ fontSize: 12, opacity: 0.7 }}>
+                  No litters have been linked to this dog yet.
+                </p>
+              )}
+              {detail.litters.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: 12,
+                  }}
+                >
+                  {detail.litters.map((litter) => {
+                    const pups = pupsByLitter[litter.id] || [];
+                    return (
+                      <div
+                        key={litter.id}
+                        style={{
+                          borderRadius: 10,
+                          border: "1px solid #1f2937",
+                          padding: "6px 8px",
+                          background: "#020617",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 8,
+                          }}
+                        >
+                          <div>
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: 13,
+                              }}
+                            >
+                              {litter.litter_name || "Unnamed litter"}
+                            </div>
+                            <div style={{ opacity: 0.7 }}>
+                              Whelped:{" "}
+                              {formatDate(
+                                litter.whelp_date || litter.expected_date
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ opacity: 0.7 }}>Puppies</div>
+                            <div style={{ fontWeight: 600 }}>
+                              {pups.length}
+                            </div>
+                          </div>
+                        </div>
+                        {pups.length > 0 && (
+                          <div
+                            style={{
+                              marginTop: 4,
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 4,
+                            }}
+                          >
+                            {pups.map((p) => (
+                              <span
+                                key={p.id}
+                                style={{
+                                  borderRadius: 999,
+                                  border: "1px solid #1f2937",
+                                  padding: "2px 8px",
+                                  fontSize: 11,
+                                  opacity: 0.85,
+                                }}
+                              >
+                                {p.name || "Puppy"} •{" "}
+                                {p.status || "status unknown"} •{" "}
+                                {typeof p.price === "number"
+                                  ? `$${p.price.toLocaleString("en-US", {
+                                      minimumFractionDigits: 0,
+                                      maximumFractionDigits: 0,
+                                    })}`
+                                  : "no price"}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </section>
+    </section>
+  );
+}
