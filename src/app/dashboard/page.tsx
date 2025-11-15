@@ -5,9 +5,8 @@
    CHANGELOG
    - 2025-11-14: Re-themed user dashboard to
                  match main portal (dark + gold).
-   - 2025-11-14: Left sidebar with same style as
-                 app/page.tsx, but for logged-in users.
-   - 2025-11-14: Compact overview cards + quick links.
+   - 2025-11-14: Lightened backgrounds so text
+                 is easier to read (less “pure black”).
    ============================================ */
 
 import React from "react";
@@ -44,7 +43,7 @@ export default function DashboardPage() {
   return (
     <main>
       <div className="shell">
-        {/* SIDEBAR (matches portal look) */}
+        {/* SIDEBAR */}
         <aside className="sidebar">
           <div className="brand">
             <div className="pupmark" aria-hidden>
@@ -215,13 +214,13 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* STYLES (mirrors app/page.tsx theme) */}
+      {/* STYLES */}
       <style jsx>{`
         :root {
           --bg: #020617;
-          --panelBorder: #111827;
+          --panelBorder: #1f2937; /* lighter border than before */
           --ink: #f9fafb;
-          --muted: #9ca3af;
+          --muted: #d1d5db; /* a bit brighter for older eyes */
           --brand: #e0a96d;
           --brandAlt: #c47a35;
         }
@@ -231,7 +230,7 @@ export default function DashboardPage() {
           background:
             radial-gradient(60% 100% at 100% 0%, #020617 0%, transparent 60%),
             radial-gradient(60% 100% at 0% 0%, #111827 0%, transparent 60%),
-            var(--bg);
+            #020617;
           color: var(--ink);
           font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
             sans-serif;
@@ -251,7 +250,7 @@ export default function DashboardPage() {
           background: #020617;
           border-radius: 20px;
           border: 1px solid var(--panelBorder);
-          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.75);
+          box-shadow: 0 14px 30px rgba(0, 0, 0, 0.7);
           padding: 16px 14px 18px;
           display: flex;
           flex-direction: column;
@@ -318,7 +317,7 @@ export default function DashboardPage() {
           width: 100%;
           border-radius: 999px;
           padding: 8px 10px;
-          border: 1px solid #1f2937;
+          border: 1px solid #374151;
           background: #020617;
           color: var(--muted);
           font-size: 13px;
@@ -329,7 +328,7 @@ export default function DashboardPage() {
         .signout:hover {
           background: #111827;
           color: #f9fafb;
-          border-color: #374151;
+          border-color: #4b5563;
         }
 
         .main {
@@ -344,9 +343,13 @@ export default function DashboardPage() {
           padding: 18px 22px;
           border: 1px solid var(--panelBorder);
           background:
-            radial-gradient(120% 220% at 0 0, rgba(224, 169, 109, 0.22), transparent 55%),
-            linear-gradient(145deg, #020617, #020617);
-          box-shadow: 0 24px 50px rgba(0, 0, 0, 0.85);
+            radial-gradient(
+              120% 220% at 0 0,
+              rgba(224, 169, 109, 0.18),
+              transparent 55%
+            ),
+            linear-gradient(145deg, #020617, #0f172a);
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
         }
 
         .header h1 {
@@ -382,8 +385,8 @@ export default function DashboardPage() {
           border-radius: 18px;
           padding: 12px 13px 14px;
           border: 1px solid var(--panelBorder);
-          background: #020617;
-          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.9);
+          background: #111827; /* lighter than pure black */
+          box-shadow: 0 12px 26px rgba(0, 0, 0, 0.75);
           display: flex;
           flex-direction: column;
           gap: 4px;
@@ -421,11 +424,11 @@ export default function DashboardPage() {
           border: 1px solid var(--panelBorder);
           background: radial-gradient(
               120% 220% at 0 0,
-              rgba(15, 23, 42, 0.7),
+              rgba(30, 64, 175, 0.25),
               transparent 55%
             ),
             #020617;
-          box-shadow: 0 22px 45px rgba(0, 0, 0, 0.85);
+          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.8);
           font-size: 14px;
         }
 
@@ -462,7 +465,7 @@ export default function DashboardPage() {
           font-size: 13px;
           text-decoration: none;
           cursor: pointer;
-          border: 1px solid #1f2937;
+          border: 1px solid #374151;
         }
 
         .btn.primary {
@@ -488,7 +491,7 @@ export default function DashboardPage() {
           border-radius: 14px;
           padding: 10px 11px 11px;
           border: 1px solid var(--panelBorder);
-          background: rgba(15, 23, 42, 0.95);
+          background: #111827;
         }
 
         .quickTitle {
@@ -512,8 +515,8 @@ export default function DashboardPage() {
         .supportBox {
           border-radius: 14px;
           padding: 10px 12px 12px;
-          border: 1px dashed #334155;
-          background: rgba(15, 23, 42, 0.95);
+          border: 1px dashed #4b5563;
+          background: #020617;
           margin-top: 4px;
         }
 
@@ -580,10 +583,7 @@ function NavLink({
   children: React.ReactNode;
 }) {
   return (
-    <Link
-      href={href}
-      className={`navItem ${active ? "active" : ""}`}
-    >
+    <Link href={href} className={`navItem ${active ? "active" : ""}`}>
       <span className="navLabel">{children}</span>
       <style jsx>{`
         .navItem {
@@ -592,8 +592,8 @@ function NavLink({
           gap: 8px;
           padding: 9px 12px;
           border-radius: 999px;
-          background: rgba(15, 23, 42, 0.95);
-          border: 1px solid #111827;
+          background: #0b1120;
+          border: 1px solid #1f2937;
           color: #f9fafb;
           text-decoration: none;
           font-size: 13px;
@@ -638,11 +638,7 @@ function InfoCard(props: {
   );
 }
 
-function QuickLink(props: {
-  title: string;
-  body: string;
-  href: string;
-}) {
+function QuickLink(props: { title: string; body: string; href: string }) {
   const { title, body, href } = props;
   return (
     <div className="quickCard">
